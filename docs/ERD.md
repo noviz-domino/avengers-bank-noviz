@@ -19,6 +19,7 @@ erDiagram
     account_products {
         int product_id PK
         string type "CHECKING/DEPOSIT/SAVINGS"
+        smallint product_code "계좌번호 PP, 종류 안에서 1~99 (ADR 0001)"
         string name
         text description
         decimal interest_rate "연 금리(%)"
@@ -168,7 +169,20 @@ erDiagram
 
 DB 구조만으로는 막을 수 없는 부분이라 애플리케이션 코드에서 보장해야 합니다.
 
-1. **계좌번호 중복 방지:** 계좌 테이블이 3개라서 `account_num`이 테이블 사이에서 겹칠 수 있습니다. 계좌번호는 `accounts.service`에서만 발급하고, 세 테이블을 모두 검사합니다.
+1. **계좌번호 형식:** `110-TPP-NNNNNN` (예: `110-101-000001`). 결정 이유: [ADR 0001](decisions/0001-account-number-format.md)
+
+   | 자리 | 뜻 |
+   |---|---|
+   | `110` | 은행 코드 (고정) |
+   | `T` | 계좌 종류: `1` 입출금, `2` 예금, `3` 적금 (`4` 대출 예약) |
+   | `PP` | 상품 코드 (`account_products.product_code`, 종류 안에서 01~99) |
+   | `NNNNNN` | 일련번호 (000001~999999) |
+
+   - 종류 코드가 테이블마다 달라서 세 계좌 테이블 사이에서는 번호가 겹칠 수 없고, 번호만 보고 어느 테이블인지 알 수 있습니다(`account_type_of`, 형식이 틀리면 `None`).
+   - 각 계좌 테이블의 CHECK 제약이 **종류 코드와 길이**가 틀린 번호를 거부합니다. 숫자인지는 DB가 검사하지 않으므로(테스트용 SQLite 호환) `make_account_num`이 보장합니다.
+   - 상품 코드는 `product_id`(내부 번호)와 별개이며, `(type, product_code)`가 unique입니다.
+   - 규칙은 `domains/accounts/account_number.py` 한 곳에 있습니다. 번호는 `make_account_num`으로만 만듭니다.
+   - 같은 테이블 안의 일련번호 중복은 `unique` 제약이 막습니다. 동시에 개설할 때 생기는 `IntegrityError`는 개설 기능을 구현할 때 처리합니다.
 2. **돈 이동은 한 트랜잭션으로:** 이체, 적금 납입, 체크카드 결제는 잔액 변경과 History 저장(양쪽 모두)을 `async with db.begin():` 블록 하나 안에서 처리합니다.
 3. **상품 종류 검증:** 계좌를 개설하거나 카드를 발급할 때 상품의 `type`이 계좌·카드 종류와 맞는지 확인합니다.
 4. **`accumulated_amount` 동기화:** 카드 History를 저장할 때 이 값도 같이 증가시킵니다.
@@ -177,5 +191,6 @@ DB 구조만으로는 막을 수 없는 부분이라 애플리케이션 코드�
 ## 팀에서 정해야 할 것
 
 - 각 `type` 컬럼에 들어갈 값 목록 (예: 거래내역 `DEPOSIT`, `WITHDRAW`, `TRANSFER_IN`, `TRANSFER_OUT`, `CARD_PAYMENT`)
-- 계좌번호와 카드번호를 만드는 형식
+- 카드번호를 만드는 형식 (계좌번호는 위 규칙 1로 결정)
+- 일련번호 발급 방식 (DB 시퀀스 추천)
 - 이체 한도 기본값
