@@ -68,6 +68,17 @@ uv run pytest
 
 테스트는 SQLite로 돌아가서 PostgreSQL 없이도 실행됩니다.
 
+### CI
+
+PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.yml`](.github/workflows/ci.yml))가 두 가지를 검사합니다.
+
+| 검사 | 하는 일 |
+|---|---|
+| 테스트 (pytest) | `uv run pytest` |
+| 마이그레이션 (PostgreSQL) | 빈 PostgreSQL에 `alembic upgrade head` → `alembic check`(모델과 마이그레이션이 맞는지) → `alembic downgrade base` → 다시 `upgrade head` |
+
+두 번째 검사는 **PostgreSQL에서 마이그레이션이 적용되고 되돌려지는지**를 확인합니다(테스트는 SQLite로 테이블을 바로 만들어서 마이그레이션 파일을 거치지 않습니다). `alembic check`는 CHECK 제약 변경을 감지하지 못해서, CHECK 내용이 모델과 같은지는 `tests/test_account_number.py`가 맡습니다. 새 도메인의 `models.py`를 `alembic/env.py`에 import했는지는 `tests/test_alembic_env.py`가 확인합니다.
+
 ## 현재 상태
 
 | 도메인 | 상태 |
