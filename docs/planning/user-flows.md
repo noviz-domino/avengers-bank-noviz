@@ -111,8 +111,8 @@ flowchart LR
     C -- 예 --> P2(["결제<br/>(기록만 남김)"])
     C -- 아니오 --> D{"결제 금액 ≤<br/>자유 사용 가능액?"}
     D -- 예 --> P3([결제])
-    D -- 아니오 --> E["확인 요청 + 확인 번호<br/>#quot;월세 낼 돈이 부족해져요#quot;"]:::ask
-    E --> F{"사용자가 확인 화면에서<br/>직접 선택 (Agent 불가)"}
+    D -- 아니오 --> E["확인 요청 + 승인 대기 작업<br/>#quot;월세 낼 돈이 부족해져요#quot;"]:::ask
+    E --> F{"사용자가 승인 화면에서<br/>PIN·패스키로 선택 (Agent 불가)"}
     F -- 사유 적고 확인 --> R{"다시 검사:<br/>그사이 더 나빠졌나?"}
     R -- 아니오 --> P4(["결제<br/>(사유 기록)"])
     R -- 예 --> E
@@ -173,10 +173,10 @@ README의 "실패 상황 동작 확인"에 쓸 후보입니다. 구현하면서 
 
 ## 테이블 이름 대응
 
-| 흐름에 적힌 이름 (FigJam 초안) | 현재 ERD (`docs/ERD.md`) |
+| 흐름에 적힌 이름 (FigJam 초안) | 현재 ERD (`docs/ERD.md`, ADR 0003) |
 |---|---|
 | `users` | `users` |
-| `accounts` | `checking_accounts`, `deposit_accounts`, `savings_accounts` |
-| `transactions` | `checking_account_histories`, `deposit_account_histories`, `savings_account_histories` |
-| `card_payments` | `credit_card_histories`, `debit_card_histories` |
-| `loan_schedules` | 없음 (대출 테이블 미정) |
+| `accounts` | `accounts` (+ 예·적금은 `account_terms`) |
+| `transactions` | `account_transactions` |
+| `card_payments` | `card_transactions` |
+| `loan_schedules` | `loan_schedules` |
