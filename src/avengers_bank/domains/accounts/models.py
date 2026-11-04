@@ -1,15 +1,28 @@
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, SmallInteger, String, func
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    SmallInteger,
+    String,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from avengers_bank.core.database import Base
+from avengers_bank.domains.accounts.account_number import check_constraint_sql
 
 
 class CheckingAccount(Base):
     """입출금 계좌"""
 
     __tablename__ = "checking_accounts"
+    __table_args__ = (
+        CheckConstraint(check_constraint_sql("checking"), name="ck_checking_accounts_account_num"),
+    )
 
     checking_account_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
@@ -30,6 +43,9 @@ class DepositAccount(Base):
     """예금 계좌"""
 
     __tablename__ = "deposit_accounts"
+    __table_args__ = (
+        CheckConstraint(check_constraint_sql("deposit"), name="ck_deposit_accounts_account_num"),
+    )
 
     deposit_account_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
@@ -49,6 +65,9 @@ class SavingsAccount(Base):
     """적금 계좌"""
 
     __tablename__ = "savings_accounts"
+    __table_args__ = (
+        CheckConstraint(check_constraint_sql("savings"), name="ck_savings_accounts_account_num"),
+    )
 
     savings_account_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
