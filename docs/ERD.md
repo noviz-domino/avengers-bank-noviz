@@ -117,10 +117,12 @@ erDiagram
 
 | 승인 필요 (`pending_actions` + PIN, 나중에 패스키) | 바로 실행 |
 |---|---|
-| 이체·출금 (**웹에서 시작해도** PIN) | 예산 안 카드 결제, 필수 업종·긴급 결제 ([budget.md](planning/budget.md) "결제 검사") |
+| 이체·출금 (**웹에서 시작해도** PIN) | 예산 안 카드 결제, 항상 통과 업종의 카드 결제 ([budget.md](planning/budget.md) "결제 검사") |
 | 대출 **실행** (계좌로 입금) | 대출 **신청**·자동 심사 (돈이 움직이지 않음) |
-| 예산 초과 결제 확인 | 월급·이자 같은 시스템 입금, 주기 끝 목표 저축 이체 (사용자가 예산 신청 때 정함) |
+| 예산 초과 확인 (카드 결제는 따로, 이체는 이체 승인과 같은 PIN 한 번) | 월급·이자 같은 시스템 입금, 주기 끝 목표 저축 이체 (사용자가 예산 신청 때 정함) |
 | 카드 정지 **해제** | 카드 **정지** (분실 신고는 바로) |
+| 예산 검사를 **약하게** 하는 변경 (목록: [ADR 0007](decisions/0007-money-execution-and-budget-guard.md#가드를-약하게-하는-변경)) | 예산 검사를 **강하게** 하는 변경 (같은 표) |
+| 잔액이 남은 계좌 해지: 남은 돈을 먼저 이체(승인) | 잔액 0인 계좌 해지 |
 
 ### 승인·실행 규칙 (ADR 0004)
 
@@ -129,7 +131,7 @@ erDiagram
 3. 같은 트랜잭션 안에서 **실행 직전에 다시 검사**합니다: 계좌 소유권·상태·잔액·한도. 실패하면 `FAILED` + `failure_reason`.
 4. 실행하면 장부 줄에 `action_id`를 남기고 `EXECUTED`로 바꿉니다. 승인 → 실행이 **한 트랜잭션**이어서 서버가 중간에 죽으면 통째로 되돌아가 `PENDING`으로 남습니다. `APPROVED`로 멈춘 행은 생기지 않습니다.
 5. `summary`는 Agent가 쓴 문장이 아니라 **서버가 payload로 만듭니다** ("5만 원"이라 적고 실제로 500만 원을 보내는 것 방지).
-6. `idempotency_key`는 **요청한 쪽**(웹·Agent·MCP)이 만들고, `(user_id, idempotency_key)`가 unique입니다. 같은 키가 다시 오면 새 행을 만들지 않고 기존 행을 돌려줍니다. 예산 재확인은 **같은 행을 갱신**합니다(payload·summary 다시 생성, `expires_at` 연장).
+6. `idempotency_key`는 **요청한 쪽**(웹·Agent·MCP)이 만들고, `(user_id, idempotency_key)`가 unique입니다. 같은 키가 다시 오면 새 행을 만들지 않고 기존 행을 돌려줍니다. 예산을 넘는 건이 실행 때 승인 때보다 나빠지면 `FAILED`로 끝나고, 사용자가 새 키로 다시 요청합니다([ADR 0007](decisions/0007-money-execution-and-budget-guard.md)).
 7. PIN을 5번 틀리면 `pin_locked_until`만 잠깁니다. **로그인은 잠기지 않아서** 토큰을 가진 Agent가 PIN을 틀려도 사용자를 쫓아낼 수 없습니다. PIN 실패 횟수는 PIN이 맞으면 0으로 돌아갑니다.
 
 ### 거래 종류 (`tx_type`)
@@ -162,7 +164,7 @@ erDiagram
 | 대출 | `loans` | user_id, product_id, loan_num(110-4PP-…), account_id, principal, remaining_principal, applied_rate, term_months, status. `account_products`에 `income_multiplier`(한도 = 연소득 × 배수) 추가 |
 | 대출 | `loan_schedules` | loan_id, seq, due_date, principal_amount, interest_amount, status, paid_tx_id |
 | 예산 | `product_preferential_rates` | product_id, code, description, rate |
-| 예산 | `categories` | name, is_essential, is_daily, always_pass |
+| 예산 | `categories` | name, is_essential, is_daily, default_always_pass (신청 때 보여 줄 추천값. 실제 설정은 사용자별로 `budget_profiles`에, ADR 0007) |
 | 예산 | `budget_profiles`, `fixed_expenses`, `savings_goals`, `budget_cycles`, `budget_decisions` | [budget.md](planning/budget.md) 참고. `budget_cycles`가 결제 검사 때 잠그는 행 |
 | Agent | `recipients` | user_id, bank_name, account_num, holder_name, nickname, last_sent_at |
 | Agent | `chat_messages` | user_id, session_id, channel(WEB/MCP), role, content, intent, action_id |
@@ -188,6 +190,7 @@ DB 제약으로 막는 것은 ✅, 코드에서 지켜야 하는 것은 📝입�
 | 10 | (카드·대출 이후) **카드·대출의 `user_id`는 연결 계좌의 `user_id`와 같아야 함** | 📝 만들 때 검사 |
 | 11 | (카드 이후) **카드 누적 사용액은 저장하지 않고 계산** | 📝 동기화 버그 방지 |
 | 12 | **1일 이체 한도는 오늘 `TRANSFER_OUT` 합계**로 계산 (내 계좌끼리 이동·카드 결제는 넣지 않음) | 📝 |
+| 13 | **잔액·장부를 바꾸는 일은 모두 실행 함수 하나를 지남**. 잔액을 바꾸는 코드는 그 함수 안에만 있고, 예산 가드(지출만)도 거기 하나 ([ADR 0007](decisions/0007-money-execution-and-budget-guard.md)) | 📝 |
 
 ## 팀에서 정해야 할 것
 

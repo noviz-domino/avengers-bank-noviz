@@ -1,6 +1,6 @@
 # 0004. Agent 연결 구조: REST API 위의 MCP, 승인은 서버가 강제
 
-- 상태: 제안 (이 PR에서 리뷰)
+- 상태: 제안, 일부 변경 (→ [0006](0006-agent-orchestration.md): MCP 도구 목록을 도메인별로 다시 정함)
 - 날짜: 2026-11-04
 - 관련 PR: #4
 
@@ -42,6 +42,8 @@ service (규칙) ──┼─ REST API (FastAPI) ──┬─ 우리 LangGraph A
 | **서버가 `pending_actions` + PIN·패스키로 강제** | **채택**. Agent는 사용자 토큰은 가질 수 있어도 PIN 입력 화면과 기기의 패스키는 가질 수 없음 |
 
 ## MCP 도구 목록 (초안)
+
+> 이 목록은 [ADR 0006](0006-agent-orchestration.md)의 도메인별 도구 표로 바뀌었습니다. 아래는 처음 초안입니다.
 
 | 도구 | 종류 | 동작 |
 |---|---|---|
