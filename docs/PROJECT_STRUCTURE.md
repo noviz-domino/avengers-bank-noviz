@@ -13,7 +13,10 @@ avengers-bank/
 ├── alembic/                # DB 마이그레이션
 │   ├── env.py              # 모든 models.py를 import해서 테이블 정보를 모음
 │   └── versions/           # 마이그레이션 파일이 쌓이는 곳
-├── docs/                   # 팀 공유 문서 (ERD, API, 구조)
+├── CLAUDE.md               # Claude Code 작업 규칙 (변경 시 문서화)
+├── Dockerfile, compose.yaml # Docker 실행 (app + PostgreSQL)
+├── docs/                   # 문서 목차: docs/README.md
+│   └── decisions/          # 설계 결정 기록(ADR): 왜 바꿨는지
 ├── tests/                  # pytest (SQLite로 실행, DB 서버 불필요)
 │   ├── conftest.py
 │   └── test_users.py
@@ -30,7 +33,7 @@ avengers-bank/
     └── domains/
         ├── users/          # 회원가입, 로그인, 내 정보          ✅ 구현됨
         ├── products/       # 계좌·카드 상품 조회                📝 모델만
-        ├── accounts/       # 입출금·예금·적금 계좌, 거래내역      📝 모델만
+        ├── accounts/       # 입출금·예금·적금 계좌, 거래내역      📝 모델 + 계좌번호 규칙(account_number.py)
         ├── transfers/      # 이체, 적금 납입, 예금 입금 (테이블 없음) 📝
         └── cards/          # 신용·체크카드, 사용내역, 결제       📝 모델만
 ```
