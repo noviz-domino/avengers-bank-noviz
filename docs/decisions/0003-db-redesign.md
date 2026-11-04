@@ -2,7 +2,7 @@
 
 - 상태: 제안 (이 PR에서 리뷰)
 - 날짜: 2026-11-04
-- 관련 PR: (이 문서를 추가하는 PR)
+- 관련 PR: #4
 - 새 ERD: [docs/ERD.md](../ERD.md)
 
 ## 결정
@@ -10,8 +10,8 @@
 1. **계좌는 `accounts` 한 테이블**에 `account_type`(입출금·예금·적금)으로 구분한다. 예·적금에만 있는 조건(확정 금리, 만기일, 월 납입금)은 1:1 테이블 `account_terms`로 뺀다.
 2. **거래는 `account_transactions` 하나의 장부**에 쌓는다. 금액은 부호로 방향을 나타내고(+ 들어옴, − 나감), 거래 후 잔액·상대방·메모·카테고리·거래 종류를 모두 둔다. 이체 두 줄은 `transfer_id`로 묶는다.
 3. **카드는 `cards` + `card_transactions`** 두 테이블로 체크·신용을 함께 담는다. 누적 사용액은 저장하지 않고 계산한다.
-4. **돈이 움직이는 모든 요청은 `pending_actions`를 거친다.** 사람이 승인해야 실행된다(ADR 0004).
-5. **ERD에는 지금 구현하는 테이블만 그린다.** 첫 구현은 6개(`users`, `account_products`, `accounts`, `account_terms`, `account_transactions`, `pending_actions`)이고, 나머지는 ERD의 "예정" 표에 두었다가 그 기능의 PR에서 추가한다. 최종 약 23개.
+4. **사람(또는 Agent)이 시작한 출금·이체·대출 실행·예산 초과 결제는 `pending_actions`를 거친다.** 사람이 승인해야 실행된다. 예산 안 결제, 시스템 입금, 카드 정지는 바로 실행한다(목록: [ERD](../ERD.md) "승인이 필요한 것과 바로 실행하는 것", ADR 0004).
+5. **ERD에는 지금 구현하는 테이블만 그린다.** 첫 구현은 6개(`users`, `account_products`, `accounts`, `account_terms`, `account_transactions`, `pending_actions`)이고, 나머지는 ERD의 "예정" 표에 두었다가 그 기능의 PR에서 추가한다. 최종 25개(핵심 6 + 예정 19, 2차인 `passkeys`와 나중인 `notifications` 포함).
 6. **다른 테이블이 이미 하는 일은 테이블로 만들지 않는다** (아래 "만들지 않는 테이블").
 
 ## 배경
@@ -71,7 +71,7 @@
 
 | 테이블 | 결과 | 이유 |
 |---|---|---|
-| `idempotency_keys` | 뺌 | 돈 이동은 전부 `pending_actions`를 거치고, 거기 `idempotency_key`(unique)가 같은 일을 함 |
+| `idempotency_keys` | 뺌 | 승인이 필요한 돈 이동은 `pending_actions`를 거치고, 거기 `(user_id, idempotency_key)` unique가 같은 일을 함. 바로 실행하는 카드 결제는 카드 기능 PR에서 `card_transactions`에 같은 방식으로 둔다 |
 | `rag_documents` | 뺌 | 출처·제목은 `rag_chunks.metadata`로 충분 |
 | `chat_sessions` | 뺌 | `chat_messages.session_id`로 대화 목록을 묶을 수 있고, 대화 맥락은 LangGraph가 저장 |
 | `verification_codes` | 뺌 | 휴대폰 본인확인을 범위에서 뺌 (ADR 0005) |
@@ -91,11 +91,11 @@
 - 조회·이체·거래내역·검색·분석이 **계좌 종류와 상관없이 한 번씩만** 구현된다.
 - Agent 도구가 단순해진다: `get_my_accounts`, `search_transactions` 하나로 모든 계좌를 다룬다.
 - 예산 관리의 "돈의 종류"를 장부의 `tx_type`으로 바로 구분할 수 있다.
-- 돈 이동이 모두 `pending_actions`를 거쳐서, 승인·실행·실패 기록이 한 곳에 남는다.
+- 승인이 필요한 돈 이동은 `pending_actions`를 거치고 장부 줄에 `action_id`가 남아서, 승인·실행·실패를 따라갈 수 있다.
 
 **감수할 점**
 - **팀 뼈대 ERD와 크게 달라진다.** 매일 아침 공유 때 이 문서로 차이를 설명한다(아래 "팀 뼈대와의 차이").
-- 테이블은 첫 구현 6개에서 시작해 최종 약 23개가 된다(팀 뼈대 13개). 한 번에 다 만들지 않고 **구현 순서대로 마이그레이션을 나눠** 추가한다.
+- 테이블은 첫 구현 6개에서 시작해 최종 25개가 된다(팀 뼈대 13개). 한 번에 다 만들지 않고 **구현 순서대로 마이그레이션을 나눠** 추가한다.
 - 예·적금 상세를 볼 때 `account_terms` 조인이 필요하다.
 - `rag_chunks`(pgvector)는 SQLite 테스트에서 만들 수 없다. PostgreSQL CI 검사로 확인한다.
 
@@ -107,11 +107,15 @@
 
 **마이그레이션 방법**
 - 아직 데이터가 없는 테이블(계좌·거래·카드)은 **새 마이그레이션에서 지우고 새로 만든다.** 기존 마이그레이션 파일은 고치지 않는다.
-- `users`에는 컬럼을 추가한다(기존 회원가입 기능 유지).
-- 구현 순서대로 나눈다: ① 핵심 6개(회원 확장·상품·계좌·장부·승인 대기) → ② 보안 보강 → ③ 카드 → ④ 대출 → ⑤ 예산 → ⑥ Agent·RAG.
+- PK는 지금처럼 `int`로 둔다. 타입 변경 마이그레이션이 필요 없고 SQLite 테스트에서도 자동 증가한다.
+- `users`에는 컬럼을 추가한다(기존 회원가입 기능 유지). 기존 행이 있는 DB에서도 실패하지 않게 `birth_date`는 NULL 허용, `marketing_agreed`는 `server_default=false`, 실패 횟수는 `server_default=0`으로 넣는다. 회원가입 API에 생년월일·마케팅 동의 입력이 생긴다.
+- `account_products`: `interest_rate` → `base_rate`로 바꾸고 우대 상한·기간·금액·나이·특판 칸을 추가한다. `product_code`(ADR 0001)는 그대로.
+- `card_products`와 카드 테이블은 **첫 구현 마이그레이션에서 지운다.** 같은 PR에서 `domains/cards/models.py`의 옛 모델, `alembic/env.py`·`tests/conftest.py`의 import, 서비스 주석의 옛 모델 이름도 지운다(남기면 autogenerate가 다시 만든다). 카드 기능 PR에서 새 구조로 다시 만든다.
+- `tests/test_account_number.py`의 `test_migration_checks_match_models`는 지금 b46530c30681을 직접 읽는다. 새 CHECK를 넣는 마이그레이션으로 바꾼다.
+- 구현 순서대로 나눈다: ① 핵심 6개(회원 확장과 로그인·PIN 잠금 컬럼, 상품, 계좌, 장부, 승인 대기) → ② 보안 보강(`refresh_tokens`, `audit_logs`) → ③ 카드 → ④ 대출 → ⑤ 예산 → ⑥ Agent·RAG. [scope.md](../planning/scope.md) "구현 순서"와 같다.
 
 **함께 바뀌는 문서 (구현 PR에서)**
-- `docs/API_ENDPOINTS.md`: `/accounts/{type}/{id}` → `/accounts/{id}`처럼 종류별 경로가 하나로 합쳐짐
+- `docs/API_ENDPOINTS.md`: `/accounts/{type}/{id}` → `/accounts/{id}`처럼 종류별 경로가 하나로 합쳐짐. 회원가입 요청에 생년월일·마케팅 동의 추가
 - `docs/PROJECT_STRUCTURE.md`: `domains/` 아래에 `loans`, `budget`, `agent`, `auth` 등 추가
 
 **팀 뼈대와의 차이**

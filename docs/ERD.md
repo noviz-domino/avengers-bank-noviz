@@ -1,6 +1,6 @@
 # ER 다이어그램
 
-> **계좌·거래는 종류마다 테이블을 나누지 않고 하나씩 둔다. 돈이 움직이는 일은 모두 "승인 대기 작업"을 거치고, 거래는 하나의 장부에 쌓인다.**
+> **계좌·거래는 종류마다 테이블을 나누지 않고 하나씩 둔다. 사람(또는 Agent)이 시작한 출금·이체·대출 실행·예산 초과 결제는 "승인 대기 작업"을 거치고, 모든 거래는 하나의 장부에 쌓인다.**
 
 결정 이유: [ADR 0003 DB 재설계](decisions/0003-db-redesign.md) · Agent와 승인: [ADR 0004](decisions/0004-agent-integration.md) · 인증: [ADR 0005](decisions/0005-auth.md)
 
@@ -17,8 +17,9 @@ erDiagram
     accounts ||--o| account_terms : "예·적금만"
     accounts ||--o{ account_transactions : "장부"
     users ||--o{ pending_actions : "승인 대기"
+    pending_actions |o--o{ account_transactions : "실행 결과"
     users {
-        bigint user_id PK
+        int user_id PK
         string login_id UK
         string hashed_password
         string name
@@ -29,11 +30,12 @@ erDiagram
         string transaction_pin_hash "NULL, 거래 PIN"
         smallint pin_fail_count
         smallint login_fail_count
-        datetime locked_until "NULL, 5회 실패 시 잠금"
+        datetime login_locked_until "NULL, 로그인 5회 실패"
+        datetime pin_locked_until "NULL, PIN 5회 실패"
         datetime created_at
     }
     account_products {
-        bigint product_id PK
+        int product_id PK
         string type "CHECKING / DEPOSIT / SAVINGS / LOAN"
         smallint product_code "계좌번호 PP, 종류 안에서 1~99"
         string name
@@ -51,9 +53,9 @@ erDiagram
         bool is_active
     }
     accounts {
-        bigint account_id PK
-        bigint user_id FK
-        bigint product_id FK
+        int account_id PK
+        int user_id FK
+        int product_id FK
         string account_type "CHECKING / DEPOSIT / SAVINGS"
         string account_num UK "110-TPP-NNNNNN"
         string nickname "NULL"
@@ -65,7 +67,7 @@ erDiagram
         datetime closed_at "NULL"
     }
     account_terms {
-        bigint account_id PK "FK accounts"
+        int account_id PK "FK accounts"
         numeric applied_rate "가입 당시 확정 금리"
         json rate_detail "적용된 우대 내역"
         date maturity_date
@@ -73,8 +75,9 @@ erDiagram
         smallint payment_day "적금 납입일 1~31"
     }
     account_transactions {
-        bigint tx_id PK
-        bigint account_id FK
+        int tx_id PK
+        int account_id FK
+        uuid action_id FK "NULL, 어느 승인이 만든 줄인지"
         uuid transfer_id "NULL, 이체 두 줄을 묶음"
         string tx_type "아래 표"
         bigint amount "들어오면 +, 나가면 -"
@@ -87,14 +90,14 @@ erDiagram
     }
     pending_actions {
         uuid action_id PK
-        bigint user_id FK
+        int user_id FK
         string action_type "TRANSFER / CARD_PAYMENT / LOAN_EXECUTE / BUDGET_CONFIRM …"
         json payload "실행할 내용"
-        text summary "승인 화면에 보여줄 문장"
+        text summary "승인 화면 문장, 서버가 payload로 생성"
         string requested_by "WEB / AGENT / MCP"
         string status "PENDING / APPROVED / REJECTED / EXPIRED / EXECUTED / FAILED"
         string approval_method "NULL, PIN / PASSKEY"
-        string idempotency_key UK "같은 요청 두 번 방지"
+        string idempotency_key "user_id와 함께 unique"
         datetime expires_at "10분"
         datetime approved_at "NULL"
         datetime executed_at "NULL"
@@ -105,7 +108,29 @@ erDiagram
 
 - `account_products`: `(type, product_code)` unique, `product_code` 1~99 (ADR 0001). 대출 상품도 `type = LOAN`으로 여기에 둡니다.
 - `account_terms.rate_detail` 예: `[{"code": "SALARY_TRANSFER", "rate": 0.5}, {"code": "MARKETING_AGREED", "rate": 0.2}]`. 가입할 때 한 번 정해지고 바뀌지 않습니다.
-- 돈이 움직이는 요청은 **바로 실행하지 않고 `pending_actions`를 만든 뒤, 사용자가 PIN(나중에 패스키)으로 승인해야** 실행합니다. 상태는 `PENDING → APPROVED → EXECUTED` 순서로만 바뀌어서 한 번만 실행됩니다(ADR 0004).
+- PK는 `int`입니다(현재 코드와 같음). SQLite 테스트에서 `BIGINT PRIMARY KEY`는 자동 증가하지 않기 때문입니다. 금액 칸(`balance`, `amount`, 한도 등)만 `bigint`입니다.
+- `account_transactions`에 `(account_id, created_at)` 인덱스를 둡니다. 거래내역 조회와 1일 한도 계산이 이 순서로 찾습니다.
+
+### 승인이 필요한 것과 바로 실행하는 것
+
+**나쁜 일이 생길 수 있는 쪽만 승인을 받습니다.** 안전해지는 쪽(카드 정지)과 사람이 시작하지 않은 것(월급·이자)은 바로 실행합니다.
+
+| 승인 필요 (`pending_actions` + PIN, 나중에 패스키) | 바로 실행 |
+|---|---|
+| 이체·출금 (**웹에서 시작해도** PIN) | 예산 안 카드 결제, 필수 업종·긴급 결제 ([budget.md](planning/budget.md) "결제 검사") |
+| 대출 **실행** (계좌로 입금) | 대출 **신청**·자동 심사 (돈이 움직이지 않음) |
+| 예산 초과 결제 확인 | 월급·이자 같은 시스템 입금, 주기 끝 목표 저축 이체 (사용자가 예산 신청 때 정함) |
+| 카드 정지 **해제** | 카드 **정지** (분실 신고는 바로) |
+
+### 승인·실행 규칙 (ADR 0004)
+
+1. 승인 요청은 **`action_id` + PIN만** 받습니다. payload는 받지 않습니다(바꿔치기 방지).
+2. 승인은 조건부 UPDATE 하나로 시작합니다: `UPDATE pending_actions SET status='APPROVED' WHERE action_id=:id AND user_id=:me AND status='PENDING' AND expires_at > now()`. 바뀐 행이 0이면 거절합니다. 동시에 두 번 승인해도 한 번만 통과하고, 만료를 따로 처리하는 배치가 없어도 시간이 지나면 승인되지 않습니다.
+3. 같은 트랜잭션 안에서 **실행 직전에 다시 검사**합니다: 계좌 소유권·상태·잔액·한도. 실패하면 `FAILED` + `failure_reason`.
+4. 실행하면 장부 줄에 `action_id`를 남기고 `EXECUTED`로 바꿉니다. 승인 → 실행이 **한 트랜잭션**이어서 서버가 중간에 죽으면 통째로 되돌아가 `PENDING`으로 남습니다. `APPROVED`로 멈춘 행은 생기지 않습니다.
+5. `summary`는 Agent가 쓴 문장이 아니라 **서버가 payload로 만듭니다** ("5만 원"이라 적고 실제로 500만 원을 보내는 것 방지).
+6. `idempotency_key`는 **요청한 쪽**(웹·Agent·MCP)이 만들고, `(user_id, idempotency_key)`가 unique입니다. 같은 키가 다시 오면 새 행을 만들지 않고 기존 행을 돌려줍니다. 예산 재확인은 **같은 행을 갱신**합니다(payload·summary 다시 생성, `expires_at` 연장).
+7. PIN을 5번 틀리면 `pin_locked_until`만 잠깁니다. **로그인은 잠기지 않아서** 토큰을 가진 Agent가 PIN을 틀려도 사용자를 쫓아낼 수 없습니다. PIN 실패 횟수는 PIN이 맞으면 0으로 돌아갑니다.
 
 ### 거래 종류 (`tx_type`)
 
@@ -162,6 +187,7 @@ DB 제약으로 막는 것은 ✅, 코드에서 지켜야 하는 것은 📝입�
 | 9 | **승인은 사람만**: `pending_actions` 승인 API는 PIN·패스키가 필요하고, Agent·MCP 도구에는 없음 | 📝 (ADR 0004) |
 | 10 | (카드·대출 이후) **카드·대출의 `user_id`는 연결 계좌의 `user_id`와 같아야 함** | 📝 만들 때 검사 |
 | 11 | (카드 이후) **카드 누적 사용액은 저장하지 않고 계산** | 📝 동기화 버그 방지 |
+| 12 | **1일 이체 한도는 오늘 `TRANSFER_OUT` 합계**로 계산 (내 계좌끼리 이동·카드 결제는 넣지 않음) | 📝 |
 
 ## 팀에서 정해야 할 것
 
