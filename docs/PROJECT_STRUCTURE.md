@@ -15,7 +15,7 @@ avengers-bank/
 │   └── versions/           # 마이그레이션 파일이 쌓이는 곳
 ├── CLAUDE.md               # Claude Code 작업 규칙 (변경 시 문서화)
 ├── Dockerfile, compose.yaml # Docker 실행 (app + PostgreSQL)
-├── .github/workflows/ci.yml # CI: PR마다 pytest + PostgreSQL 마이그레이션 검사
+├── .github/workflows/ci.yml # CI: PR과 main push마다 pytest + PostgreSQL 마이그레이션 검사
 ├── docs/                   # 문서 목차: docs/README.md
 │   └── decisions/          # 설계 결정 기록(ADR): 왜 바꿨는지
 ├── tests/                  # pytest (SQLite로 실행, DB 서버 불필요)
