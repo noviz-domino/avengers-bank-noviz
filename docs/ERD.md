@@ -121,6 +121,7 @@ erDiagram
 | 대출 **실행** (계좌로 입금) | 대출 **신청**·자동 심사 (돈이 움직이지 않음) |
 | 예산 초과 결제 확인 | 월급·이자 같은 시스템 입금, 주기 끝 목표 저축 이체 (사용자가 예산 신청 때 정함) |
 | 카드 정지 **해제** | 카드 **정지** (분실 신고는 바로) |
+| 예산 검사를 **약하게** 하는 설정 변경 (항상 통과 업종 추가 등, [ADR 0007](decisions/0007-money-execution-and-budget-guard.md)) | 예산 검사를 **강하게** 하는 설정 변경 (항상 통과 해제 등) |
 
 ### 승인·실행 규칙 (ADR 0004)
 
@@ -162,7 +163,7 @@ erDiagram
 | 대출 | `loans` | user_id, product_id, loan_num(110-4PP-…), account_id, principal, remaining_principal, applied_rate, term_months, status. `account_products`에 `income_multiplier`(한도 = 연소득 × 배수) 추가 |
 | 대출 | `loan_schedules` | loan_id, seq, due_date, principal_amount, interest_amount, status, paid_tx_id |
 | 예산 | `product_preferential_rates` | product_id, code, description, rate |
-| 예산 | `categories` | name, is_essential, is_daily, always_pass |
+| 예산 | `categories` | name, is_essential, is_daily, default_always_pass (신청 때 보여 줄 추천값. 실제 설정은 사용자별로 `budget_profiles`에, ADR 0007) |
 | 예산 | `budget_profiles`, `fixed_expenses`, `savings_goals`, `budget_cycles`, `budget_decisions` | [budget.md](planning/budget.md) 참고. `budget_cycles`가 결제 검사 때 잠그는 행 |
 | Agent | `recipients` | user_id, bank_name, account_num, holder_name, nickname, last_sent_at |
 | Agent | `chat_messages` | user_id, session_id, channel(WEB/MCP), role, content, intent, action_id |
@@ -188,6 +189,7 @@ DB 제약으로 막는 것은 ✅, 코드에서 지켜야 하는 것은 📝입�
 | 10 | (카드·대출 이후) **카드·대출의 `user_id`는 연결 계좌의 `user_id`와 같아야 함** | 📝 만들 때 검사 |
 | 11 | (카드 이후) **카드 누적 사용액은 저장하지 않고 계산** | 📝 동기화 버그 방지 |
 | 12 | **1일 이체 한도는 오늘 `TRANSFER_OUT` 합계**로 계산 (내 계좌끼리 이동·카드 결제는 넣지 않음) | 📝 |
+| 13 | **돈이 나가는 일은 모두 실행 함수 하나를 지남**. 잔액을 바꾸는 코드는 그 함수 안에만 있고, 예산 가드도 거기 하나 ([ADR 0007](decisions/0007-money-execution-and-budget-guard.md)) | 📝 |
 
 ## 팀에서 정해야 할 것
 

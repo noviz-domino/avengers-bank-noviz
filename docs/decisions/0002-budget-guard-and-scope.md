@@ -1,6 +1,6 @@
 # 0002. 예산 관리 추가와 구현 범위 조정
 
-- 상태: 채택 (일부 항목은 "결정 대기")
+- 상태: 채택 (일부 항목은 "결정 대기"), 필수 업종 항상 통과는 일부 변경 (→ [0007](0007-money-execution-and-budget-guard.md): 사용자가 업종을 고름)
 - 날짜: 2026-11-04
 - 관련 PR: [#2](https://github.com/noviz-domino/avengers-bank-noviz/pull/2)
 
