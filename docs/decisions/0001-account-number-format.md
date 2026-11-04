@@ -1,6 +1,6 @@
 # 0001. 계좌번호 형식과 상품 코드
 
-- 상태: 채택
+- 상태: 일부 변경 (→ [0003](0003-db-redesign.md): 계좌 테이블이 하나로 합쳐져 CHECK가 `accounts` 하나로 바뀜. 번호 형식과 상품 코드는 그대로)
 - 날짜: 2026-11-04
 - 관련 PR: [#1](https://github.com/noviz-domino/avengers-bank-noviz/pull/1)
 
