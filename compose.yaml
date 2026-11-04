@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: avengers_bank
+    ports:
+      - "5433:5432" # 내 PC의 5432는 로컬 PostgreSQL이 쓰고 있어서 5433으로 연결
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d avengers_bank"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # 컨테이너 안에서 DB 주소는 localhost가 아니라 서비스 이름 db
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/avengers_bank
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # 컨테이너에서 만든 마이그레이션 파일이 내 PC에도 남도록
+      - ./alembic/versions:/app/alembic/versions
+
+volumes:
+  pgdata:
