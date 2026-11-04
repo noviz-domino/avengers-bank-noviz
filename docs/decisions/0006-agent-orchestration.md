@@ -2,14 +2,14 @@
 
 - 상태: 제안 (이 PR에서 리뷰)
 - 날짜: 2026-11-04
-- 관련 PR: (이 문서를 추가하는 PR)
+- 관련 PR: #5
 - 관련: [ADR 0004](0004-agent-integration.md) Agent 연결 구조, [ADR 0007](0007-money-execution-and-budget-guard.md) 돈 실행 지점과 예산 가드
 
 ## 결정
 
 1. **LangGraph의 감독관(supervisor) 패턴**으로 만든다. 감독관은 요청을 받아 **담당 도메인 Agent를 고르고**, 여러 업무가 섞이면 순서대로 맡긴 뒤 결과를 합쳐 답한다.
 2. 도메인 Agent는 **코드의 도메인과 같은 경계로 5개**: 계좌, 카드, 대출, 예산, 상품(RAG). 각 Agent는 **자기 도메인 도구만** 가진다.
-3. **예산 정보는 매 턴 자동으로 들어간다.** 감독관 앞의 "예산 컨텍스트" 노드가 자유 사용 가능액을 상태에 넣고, 돈과 관련된 답변에는 "예산 코멘트" 노드가 영향을 한 줄 붙인다. 예산 Agent는 예산을 **물어볼 때만** 상담한다.
+3. **예산 정보는 매 턴 자동으로 들어간다.** 감독관 앞의 "예산 컨텍스트" 노드가 자유 사용 가능액을 상태에 넣고, 돈과 관련된 답변에는 "예산 코멘트" 노드가 영향을 한 줄 붙인다. 예산 Agent는 예산을 **물어볼 때만** 상담한다. 코멘트의 숫자는 **서버가 계산한 값**(돈 관련 API 응답의 `budget_preview`)을 그대로 옮기고, LLM은 숫자를 만들지 않는다(budget.md "계산은 코드, 설명은 AI").
 4. **예산 초과를 막는 것은 Agent가 아니라 서버 코드**다(ADR 0007). Agent 구조를 어떻게 바꿔도 예산 보호는 약해지지 않는다.
 5. 우리 Agent도 **MCP 서버의 도구를 그대로** 쓴다(`langchain-mcp-adapters`). Claude Desktop 같은 외부 Agent와 같은 도구, 같은 규칙이다.
 6. 대화 상태는 **PostgreSQL 체크포인터**에, 실행 추적은 **Langfuse**에 남긴다.
@@ -22,7 +22,7 @@
 [감독관]          라우팅만. 의도 분류, 여러 업무면 순서 결정
    ├ 계좌 Agent ─┐
    ├ 카드 Agent ─┤
-   ├ 대출 Agent ─┼─▶ [예산 코멘트]  돈 관련 응답이면 "이 이체 후 자유 사용 가능액 12만 원"
+   ├ 대출 Agent ─┼─▶ [예산 코멘트]  돈 관련 응답이면 서버가 준 budget_preview로 한 줄
    ├ 예산 Agent ─┤
    └ 상품 Agent ─┘
    │
@@ -33,8 +33,8 @@
 
 ## 배경
 
-- 목표는 **은행 웹에서 하는 모든 일을 Agent로** 하는 것이다([scope.md](../planning/scope.md)). 계좌·카드·대출·예산·상품을 모두 다루면 도구가 **30개 안팎**이 된다.
-- LLM 하나에 도구 30개를 주면 비슷한 도구를 헷갈리고(계좌 동결 ↔ 카드 정지), 도구 설명만으로 프롬프트가 길어져 느리고 비싸다.
+- 목표는 **은행 웹에서 하는 모든 일을 Agent로** 하는 것이다([scope.md](../planning/scope.md)). 계좌·카드·대출·예산·상품을 모두 다루면 도구가 **약 27개**(아래 초안)가 된다.
+- LLM 하나에 도구 27개를 주면 비슷한 도구를 헷갈리고(계좌 동결 ↔ 카드 정지), 도구 설명만으로 프롬프트가 길어져 느리고 비싸다.
 - ADR 0004의 MCP 도구 목록(9개)은 초안이었다. 이 ADR에서 도메인별로 다시 정한다.
 - 예산 관리는 이 프로젝트의 차별 기능이라 **모든 대화에 반영돼야** 한다. 하지만 예산 질문이 아닌 요청(약관 질문 등)까지 예산 Agent를 거칠 필요는 없다.
 
@@ -42,10 +42,10 @@
 
 | Agent | 도구 | 돈이 움직이는 도구 |
 |---|---|---|
-| 계좌 | `get_my_accounts`, `open_account`, `close_account`, `search_transactions`, `list_recipients`, `add_recipient`, `request_transfer` | `request_transfer` → 승인 대기 |
+| 계좌 | `get_my_accounts`, `open_account`, `close_account`, `search_transactions`, `list_recipients`, `add_recipient`, `request_transfer` | `request_transfer` → 승인 대기. `close_account`는 **잔액 0일 때만** (남은 돈은 먼저 이체) |
 | 카드 | `get_my_cards`, `issue_card`, `search_card_transactions`, `get_card_limit`, `suspend_card`, `request_unsuspend_card` | 정지는 바로, 해제는 승인 대기 |
 | 대출 | `check_loan_limit`, `apply_loan`, `get_loan_status`, `get_repayment_schedule`, `request_loan_execute` | `request_loan_execute` → 승인 대기 |
-| 예산 | `get_budget_status`, `get_cycle_summary`, `list_goals`, `add_goal`, `get_spending_analysis`, `propose_budget_change` | 없음. 설정 변경은 제안만, 반영은 사용자 승인 |
+| 예산 | `get_budget_status`, `get_cycle_summary`, `list_goals`, `add_goal`, `get_spending_analysis`, `propose_budget_change` | 없음. 설정 변경은 제안만, 가드를 약하게 하는 변경은 승인 대기 (ADR 0007) |
 | 상품 | `search_products`, `get_product_detail`, `ask_bank_docs`(RAG) | 없음 |
 
 - **승인 API, PIN·패스키 API는 어느 Agent에도 없다**(ADR 0004).
@@ -67,9 +67,10 @@
 
 | 대안 | 장점 | 단점 | 결과 |
 |---|---|---|---|
-| Agent 하나 + 도구 30개 | 단순 | 비슷한 도구를 헷갈림. 프롬프트가 길어 느림. 도메인별 테스트 어려움 | 버림 |
+| Agent 하나 + 도구 27개 | 단순 | 비슷한 도구를 헷갈림. 프롬프트가 길어 느림. 도메인별 테스트 어려움 | 버림 |
+| Agent 하나 + 도구 필터 (요청마다 관련 도구만 골라 줌) | 가볍고 LLM 호출 1번 | 도구를 고르는 필터가 사실상 라우터가 됨. 복합 요청의 순서 통제, 도메인별 평가가 어려움 | 버림. 아래 "다시 검토할 조건"을 넘으면 비교 |
 | 라우터 + 흐름별 서브그래프 (조회·이체·예산·RAG) | 빠름 | 흐름 기준이라 카드·대출 업무가 여기저기 흩어짐 | 버림 |
-| **감독관 + 도메인 Agent** | 도메인마다 도구 5~7개로 정확함. 코드의 도메인 폴더와 경계가 같음 | 감독관 라우팅만큼 LLM 호출이 늘어남 | **채택** |
+| **감독관 + 도메인 Agent** | 도메인마다 도구 3~7개로 정확함. 코드의 도메인 폴더와 경계가 같음 | 감독관 라우팅만큼 LLM 호출이 늘어남 | **채택** |
 | Swarm (Agent끼리 직접 넘김) | 라우팅 호출이 줄어 빠름 | Agent끼리 서로 미루는 핑퐁, 넘길 때 맥락 손실. 복합 요청의 순서 통제가 어려움 | 버림. 느려지면 다시 검토 |
 
 ### 예산의 위치
@@ -106,13 +107,17 @@
 - 과제의 "선택한 실패 사례"를 노드 단위로 보여 줄 수 있다(감독관 오분류인지, 도메인 Agent의 되묻기 누락인지).
 
 **감수할 점**
-- 보통 질문도 LLM 호출이 2번(감독관 + 도메인 Agent)이다. 단순 조회는 감독관이 바로 한 Agent로 보내고 끝내서 줄인다.
+- 보통 질문도 LLM 호출이 최소 2번(감독관 + 도메인 Agent)이고, 복합 요청은 더 많다.
 - 감독관이 틀리게 보내면 엉뚱한 Agent가 답한다. 감독관의 출력은 구조화(Pydantic)해서 정해진 Agent 이름만 고르게 한다.
 - MCP 서버가 Agent와 REST 사이에 한 층 더 생긴다(ADR 0004에서 이미 감수함).
 
+**다시 검토할 조건** (Langfuse와 평가 세트로 측정)
+- 응답 시간 p95가 8초를 넘거나, 감독관 호출이 전체 시간의 30% 이상이면: swarm, 또는 Agent 하나 + 도구 필터와 비교한다.
+- 감독관 오분류가 평가 세트의 10%를 넘으면: 감독관 프롬프트와 예시를 보강하고, 그래도 안 되면 구조를 다시 검토한다.
+
 **ADR 0004와의 관계**
 - 구조(REST 위의 MCP, 서버가 승인 강제)는 그대로다.
-- MCP 도구 목록(9개 초안)은 이 ADR의 도메인별 표로 바뀐다. ADR 0004의 상태는 "일부 변경 (→ 0006)"으로 바꾼다.
+- MCP 도구 목록(9개 초안)은 이 ADR의 도메인별 표로 바뀐다. ADR 0004의 상태는 "제안, 일부 변경 (→ 0006)"으로 바꾼다.
 
 **팀 뼈대와의 차이**
 - 팀 뼈대에는 Agent 구조가 없다(과제 요구: 자연어 입력). 이 레포는 감독관 + 도메인 Agent 5개 + MCP로 만든다.
