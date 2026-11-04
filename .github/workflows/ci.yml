@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: 테스트 (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest
+
+  migrations:
+    name: 마이그레이션 (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: avengers_bank
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d avengers_bank"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/avengers_bank
+      # CI 전용 값. 실제 비밀이 아니다
+      JWT_SECRET_KEY: ci-only-not-a-secret-ci-only-not-a-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --no-dev
+      # 빈 DB에 처음부터 끝까지 적용되는지
+      - run: uv run alembic upgrade head
+      # 모델을 바꾸고 마이그레이션을 안 만들었는지 (CHECK 제약은 감지 못 함 → tests/test_account_number.py)
+      - run: uv run alembic check
+      # 되돌리기도 동작하는지
+      - run: uv run alembic downgrade base

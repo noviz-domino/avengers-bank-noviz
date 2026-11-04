@@ -68,6 +68,17 @@ uv run pytest
 
 테스트는 SQLite로 돌아가서 PostgreSQL 없이도 실행됩니다.
 
+### CI
+
+PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.yml`](.github/workflows/ci.yml))가 두 가지를 검사합니다.
+
+| 검사 | 하는 일 |
+|---|---|
+| 테스트 (pytest) | `uv run pytest` |
+| 마이그레이션 (PostgreSQL) | 빈 PostgreSQL에 `alembic upgrade head` → `alembic check`(모델과 마이그레이션이 맞는지) → `alembic downgrade base` |
+
+SQLite 테스트로는 PostgreSQL 전용 동작(CHECK 제약, 마이그레이션 순서)을 확인할 수 없어서 두 번째 검사를 따로 둡니다.
+
 ## 현재 상태
 
 | 도메인 | 상태 |
