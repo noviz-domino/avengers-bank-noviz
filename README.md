@@ -86,7 +86,7 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 
 | 도메인 | 상태 |
 |---|---|
-| users | ✅ 회원가입(생년월일·마케팅 동의), 로그인(5회 실패 15분 잠금), 내 정보 조회 |
+| users | ✅ 회원가입(생년월일·마케팅 동의), 로그인(5회 실패 15분 잠금), refresh token 교체·도난 감지, 로그아웃(기기별), 내 정보 조회 |
 | products | ✅ 판매 중인 상품 목록·상세(우대금리 조건 포함), 데모 상품 seed |
 | accounts, approvals | 📝 테이블만 완성 ([ERD](docs/ERD.md) 핵심 6개). API는 TODO 주석 |
 | transfers, cards | 📝 TODO 주석. 카드 테이블은 카드 기능 PR에서 새로 만듦 |

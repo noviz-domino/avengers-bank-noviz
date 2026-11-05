@@ -6,7 +6,7 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리)
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token)
 
 ## 핵심 테이블 (구현됨)
 
@@ -18,6 +18,7 @@ erDiagram
     accounts ||--o| account_terms : "예·적금만"
     accounts ||--o{ account_transactions : "장부"
     users ||--o{ pending_actions : "승인 대기"
+    users ||--o{ refresh_tokens : "로그인 유지"
     pending_actions |o--o{ account_transactions : "실행 결과"
     users {
         int user_id PK
@@ -52,6 +53,17 @@ erDiagram
         date sale_start "NULL, 특판"
         date sale_end "NULL, 특판"
         bool is_active
+    }
+    refresh_tokens {
+        int token_id PK
+        int user_id FK
+        string token_hash UK "SHA-256, 원문은 저장 안 함"
+        uuid family_id "한 번의 로그인에서 이어진 토큰 묶음"
+        string device_name "NULL, 기기별 로그아웃"
+        datetime expires_at "14일, 교체마다 다시 시작"
+        datetime revoked_at "NULL, 교체·로그아웃·도난 감지 때"
+        int replaced_by FK "NULL, 교체로 새로 발급된 토큰"
+        datetime created_at
     }
     product_preferential_rates {
         int rate_id PK
@@ -165,7 +177,6 @@ erDiagram
 
 | 기능 (구현 순서) | 테이블 | 주요 컬럼 |
 |---|---|---|
-| 보안 보강 | `refresh_tokens` | user_id, token_hash, device_name, expires_at, revoked_at, replaced_by |
 | 보안 보강 | `audit_logs` | user_id, actor(USER/AGENT/MCP/SYSTEM), action, target, detail. **로그인 실패·승인 실패처럼 장부와 승인 대기에 남지 않는 것만** |
 | 카드 | `card_products` | type(CREDIT/DEBIT), name, annual_fee, benefits |
 | 카드 | `cards` | user_id, product_id, card_type, card_num, linked_account_id, daily_limit, monthly_limit, payment_day, status(ACTIVE/SUSPENDED/LOST) |

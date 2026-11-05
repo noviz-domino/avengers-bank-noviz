@@ -7,6 +7,7 @@ from avengers_bank.core.database import get_db
 from avengers_bank.core.dependencies import get_current_user
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.users.schemas import (
+    RefreshRequest,
     TokenResponse,
     UserCreate,
     UserLogin,
@@ -36,10 +37,34 @@ async def signup(data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)])
 async def login(
     data: UserLogin, db: Annotated[AsyncSession, Depends(get_db)], response: Response
 ):
-    access_token = await user_service.login(db, data)
+    tokens = await user_service.login(db, data)
+    no_store(response)
+    return SuccessResponse[TokenResponse](data=tokens)
+
+
+@router.post(
+    "/token/refresh",
+    response_model=SuccessResponse[TokenResponse],
+    responses=error_responses(401),
+)
+async def refresh_token(
+    data: RefreshRequest, db: Annotated[AsyncSession, Depends(get_db)], response: Response
+):
+    tokens = await user_service.refresh(db, data.refresh_token)
+    no_store(response)
+    return SuccessResponse[TokenResponse](data=tokens)
+
+
+@router.post("/logout", response_model=SuccessResponse[None])
+async def logout(data: RefreshRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+    await user_service.logout(db, data.refresh_token)
+    return SuccessResponse[None](data=None, message="로그아웃되었습니다.")
+
+
+def no_store(response: Response) -> None:
+    # 토큰이 담긴 응답은 브라우저·프록시가 저장하지 않게
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    return SuccessResponse[TokenResponse](data=TokenResponse(access_token=access_token))
 
 
 @router.get(
