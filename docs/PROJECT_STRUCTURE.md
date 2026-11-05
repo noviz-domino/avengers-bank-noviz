@@ -23,6 +23,7 @@ avengers-bank/
 │   ├── test_users.py           # 회원가입, 로그인, 로그인 잠금
 │   ├── test_products.py        # 상품 목록·상세, 특판 기간, seed
 │   ├── test_refresh_tokens.py  # 토큰 교체, 재사용 감지, 만료, 기기별 로그아웃
+│   ├── test_accounts.py        # 계좌 개설·가입 조건·적용 금리, 메인 화면 총자산, 남의 계좌 404, 거래내역
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/
@@ -38,8 +39,8 @@ avengers-bank/
     │   └── responses.py    # SuccessResponse, ErrorResponse 형식
     └── domains/
         ├── users/          # 회원가입, 로그인, 내 정보          ✅ 구현됨
-        ├── products/       # 계좌·대출 상품 조회, 우대금리       ✅ 목록·상세
-        ├── accounts/       # 계좌·예적금 조건·장부              📝 모델 + 계좌번호 규칙(account_number.py)
+        ├── products/       # 계좌·대출 상품 조회, 우대금리       ✅ 목록·상세, 가입 조건·적용 금리(eligibility.py)
+        ├── accounts/       # 계좌·예적금 조건·장부              ✅ 개설·조회 + 계좌번호 규칙(account_number.py)
         ├── approvals/      # 승인 대기 작업(pending_actions)     📝 모델만. API는 이체 PR에서
         ├── transfers/      # 이체 (테이블 없음, 장부는 accounts) 📝
         └── cards/          # 카드                              📝 TODO만. 테이블은 카드 기능 PR에서

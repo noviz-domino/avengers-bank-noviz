@@ -13,6 +13,7 @@
 | [0005](0005-auth.md) | 인증 구조: 로그인과 거래 인증(PIN → 패스키) | 채택 | 2026-11-04 |
 | [0006](0006-agent-orchestration.md) | Agent 구조: 감독관(supervisor)과 도메인별 Agent | 제안 | 2026-11-04 |
 | [0007](0007-money-execution-and-budget-guard.md) | 돈 실행 지점 하나와 예산 가드 | 제안 | 2026-11-04 |
+| [0008](0008-account-opening-policy.md) | 계좌 개설 정책: 남의 계좌 404, 기본 이체 한도, 일련번호, 예금은 이체와 함께 | 채택 | 2026-11-05 |
 
 ## 새로 쓰는 법
 

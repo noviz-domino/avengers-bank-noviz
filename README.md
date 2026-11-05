@@ -59,7 +59,15 @@ uv run python -m avengers_bank.seed
 uv run fastapi dev
 ```
 
-`avengers_bank.seed`는 데모 상품(입출금 1, 예금 2, 적금 2, 대출 1)을 넣습니다. 여러 번 실행해도 같은 상품을 다시 넣지 않습니다.
+`avengers_bank.seed`는 데모 상품(입출금 1, 예금 2, 적금 2, 대출 1)과 **데모 사용자**를 넣습니다. 여러 번 실행해도 다시 넣지 않습니다.
+
+### 데모 계정
+
+메인 화면(총자산, 잔액 상위 3개 계좌)을 바로 볼 수 있게 잔액이 있는 계좌 4개를 가진 사용자입니다. 데모용 값이라 비밀이 아닙니다. 비밀번호가 공개돼 있어 누구나 5번 틀려 잠글 수 있어서, seed가 실행될 때(Docker 시작)마다 이 계정의 로그인 잠금을 풉니다.
+
+| 아이디 | 비밀번호 |
+|---|---|
+| `demo` | `demo-password-1234` |
 
 API 문서: http://127.0.0.1:8000/docs
 
@@ -88,5 +96,6 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 |---|---|
 | users | ✅ 회원가입(생년월일·마케팅 동의), 로그인(5회 실패 15분 잠금), refresh token 교체·도난 감지, 로그아웃(기기별), 내 정보 조회 |
 | products | ✅ 판매 중인 상품 목록·상세(우대금리 조건 포함), 데모 상품 seed |
-| accounts, approvals | 📝 테이블만 완성 ([ERD](docs/ERD.md) 핵심 6개). API는 TODO 주석 |
+| accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), 내 계좌 목록과 총자산, 상세, 거래내역, 별칭 |
+| approvals | 📝 테이블만 완성. API는 이체 PR에서 |
 | transfers, cards | 📝 TODO 주석. 카드 테이블은 카드 기능 PR에서 새로 만듦 |
