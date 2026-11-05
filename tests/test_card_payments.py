@@ -50,6 +50,7 @@ async def test_debit_pays_from_account_once(bank):
     assert (tx["status"], tx["billing_status"], tx["category"]) == ("APPROVED", None, "카페·간식")
     again = await pay(client, me, debit)  # 가맹점이 다시 보냄
     assert again.status_code == 200 and again.json()["data"]["card_tx_id"] == tx["card_tx_id"]
+    assert again.json()["message"] == "이미 처리된 결제 요청입니다."
     assert await balance(checking["account_id"]) == 1_988_000
     assert await ledger(checking["account_id"]) == [("CARD_PAYMENT", -12_000, "카페·간식")]
     reused = await pay(client, me, debit, amount=99_000)

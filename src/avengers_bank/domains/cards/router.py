@@ -78,7 +78,8 @@ async def pay(card_id: int, data: CardPayment, response: Response, db: DB, me: M
     tx, created = await card_service.pay(db, me.user_id, card_id, data)
     if not created:
         response.status_code = status.HTTP_200_OK
-    return SuccessResponse[CardTransactionResponse](data=tx, message="결제되었습니다.")
+    message = "결제되었습니다." if created else "이미 처리된 결제 요청입니다."  # 재전송: 상태는 data.status로
+    return SuccessResponse[CardTransactionResponse](data=tx, message=message)
 
 
 @router.get("/{card_id}/transactions", response_model=SuccessResponse[list[CardTransactionResponse]],
