@@ -53,14 +53,16 @@ async def test_reused_token_revokes_family(user):
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "REFRESH_TOKEN_REUSED"
 
-    response = await refresh(user, second["refresh_token"])  # 정상 사용자 토큰도 같이 끊김
-    assert response.json()["error"]["code"] == "REFRESH_TOKEN_REUSED"
+    response = await refresh(user, second["refresh_token"])  # 정상 사용자 토큰도 같이 끊김 (교체된 적 없어서 그냥 무효)
+    assert response.json()["error"]["code"] == "INVALID_REFRESH_TOKEN"
 
 
 async def test_other_device_survives_reuse(user):
     phone, laptop = await login(user, "폰"), await login(user, "노트북")
-    await refresh(user, phone["refresh_token"])
-    await refresh(user, phone["refresh_token"])  # 폰 family만 폐기
+    phone_new = (await refresh(user, phone["refresh_token"])).json()["data"]
+    response = await refresh(user, phone["refresh_token"])  # 폰 family만 폐기
+    assert response.json()["error"]["code"] == "REFRESH_TOKEN_REUSED"
+    assert (await refresh(user, phone_new["refresh_token"])).status_code == 401
     assert (await refresh(user, laptop["refresh_token"])).status_code == 200
 
 
@@ -81,7 +83,8 @@ async def test_logout_revokes_this_device_only(user):
     response = await user.post("/users/logout", json={"refresh_token": phone["refresh_token"]})
     assert response.status_code == 200
 
-    assert (await refresh(user, phone["refresh_token"])).status_code == 401
+    response = await refresh(user, phone["refresh_token"])  # 로그아웃한 토큰은 도난이 아니라 그냥 무효
+    assert response.json()["error"]["code"] == "INVALID_REFRESH_TOKEN"
     assert (await refresh(user, laptop["refresh_token"])).status_code == 200
     # 없는 토큰으로 로그아웃해도 성공 (이미 로그아웃한 상태와 같음)
     assert (await user.post("/users/logout", json={"refresh_token": "nope"})).status_code == 200

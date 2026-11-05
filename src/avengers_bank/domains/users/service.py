@@ -98,25 +98,30 @@ class UserService:
     async def refresh(self, db: AsyncSession, raw_token: str) -> TokenResponse:
         """refresh token을 새 것으로 바꾼다. 이미 바꾼 토큰이 다시 오면 그 기기의 토큰을 모두 폐기한다."""
         token_hash, now = hash_refresh_token(raw_token), datetime.now(UTC)
+        error_code: str | None = None
         async with db.begin():
             old = await refresh_token_repository.revoke_if_active(db, token_hash, now)
-            if old is None:
-                known = await refresh_token_repository.find_by_hash(db, token_hash)
-                reused = known is not None and known.revoked_at is not None
-                if reused:  # 도난으로 본다: 공격자와 사용자 중 누가 먼저 썼는지 알 수 없어서 둘 다 끊는다
-                    await refresh_token_repository.revoke_family(db, known.family_id, now)
-            else:
+            if old is not None:
                 user_id = old.user_id
                 new_raw = await self._issue_refresh(db, user_id, old.family_id, old.device_name, now, replaces=old)
+            else:
+                known = await refresh_token_repository.find_by_hash(db, token_hash)
+                # 교체된 적 있는 토큰(replaced_by)만 도난으로 본다. 로그아웃·만료로 끝난 토큰은 그냥 무효
+                if known is not None and known.replaced_by is not None:
+                    # 공격자와 사용자 중 누가 먼저 썼는지 알 수 없어서 둘 다 끊는다
+                    await refresh_token_repository.revoke_family(db, known.family_id, now)
+                    error_code = "REFRESH_TOKEN_REUSED"
+                else:
+                    error_code = "INVALID_REFRESH_TOKEN"
 
-        if old is None:  # 폐기는 커밋된 뒤에 예외를 던진다
-            if reused:
-                raise UnauthorizedException(
-                    message="이미 사용된 로그인 정보입니다. 보안을 위해 다시 로그인해 주세요.",
-                    code="REFRESH_TOKEN_REUSED",
-                )
+        # 폐기는 커밋된 뒤에 예외를 던진다
+        if error_code == "REFRESH_TOKEN_REUSED":
             raise UnauthorizedException(
-                message="로그인 정보가 만료되었습니다. 다시 로그인해 주세요.", code="INVALID_REFRESH_TOKEN"
+                message="이미 사용된 로그인 정보입니다. 보안을 위해 다시 로그인해 주세요.", code=error_code
+            )
+        if error_code is not None:
+            raise UnauthorizedException(
+                message="로그인 정보가 만료되었습니다. 다시 로그인해 주세요.", code=error_code
             )
         return TokenResponse(access_token=create_access_token(user_id), refresh_token=new_raw)
 

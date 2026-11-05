@@ -17,7 +17,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     login_id: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=1, max_length=128, repr=False)
-    device_name: str | None = Field(default=None, max_length=100)  # 기기별 로그아웃 화면에 보여줌
+    device_name: str | None = Field(default=None, max_length=100)  # 기기 이름. 로그인 기기 목록 기능을 만들면 보여줌
 
 
 class RefreshRequest(BaseModel):

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from sqlalchemy import case, select, update
@@ -64,7 +65,7 @@ class RefreshTokenRepository:
     async def find_by_hash(self, db: AsyncSession, token_hash: str) -> RefreshToken | None:
         return await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
 
-    async def revoke_family(self, db: AsyncSession, family_id, now: datetime) -> None:
+    async def revoke_family(self, db: AsyncSession, family_id: uuid.UUID, now: datetime) -> None:
         await db.execute(
             update(RefreshToken)
             .where(RefreshToken.family_id == family_id, RefreshToken.revoked_at.is_(None))
