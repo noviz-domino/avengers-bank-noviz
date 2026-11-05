@@ -158,7 +158,8 @@ README의 "실패 상황 동작 확인"에 쓸 후보입니다. 구현하면서 
 | ① | 5회 연속 실패 후 로그인 | `423 LOGIN_LOCKED` (15분 동안 비밀번호가 맞아도 거절) ✅ 구현됨 |
 | ② | 판매가 끝났거나 없는 상품 | `404 PRODUCT_NOT_FOUND` ✅ 구현됨 (특판 기간이 지나면 목록·상세·가입 모두 막힘) |
 | ② | 가입 조건 불충족 (나이·기간·금액) | `400 AGE_NOT_ELIGIBLE`, `400 TERM_OUT_OF_RANGE`, `400 AMOUNT_OUT_OF_RANGE` ✅ 구현됨 |
-| ② | 출금 계좌 잔액 부족 | `400 INSUFFICIENT_BALANCE` (예정) |
+| ② | 출금 계좌 잔액 부족 (예금) | `400 INSUFFICIENT_BALANCE` 신청 때, 승인 때 줄었으면 `FAILED`이고 **예금 계좌를 만들지 않음** ✅ 구현됨 |
+| ② | 승인 전에 특판이 끝남 | `400 PRODUCT_NOT_FOUND`, `FAILED` ✅ 구현됨 |
 | ③ | 없는 계좌로 이체 | `400 RECEIVER_NOT_FOUND` ✅ 구현됨 |
 | ③ | 1회·1일 한도 초과 | `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED`(남은 금액 안내) ✅ 구현됨 |
 | ③ | 잔액 부족 | `400 INSUFFICIENT_BALANCE` ✅ 요청 때와 승인 때 모두 |

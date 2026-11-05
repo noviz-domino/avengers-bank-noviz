@@ -111,7 +111,7 @@
 | ✅ | GET | `/accounts/{account_id}` | 🔒 | 계좌 상세 (적금·예금은 금리·만기 포함) |
 | ✅ | GET | `/accounts/{account_id}/transactions?limit=&before=` | 🔒 | 거래내역, 최근부터. 다음 쪽은 받은 마지막 `tx_id`를 `before`로 |
 | ✅ | PATCH | `/accounts/{account_id}` | 🔒 | 별칭 변경 (`null`이면 지움) |
-| 📝 | | 예금 개설 | 🔒 | 맡길 돈을 입출금 계좌에서 옮겨야 해서 이체·승인 PR에서 |
+| ✅ | POST | `/accounts/deposits` | 🔒 | **예금 개설 신청** → `202` 승인 대기. PIN 승인 때 계좌 생성 + 맡길 돈 이동이 한 트랜잭션 |
 | 📝 | | 이체 한도 변경, 해지 | 🔒 | 한도를 올리는 것은 보안을 약하게 해서 승인 PR에서. 해지는 잔액 0일 때만 |
 
 <details>
@@ -134,7 +134,16 @@
 - 입출금 계좌는 이체 한도 기본값 1회 100만 원, 1일 500만 원으로 열립니다.
 - 적금의 적용 금리 = 기본금리 + min(충족한 우대 합계, 우대 상한). 마케팅 동의와 첫 예·적금 우대는 개설 때 확인하고, **급여이체 우대는 개설 때 알 수 없어서 넣지 않습니다**. 상한에 걸리면 `rate_detail` 끝에 `{"code": "PREFERENTIAL_CAP", "rate": "-0.20"}`처럼 깎인 만큼이 붙어서, 기본금리 + `rate_detail` 합계 = 적용 금리입니다([ADR 0008](decisions/0008-account-opening-policy.md)).
 - 만기일은 오늘(한국 날짜) + 기간. 그 달에 같은 날이 없으면 말일입니다.
-- 실패: `400 AGE_NOT_ELIGIBLE`, `400 TERM_OUT_OF_RANGE`, `400 AMOUNT_OUT_OF_RANGE`, `400 DEPOSIT_NEEDS_TRANSFER`(예금), `400 PRODUCT_NOT_OPENABLE`(대출), `404 PRODUCT_NOT_FOUND`(판매 중 아님), `409 ACCOUNT_NUM_CONFLICT`(같은 상품을 동시에 개설, 다시 시도)
+- 실패: `400 AGE_NOT_ELIGIBLE`, `400 TERM_OUT_OF_RANGE`, `400 AMOUNT_OUT_OF_RANGE`, `400 DEPOSIT_NEEDS_TRANSFER`(예금은 `/accounts/deposits`로), `400 PRODUCT_NOT_OPENABLE`(대출), `404 PRODUCT_NOT_FOUND`(판매 중 아님), `409 ACCOUNT_NUM_CONFLICT`(같은 상품을 동시에 개설, 다시 시도)
+
+`POST /accounts/deposits` (예금)
+```json
+{ "product_id": 2, "from_account_id": 1, "amount": 2000000, "term_months": 12, "nickname": "목돈", "idempotency_key": "web-7c2d…" }
+```
+→ `202` 승인 대기 (`action_type: OPEN_DEPOSIT`, summary: "생활비(110-101-000001)에서 2,000,000원을 히어로 정기예금 12개월에 맡기기"). `POST /approvals/{action_id}/approve`(PIN) → 예금 계좌가 열리고 2,000,000원이 옮겨지며, 응답(`ActionResponse`)의 `result.account_id`에 새 계좌 id가 들어갑니다.
+- 예금 금액은 상품의 `min_amount`~`max_amount`, 출금 계좌는 내 입출금 계좌. 승인 때 상품 판매·가입 조건·잔액을 **다시** 확인하고, 안 되면 계좌를 만들지 않고 `FAILED`(계좌번호 충돌 `ACCOUNT_NUM_CONFLICT`도 같음)
+- 승인 뒤 같은 멱등키로 다시 보내면 `200`으로 처음 요청(상태 `EXECUTED`)을 돌려줍니다
+- 예금 계좌에는 나중에 이체로 돈을 더 넣을 수 없습니다(`ACCOUNT_CANNOT_RECEIVE`)
 
 `GET /accounts` → `200`
 ```json

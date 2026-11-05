@@ -15,6 +15,17 @@ class AccountCreate(BaseModel):
     payment_day: int | None = Field(default=None, ge=1, le=28)  # 29~31일은 없는 달이 있어서 28일까지
 
 
+class DepositCreate(BaseModel):
+    """POST /accounts/deposits — 예금 개설 신청. 맡길 돈을 옮겨야 해서 승인 대기를 만든다"""
+
+    product_id: int
+    from_account_id: int  # 맡길 돈을 꺼낼 내 입출금 계좌
+    amount: int = Field(gt=0)
+    term_months: int = Field(ge=1, le=120)
+    nickname: str | None = Field(default=None, min_length=1, max_length=50)
+    idempotency_key: str = Field(min_length=8, max_length=100)
+
+
 class AccountUpdate(BaseModel):
     nickname: str | None = Field(min_length=1, max_length=50)  # null이면 별칭 지움 (화면은 상품명)
 

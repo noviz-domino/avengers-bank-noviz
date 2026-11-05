@@ -48,7 +48,7 @@
 | 필수 범위 | 기획 | DB (`docs/ERD.md`) | 비고 |
 |---|---|---|---|
 | 회원가입·인증 | ✅ 기능 트리, 흐름 ① | ✅ `users` 확장, `refresh_tokens` (+ 예정: `passkeys`) | ADR 0005. ✅ 회원가입(생년월일), 로그인, **5회 실패 잠금**, refresh token(교체·도난 감지)·로그아웃. 휴대폰 본인확인은 뺌 |
-| 계좌·이체 | ✅ 명세, 흐름 ②③ | ✅ `accounts`, `account_terms`, `account_transactions`, `pending_actions` | ADR 0003. ✅ 입출금·적금 개설(가입 조건, 적용 금리), 목록·총자산, 상세, 거래내역, 별칭, **이체(승인 대기 → PIN → 실행 함수)**. 예금 개설은 다음 PR |
+| 계좌·이체 | ✅ 명세, 흐름 ②③ | ✅ `accounts`, `account_terms`, `account_transactions`, `pending_actions` | ADR 0003. ✅ 입출금·적금 개설(가입 조건, 적용 금리), 목록·총자산, 상세, 거래내역, 별칭, **이체(승인 대기 → PIN → 실행 함수)**, **예금 개설(승인 후 계좌 생성 + 맡길 돈 이동)** |
 | 상품 가입 조건 | ✅ 명세(예·적금 1번) | ✅ 기간·금액·나이·조건·우대(`product_preferential_rates`)·특판 | ✅ 상품 목록·상세 API, 데모 상품 seed. 가입 조건 검사는 계좌 개설 PR |
 | 카드 | ✅ 명세, 흐름 ④ | 📐 `cards`, `card_transactions` (상태·한도 포함) | |
 | 대출 | ✅ 명세 16개 중 9개, 흐름 ⑤ | 📐 `loans`, `loan_schedules` | 가볍게 구현 ([scope.md](scope.md)) |

@@ -28,7 +28,8 @@ class PendingAction(Base):
     action_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
     action_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)  # 요청 내용. 만든 뒤에는 바꾸지 않는다 (멱등키 비교)
+    result: Mapped[dict | None] = mapped_column(JSON)  # 실행 결과 (예: 새로 연 예금의 account_id)
     summary: Mapped[str] = mapped_column(Text, nullable=False)  # 서버가 payload로 만든 승인 화면 문장
     requested_by: Mapped[str] = mapped_column(String(10), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="PENDING", nullable=False)
