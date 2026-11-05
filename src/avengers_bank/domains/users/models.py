@@ -35,6 +35,10 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    @property
+    def has_pin(self) -> bool:
+        return self.transaction_pin_hash is not None
+
 
 class RefreshToken(Base):
     """로그인 유지용 토큰. 원문은 저장하지 않고 SHA-256 해시만 둔다 (ADR 0005)

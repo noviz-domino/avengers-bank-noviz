@@ -16,24 +16,25 @@ class UserRepository:
     async def find_by_login_id(self, db: AsyncSession, login_id: str) -> User | None:
         return await db.scalar(select(User).where(User.login_id == login_id))
 
-    async def add_login_failure(
-        self, db: AsyncSession, user_id: int, max_fails: int, lock_until: datetime
-    ) -> datetime | None:
-        """실패 횟수 +1. max_fails에 닿으면 잠그고 횟수는 0으로. 한 문장이라 동시 실패에도 정확하다."""
-        reached = User.login_fail_count + 1 >= max_fails
-        return await db.scalar(
+    async def add_failure(
+        self, db: AsyncSession, user_id: int, kind: str, max_fails: int, lock_until: datetime
+    ) -> tuple[int, datetime | None]:
+        """kind(login·pin)의 실패 횟수 +1. max_fails에 닿으면 잠그고 횟수는 0으로.
+        한 문장이라 동시 실패에도 정확하다. (실패 횟수, 잠금 시각)을 돌려준다."""
+        count, locked = getattr(User, f"{kind}_fail_count"), getattr(User, f"{kind}_locked_until")
+        reached = count + 1 >= max_fails
+        row = (await db.execute(
             update(User)
             .where(User.user_id == user_id)
-            .values(
-                login_fail_count=case((reached, 0), else_=User.login_fail_count + 1),
-                login_locked_until=case((reached, lock_until), else_=User.login_locked_until),
-            )
-            .returning(User.login_locked_until)
-        )
+            .values({count: case((reached, 0), else_=count + 1), locked: case((reached, lock_until), else_=locked)})
+            .returning(count, locked)
+        )).one()
+        return row[0], row[1]
 
-    async def reset_login_failures(self, db: AsyncSession, user_id: int) -> None:
+    async def reset_failures(self, db: AsyncSession, user_id: int, kind: str) -> None:
         await db.execute(
-            update(User).where(User.user_id == user_id).values(login_fail_count=0, login_locked_until=None)
+            update(User).where(User.user_id == user_id)
+            .values({f"{kind}_fail_count": 0, f"{kind}_locked_until": None})
         )
 
     async def find_by_id(self, db: AsyncSession, user_id: int) -> User | None:

@@ -20,6 +20,13 @@ class UserLogin(BaseModel):
     device_name: str | None = Field(default=None, max_length=100)  # 기기 이름. 로그인 기기 목록 기능을 만들면 보여줌
 
 
+class PinSet(BaseModel):
+    """거래 PIN 설정·변경. 비밀번호를 다시 받는다 (토큰만으로는 PIN을 바꿀 수 없게)"""
+
+    password: str = Field(min_length=1, max_length=128, repr=False)
+    pin: str = Field(pattern=r"^\d{6}$", repr=False)
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=1, max_length=200, repr=False)
 
@@ -32,6 +39,7 @@ class UserResponse(BaseModel):
     phone: str
     birth_date: date | None
     marketing_agreed: bool
+    has_pin: bool = False
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

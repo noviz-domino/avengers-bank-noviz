@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
 from avengers_bank.core.dependencies import get_current_user
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.users.schemas import (
+    PinSet,
     RefreshRequest,
     TokenResponse,
     UserCreate,
@@ -35,9 +36,9 @@ async def signup(data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)])
     responses=error_responses(401, 423),
 )
 async def login(
-    data: UserLogin, db: Annotated[AsyncSession, Depends(get_db)], response: Response
+    data: UserLogin, db: Annotated[AsyncSession, Depends(get_db)], response: Response, request: Request
 ):
-    tokens = await user_service.login(db, data)
+    tokens = await user_service.login(db, data, ip=client_ip(request))
     no_store(response)
     return SuccessResponse[TokenResponse](data=tokens)
 
@@ -59,6 +60,21 @@ async def refresh_token(
 async def logout(data: RefreshRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     await user_service.logout(db, data.refresh_token)
     return SuccessResponse[None](data=None, message="로그아웃되었습니다.")
+
+
+@router.put(
+    "/me/pin", response_model=SuccessResponse[None], responses=error_responses(400, 401)
+)
+async def set_pin(
+    data: PinSet, db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+):
+    await user_service.set_pin(db, current_user.user_id, data.password, data.pin)
+    return SuccessResponse[None](data=None, message="거래 PIN이 설정되었습니다.")
+
+
+def client_ip(request: Request) -> str | None:
+    return request.client.host if request.client else None
 
 
 def no_store(response: Response) -> None:
