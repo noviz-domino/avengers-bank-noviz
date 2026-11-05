@@ -51,7 +51,7 @@
 | 계좌·이체 | ✅ 명세, 흐름 ②③ | ✅ `accounts`, `account_terms`, `account_transactions`, `pending_actions` | ADR 0003. ✅ 입출금·적금 개설(가입 조건, 적용 금리), 목록·총자산, 상세, 거래내역, 별칭, **이체(승인 대기 → PIN → 실행 함수)**, **예금 개설(승인 후 계좌 생성 + 맡길 돈 이동)** |
 | 상품 가입 조건 | ✅ 명세(예·적금 1번) | ✅ 기간·금액·나이·조건·우대(`product_preferential_rates`)·특판 | ✅ 상품 목록·상세 API, 데모 상품 seed. 가입 조건 검사는 계좌 개설 PR |
 | 거래내역 검색·카테고리 | ✅ 명세(계좌 4·5번) | ✅ `account_transactions.category` | ✅ 기간(한국 날짜)·금액·키워드·방향·카테고리 검색과 전체 합계, 규칙 기반 카테고리, 사용자 수정 |
-| 카드 | ✅ 명세, 흐름 ④ | ✅ `card_products`, `cards` (📐 `card_transactions`) | ✅ 발급, 목록·상세(가린 번호), 정지·분실(바로), 정지 해제(PIN). 결제는 다음 PR |
+| 카드 | ✅ 명세, 흐름 ④ | ✅ `card_products`, `cards`, `card_transactions` | ✅ 발급, 목록·상세(가린 번호), 정지·분실(바로), 정지 해제(PIN), 결제·취소·사용내역·한도. 신용 대금 출금은 다음 PR |
 | 대출 | ✅ 명세 16개 중 9개, 흐름 ⑤ | 📐 `loans`, `loan_schedules` | 가볍게 구현 ([scope.md](scope.md)) |
 | 수취인·알림 | ✅ 명세 | 📐 `recipients`, `notifications` | 자동이체는 예산의 저축 이체만 |
 | 자연어 입력 | ⚠️ 흐름 ⑥만 있음, 기능 명세 없음 | 📐 `chat_messages`, `pending_actions` | ADR 0004 |

@@ -6,7 +6,7 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs), `cards`(card_products, cards). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록), `a7c3e9f15b20`(승인 결과), `b6e1f3a8c442`(카드)
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs), `cards`(card_products, cards, card_transactions). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록), `a7c3e9f15b20`(승인 결과), `b6e1f3a8c442`(카드), `c4f8a2d6e1b7`(카드 사용내역, `credit_limit` 이름 변경)
 
 ## 핵심 테이블 (구현됨)
 
@@ -23,6 +23,8 @@ erDiagram
     users ||--o{ cards : "보유"
     card_products ||--o{ cards : "상품"
     accounts ||--o{ cards : "결제 계좌"
+    cards ||--o{ card_transactions : "사용내역"
+    account_transactions |o--o| card_transactions : "체크카드 출금·환불"
     pending_actions |o--o{ account_transactions : "실행 결과"
     users {
         int user_id PK
@@ -76,10 +78,24 @@ erDiagram
         string card_num UK "9410 T PP N8 C (Luhn), 응답은 가린 번호"
         string nickname "NULL"
         bigint daily_limit "0보다 큼"
-        bigint monthly_limit "신용만, 1일 한도 이상"
+        bigint credit_limit "신용만, 안 갚은 사용액 한도, 1일 한도 이상"
         smallint payment_day "신용만, 1~28"
         string status "ACTIVE SUSPENDED LOST"
         datetime issued_at
+    }
+    card_transactions {
+        int card_tx_id PK
+        int card_id FK
+        string idempotency_key "카드마다 UK"
+        string merchant_name
+        string category "가맹점 이름으로 서버가 정함"
+        bigint amount "0보다 큼"
+        string status "APPROVED CANCELED"
+        string billing_status "신용만: UNBILLED BILLED PAID"
+        int account_tx_id FK "체크만: 출금 줄"
+        int refund_tx_id FK "체크 취소: 환불 줄"
+        datetime approved_at
+        datetime canceled_at "CANCELED일 때만"
     }
     audit_logs {
         int log_id PK
@@ -215,7 +231,6 @@ erDiagram
 
 | 기능 (구현 순서) | 테이블 | 주요 컬럼 |
 |---|---|---|
-| 카드 | `card_transactions` | card_id, merchant_name, category, amount, is_overseas, status(APPROVED/CANCELED), billing_status, account_tx_id |
 | 대출 | `loans` | user_id, product_id, loan_num(110-4PP-…), account_id, principal, remaining_principal, applied_rate, term_months, status. `account_products`에 `income_multiplier`(한도 = 연소득 × 배수) 추가 |
 | 대출 | `loan_schedules` | loan_id, seq, due_date, principal_amount, interest_amount, status, paid_tx_id |
 | 예산 | `categories` | name, is_essential, is_daily, default_always_pass (신청 때 보여 줄 추천값. 실제 설정은 사용자별로 `budget_profiles`에, ADR 0007) |
@@ -242,7 +257,7 @@ DB 제약으로 막는 것은 ✅, 코드에서 지켜야 하는 것은 📝입�
 | 8 | **금액은 정수(원)**, 실수형 금지 | ✅ BIGINT |
 | 9 | **승인은 사람만**: `pending_actions` 승인 API는 PIN·패스키가 필요하고, Agent·MCP 도구에는 없음 | 📝 (ADR 0004) |
 | 10 | (카드·대출 이후) **카드·대출의 `user_id`는 연결 계좌의 `user_id`와 같아야 함** | 📝 만들 때 검사 |
-| 11 | (카드 이후) **카드 누적 사용액은 저장하지 않고 계산** | 📝 동기화 버그 방지 |
+| 11 | **카드 누적 사용액은 저장하지 않고 계산** (1일: 오늘 승인 합계, 신용: 안 갚은 합계). 같은 카드의 결제·취소는 카드 행을 잠그고 처리 (ADR 0010) | 📝 동기화 버그 방지 |
 | 12 | **1일 이체 한도는 오늘 `TRANSFER_OUT` 합계**로 계산 (내 계좌끼리 이동·카드 결제는 넣지 않음) | 📝 |
 | 13 | **잔액·장부를 바꾸는 일은 모두 실행 함수 하나를 지남**. 잔액을 바꾸는 코드는 그 함수 안에만 있고, 예산 가드(지출만)도 거기 하나 ([ADR 0007](decisions/0007-money-execution-and-budget-guard.md)) | 📝 |
 

@@ -44,8 +44,8 @@ async def test_issue_debit_and_credit(bank):
     client, me, checking = bank
     debit = (await issue(client, me, checking, nickname="생활카드")).json()["data"]
     credit = (await issue(client, me, checking, "CREDIT", payment_day=25)).json()["data"]
-    assert (debit["card_type"], debit["daily_limit"], debit["monthly_limit"], debit["payment_day"]) == ("DEBIT", 1_000_000, None, None)
-    assert (credit["card_type"], credit["monthly_limit"], credit["payment_day"]) == ("CREDIT", 3_000_000, 25)
+    assert (debit["card_type"], debit["daily_limit"], debit["credit_limit"], debit["payment_day"]) == ("DEBIT", 1_000_000, None, None)
+    assert (credit["card_type"], credit["credit_limit"], credit["payment_day"]) == ("CREDIT", 3_000_000, 25)
     assert debit["masked_card_num"].startswith("9410-20**-****-") and "card_num" not in debit  # 전체 번호는 안 나감
     second = (await issue(client, me, checking)).json()["data"]
     async with SessionLocal() as db:
@@ -116,6 +116,6 @@ async def test_db_rejects_debit_with_credit_terms(bank):
     client, me, checking = bank
     async with SessionLocal() as db:
         db.add(Card(user_id=1, product_id=await card_product_id("DEBIT"), linked_account_id=checking["account_id"],
-                    card_type="DEBIT", card_num=make_card_num("DEBIT", 1, 99), daily_limit=1, monthly_limit=10, status="ACTIVE"))
+                    card_type="DEBIT", card_num=make_card_num("DEBIT", 1, 99), daily_limit=1, credit_limit=10, status="ACTIVE"))
         with pytest.raises(IntegrityError):
             await db.commit()
