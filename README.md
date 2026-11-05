@@ -11,6 +11,7 @@
 | [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md) | API 엔드포인트 목록, 요청·응답 형식, 구현 상태 |
 | [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | 폴더 구조, 계층(router → service → repository) 설명, 역할 분담 |
 | [docs/decisions/](docs/decisions/README.md) | 설계 결정 기록(ADR): 팀 뼈대에서 무엇을 왜 바꿨는지 |
+| [docs/guides/](docs/guides/README.md) | 코드 가이드: 기능별 흐름과 설계 이유, 면접 예상 질문 |
 
 ## 시작하기 (Docker)
 
