@@ -20,6 +20,7 @@ from avengers_bank.domains.users.schemas import UserResponse
 # 입출금 계좌의 기본 이체 한도. 올리는 것은 보안을 약하게 해서 승인 기능과 함께 만든다
 DEFAULT_PER_TRANSFER_LIMIT = 1_000_000
 DEFAULT_DAILY_TRANSFER_LIMIT = 5_000_000
+MAX_SERIAL = 999_999  # 계좌번호 NNNNNN
 
 
 def summary(account: Account, product_name: str) -> AccountSummaryResponse:
@@ -55,6 +56,8 @@ class AccountService:
 
             prefix = f"{BANK_CODE}-{TYPE_CODES[product.type]}{product.product_code:02d}-"
             serial = await account_repository.last_serial(db, prefix) + 1
+            if serial > MAX_SERIAL:
+                raise ConflictException(message="이 상품은 더 이상 계좌를 만들 수 없습니다.", code="ACCOUNT_NUM_EXHAUSTED")
             account = Account(
                 user_id=user.user_id, product_id=product.product_id, account_type=product.type,
                 account_num=make_account_num(product.type, product.product_code, serial),
@@ -70,7 +73,9 @@ class AccountService:
             # shortcut: 같은 상품을 동시에 개설하면 일련번호가 겹쳐 409. 자주 생기면 DB 시퀀스로 바꾼다
             try:
                 await account_repository.save(db, account)
-            except IntegrityError:
+            except IntegrityError as e:
+                if "account_num" not in str(e.orig):  # 번호 중복만 409, 다른 제약 위반은 버그라서 그대로 500
+                    raise
                 raise ConflictException(
                     message="잠시 후 다시 시도해 주세요.", code="ACCOUNT_NUM_CONFLICT"
                 ) from None

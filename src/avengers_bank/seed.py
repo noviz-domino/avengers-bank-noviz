@@ -22,6 +22,7 @@ from avengers_bank.core.security import hash_password
 import avengers_bank.domains.approvals.models  # noqa: F401  장부의 action_id FK가 가리키는 테이블
 from avengers_bank.domains.accounts.account_number import BANK_CODE, TYPE_CODES, make_account_num
 from avengers_bank.domains.accounts.repository import account_repository
+from avengers_bank.domains.accounts.service import DEFAULT_DAILY_TRANSFER_LIMIT, DEFAULT_PER_TRANSFER_LIMIT
 from avengers_bank.domains.accounts.models import Account, AccountTerms, AccountTransaction
 from avengers_bank.domains.products.eligibility import add_months
 from avengers_bank.domains.products.models import AccountProduct, ProductPreferentialRate
@@ -97,7 +98,10 @@ async def seed_demo_user(db: AsyncSession) -> bool:
     이체 기능이 생기면 seed도 그 함수를 쓰게 바꾼다.
     """
     async with db.begin():
-        if await db.scalar(select(User.user_id).where(User.login_id == DEMO_LOGIN_ID)) is not None:
+        existing = await db.scalar(select(User).where(User.login_id == DEMO_LOGIN_ID))
+        if existing is not None:
+            # 비밀번호가 README에 공개돼 있어서 누구나 5번 틀려 잠글 수 있다. 시작할 때마다 잠금을 푼다
+            existing.login_fail_count, existing.login_locked_until = 0, None
             return False
         user = User(
             login_id=DEMO_LOGIN_ID, hashed_password=hash_password(DEMO_PASSWORD), name="데모 사용자",
@@ -113,7 +117,7 @@ async def seed_demo_user(db: AsyncSession) -> bool:
         async def account(kind, code, nickname, txs, terms=None):
             product = products[(kind, code)]
             serial = await account_repository.last_serial(db, f"{BANK_CODE}-{TYPE_CODES[kind]}{code:02d}-") + 1
-            limits = dict(per_transfer_limit=1_000_000, daily_transfer_limit=5_000_000) if kind == "CHECKING" else {}
+            limits = dict(per_transfer_limit=DEFAULT_PER_TRANSFER_LIMIT, daily_transfer_limit=DEFAULT_DAILY_TRANSFER_LIMIT) if kind == "CHECKING" else {}
             acc = Account(
                 user_id=user.user_id, product_id=product.product_id, account_type=kind, status="ACTIVE",
                 account_num=make_account_num(kind, code, serial), nickname=nickname,
@@ -140,8 +144,8 @@ async def seed_demo_user(db: AsyncSession) -> bool:
             maturity_date=add_months(today, 12),
         ))
         await account("SAVINGS", 1, "휴대폰 모으기", [("DEPOSIT", 300_000, "1회차"), ("DEPOSIT", 300_000, "2회차")], dict(
-            applied_rate=Decimal("4.00"),
-            rate_detail=[{"code": "MARKETING_AGREED", "rate": "0.20"}, {"code": "FIRST_PRODUCT", "rate": "0.30"}],
+            applied_rate=Decimal("3.70"),  # 예금을 먼저 열어서 첫 가입 우대는 없음
+            rate_detail=[{"code": "MARKETING_AGREED", "rate": "0.20"}],
             maturity_date=add_months(today, 12), monthly_payment=300_000, payment_day=min(today.day, 28),
         ))
     return True

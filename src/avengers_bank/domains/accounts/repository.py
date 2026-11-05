@@ -45,7 +45,11 @@ class AccountRepository:
     async def find_transactions(
         self, db: AsyncSession, account_id: int, limit: int, before_tx_id: int | None
     ) -> list[AccountTransaction]:
-        """최근 거래부터. 다음 쪽은 받은 마지막 tx_id를 before로 넘긴다 (tx_id는 기록 순서와 같음)"""
+        """최근 거래부터. 다음 쪽은 받은 마지막 tx_id를 before로 넘긴다 (tx_id는 기록 순서와 같음)
+
+        shortcut: account_id로 걸러서 tx_id로 정렬한다. (account_id, created_at) 인덱스로 거른 뒤 정렬하는데,
+        계좌 하나의 거래가 수만 건이 되면 (account_id, tx_id) 인덱스를 추가한다.
+        """
         query = select(AccountTransaction).where(AccountTransaction.account_id == account_id)
         if before_tx_id is not None:
             query = query.where(AccountTransaction.tx_id < before_tx_id)

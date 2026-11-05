@@ -53,8 +53,9 @@ class AppliedRate:
 def applied_rate(product: AccountProduct, met_codes: set[str]) -> AppliedRate:
     """적용 금리 = 기본금리 + min(충족한 우대 합계, 우대 상한) (docs/ERD.md)"""
     met = [r for r in product.preferential_rates if r.code in met_codes]
-    bonus = min(sum((r.rate for r in met), Decimal("0")), product.max_preferential_rate)
-    return AppliedRate(
-        rate=product.base_rate + bonus,
-        detail=[{"code": r.code, "rate": str(r.rate)} for r in met],
-    )
+    total = sum((r.rate for r in met), Decimal("0"))
+    bonus = min(total, product.max_preferential_rate)
+    detail = [{"code": r.code, "rate": str(r.rate)} for r in met]
+    if bonus < total:  # 스냅샷만 보고도 적용 금리를 다시 계산할 수 있게 깎인 만큼을 남긴다
+        detail.append({"code": "PREFERENTIAL_CAP", "rate": str(bonus - total)})
+    return AppliedRate(rate=product.base_rate + bonus, detail=detail)
