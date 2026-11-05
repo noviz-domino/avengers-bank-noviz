@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -6,8 +7,11 @@ from sqlalchemy import func, select, update
 from avengers_bank.core.database import SessionLocal
 from avengers_bank.domains.accounts.models import Account, AccountTransaction
 from avengers_bank.domains.approvals.models import PendingAction
+from avengers_bank.domains.approvals.repository import approval_repository
 from avengers_bank.domains.audit.models import AuditLog
 from avengers_bank.domains.products.models import AccountProduct
+from avengers_bank.domains.users.models import User
+from avengers_bank.domains.users.repository import user_repository
 from avengers_bank.seed import seed_products
 
 pytestmark = pytest.mark.anyio
@@ -211,9 +215,6 @@ async def test_expired_reject_and_other_users_action(bank):
 
 async def test_attempts_are_reserved_before_checking(bank):
     """느린 PIN 확인이 동시에 많이 돌아도 예약은 5번까지만 성공한다 (동시 추측 차단)"""
-    from avengers_bank.domains.users.repository import user_repository
-    from avengers_bank.domains.users.models import User
-
     now = datetime.now(UTC)
     async with SessionLocal() as db:
         uid = await db.scalar(select(User.user_id).where(User.login_id == "ironman"))
@@ -262,3 +263,16 @@ async def test_name_cannot_look_like_amount(client):
     for name in ["피터 500만원", "1,000,000", "피터(관리자)"]:
         assert (await client.post("/users/signup", json={**body, "name": name})).status_code == 422, name
     assert (await client.post("/users/signup", json={**body, "name": "Peter Parker"})).status_code == 201
+
+
+async def test_claim_succeeds_only_once(bank):
+    """승인 상태 변경은 조건부 UPDATE 한 문장: 같은 작업을 두 번 바꾸려 하면 두 번째는 0행 (docs/guides/04)"""
+    client, tony, _, src, dst = bank
+    action = (await client.post("/transfers", json=transfer(src, dst), headers=tony)).json()["data"]
+    async with SessionLocal() as db:
+        uid = await db.scalar(select(User.user_id).where(User.login_id == "ironman"))
+        aid = uuid.UUID(action["action_id"])
+        now = datetime.now(UTC)
+        assert await approval_repository.claim(db, aid, uid, now, "APPROVED") is not None
+        assert await approval_repository.claim(db, aid, uid, now, "APPROVED") is None
+        await db.rollback()

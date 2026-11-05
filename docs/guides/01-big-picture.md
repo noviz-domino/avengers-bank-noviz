@@ -12,7 +12,7 @@ src/avengers_bank/
 │   ├── database.py      DB 연결, Base, get_db, in_sql (CHECK 문장 만들기)
 │   ├── security.py      비밀번호 해시(Argon2), JWT, refresh token 해시(SHA-256)
 │   ├── dependencies.py  get_current_user: "Authorization: Bearer …" → 로그인 사용자
-│   ├── exceptions.py    BadRequest(400) · Unauthorized(401) · NotFound(404) · Conflict(409) · Locked(423)
+│   ├── exceptions.py    BadRequest(400) · Unauthorized(401) · Forbidden(403) · NotFound(404) · Conflict(409) · Locked(423)
 │   ├── exception_handlers.py  예외 → {"error": {"code", "message"}} 로 바꿈
 │   └── clock.py         한국 날짜 (today_kst)
 └── domains/             업무별 폴더. 각자 router / service / repository / models / schemas
@@ -45,7 +45,7 @@ sequenceDiagram
 |---|---|---|
 | 받기 | `domains/accounts/router.py` | 경로·입력 모양 확인(Pydantic), 로그인 확인(`Depends(get_current_user)`), 결과를 `SuccessResponse`로 감쌈 |
 | 규칙 | `domains/accounts/service.py` | "해지한 계좌는 빼고, 총자산은 합계" 같은 규칙. 쓰기가 있으면 `async with db.begin():` |
-| DB | `domains/accounts/repository.py` | SELECT·INSERT만. 규칙은 넣지 않음 |
+| DB | `domains/accounts/repository.py` | SELECT·INSERT·UPDATE 문장만. 업무 규칙은 넣지 않음 |
 
 ## 규칙 세 가지
 
@@ -86,4 +86,9 @@ A. 바뀌는 이유가 달라서입니다. 경로·입력 모양이 바뀌면 ro
 A. 모든 업무 오류를 `ApiException`의 하위 클래스로 던지고, `exception_handlers.py`가 `{"error": {"code", "message"}}`로 바꿉니다. 입력 형식 오류(422)와 예상 못 한 오류(500)도 같은 모양으로 바꿔서 앱은 한 가지 형식만 처리하면 됩니다.
 
 **Q. 테스트를 SQLite로 돌리면 PostgreSQL과 다르지 않나요?**
-A. 다릅니다. 그래서 두 가지를 더 합니다. CI에서 실제 PostgreSQL에 마이그레이션을 올렸다 내렸다 하고, 시간 비교처럼 두 DB가 다르게 동작하는 곳은 UTC로 통일했습니다. 행 잠금(`FOR UPDATE`)은 SQLite에서 무시되므로, 동시성은 "조건부 UPDATE 한 문장"처럼 DB 종류와 상관없이 맞는 방식으로 짰습니다.
+A. 다릅니다. CI에서 실제 PostgreSQL에 마이그레이션을 올렸다 내렸다 하고, 시간 비교처럼 두 DB가 다르게 동작하는 곳은 UTC로 통일했습니다. 동시성은 두 가지로 지킵니다.
+- **조건부 UPDATE 한 문장**(로그인·PIN 시도 예약, 승인, 토큰 교체): DB 종류와 상관없이 맞고 SQLite 테스트로도 확인합니다.
+- **행 잠금 `FOR UPDATE`**(잔액 변경): PostgreSQL에서만 동작하고 SQLite는 무시합니다. 그래서 "동시에 두 출금이 와도 잔액이 맞는가"는 **지금 테스트로 확인하지 못합니다.** 다음 단계는 CI에서 PostgreSQL로 동시성 테스트를 돌리는 것입니다.
+
+**Q. 돈은 왜 정수(BIGINT)로 저장하나요?**
+A. 원 단위 정수로만 저장해서 소수 오차가 생기지 않게 했습니다(`0.1 + 0.2 ≠ 0.3` 문제). 금리처럼 소수가 필요한 값은 `Numeric(5, 2)`(파이썬 `Decimal`)로 정확한 소수를 쓰고, API로 보낼 때도 문자열로 보내서 JavaScript의 부동소수점 오차를 피합니다.
