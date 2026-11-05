@@ -6,9 +6,9 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다.
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions). 마이그레이션: `c3d9e1a47b20`
 
-## 핵심 테이블 (첫 구현)
+## 핵심 테이블 (구현됨)
 
 ```mermaid
 erDiagram
@@ -179,8 +179,8 @@ DB 제약으로 막는 것은 ✅, 코드에서 지켜야 하는 것은 📝입�
 | # | 규칙 | |
 |---|---|---|
 | 1 | **계좌번호 형식** `110-TPP-NNNNNN`. 종류 코드는 `accounts.account_type`과 맞아야 함 (입출금 1, 예금 2, 적금 3, 대출 4) | ✅ CHECK (종류 코드·길이), 📝 숫자는 `make_account_num` |
-| 2 | **잔액은 0 이상**, 장부의 `balance_after`도 0 이상 | ✅ CHECK |
-| 3 | **입출금 계좌만 이체 한도가 있음**, 예·적금만 `account_terms`가 있음 | ✅ CHECK (한도), 📝 (terms) |
+| 2 | **잔액은 0 이상**, 장부의 `balance_after`도 0 이상. **금액 부호는 거래 종류와 맞아야 함**(들어오는 종류는 +, 나가는 종류는 −, 아래 표) | ✅ CHECK |
+| 3 | **입출금 계좌만 이체 한도가 있음**(1회 한도 > 0, 1일 한도 ≥ 1회 한도), 예·적금만 `account_terms`가 있음 | ✅ CHECK (한도), 📝 (terms) |
 | 4 | **돈 이동은 한 트랜잭션으로**: 잔액 변경 + 장부 줄 저장 + `pending_actions` 상태 변경을 `async with db.begin():` 하나 안에서 | 📝 |
 | 5 | **잠금 순서**: (예산 기능 이후) 예산 주기 행 → 계좌 행(계좌 id 오름차순) | 📝 교착 방지 |
 | 6 | **이체는 장부 두 줄**(보낸 쪽 −, 받는 쪽 +)을 같은 `transfer_id`로 | 📝 |

@@ -6,7 +6,7 @@
 
 | 문서 | 내용 |
 |---|---|
-| [docs/planning/](docs/planning/README.md) | 기획서: 과제 요구사항, 기능 목록, 이용 흐름 |
+| [docs/planning/](docs/planning/README.md) | 기획서: 과제 요구사항, 기능 목록, 이용 흐름, 화면 구성 |
 | [docs/ERD.md](docs/ERD.md) | ER 다이어그램 (Mermaid), 코드에서 지킬 규칙 · 원본: [AvengersBankDiagram.drawio](docs/AvengersBankDiagram.drawio) |
 | [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md) | API 엔드포인트 목록, 요청·응답 형식, 구현 상태 |
 | [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | 폴더 구조, 계층(router → service → repository) 설명, 역할 분담 |
@@ -83,5 +83,6 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 
 | 도메인 | 상태 |
 |---|---|
-| users | ✅ 회원가입, 로그인, 내 정보 조회 |
-| products, accounts, transfers, cards | 📝 모델(테이블)만 완성. router·service·repository는 TODO 주석 |
+| users | ✅ 회원가입(생년월일·마케팅 동의), 로그인(5회 실패 15분 잠금), 내 정보 조회 |
+| products, accounts, approvals | 📝 테이블만 완성 ([ERD](docs/ERD.md) 핵심 6개). API는 TODO 주석 |
+| transfers, cards | 📝 TODO 주석. 카드 테이블은 카드 기능 PR에서 새로 만듦 |

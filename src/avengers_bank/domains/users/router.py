@@ -31,7 +31,7 @@ async def signup(data: UserCreate, db: Annotated[AsyncSession, Depends(get_db)])
 @router.post(
     "/login",
     response_model=SuccessResponse[TokenResponse],
-    responses=error_responses(401),
+    responses=error_responses(401, 423),
 )
 async def login(
     data: UserLogin, db: Annotated[AsyncSession, Depends(get_db)], response: Response

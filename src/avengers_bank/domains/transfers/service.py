@@ -1,15 +1,11 @@
 class TransferService:
-    # 이 도메인은 테이블이 없다. 계좌 데이터는 accounts.repository를 통해 읽고 쓴다.
+    # 이 도메인은 테이블이 없다. 계좌와 장부는 accounts.repository를 통해 읽고 쓴다.
     #
-    # TODO: transfer(db, data, current_user) — 입출금 → 입출금 이체
-    #   async with db.begin():
-    #       1. 보내는 계좌가 본인 것인지 확인 (ForbiddenException)
-    #       2. 받는 계좌 찾기 (NotFoundException)
-    #       3. 잔액, 1회 한도, 1일 한도 검사 (BadRequestException)
-    #       4. 양쪽 balance 변경
-    #       5. 양쪽 CheckingAccountHistory 한 줄씩 저장
-    # TODO: pay_savings — 입출금 → 적금 납입 (입출금 History + 적금 History)
-    # TODO: pay_deposit — 입출금 → 예금 입금 (입출금 History + 예금 History)
+    # TODO: request_transfer — 바로 실행하지 않고 pending_actions만 만든다 (ADR 0004)
+    #       요청 때 예산을 미리 계산해서 payload.budget_check에 저장 (ADR 0007)
+    # TODO: 승인 후 실행은 실행 함수 하나(ADR 0007)에서:
+    #       예산 주기 행 → 계좌 행(id 오름차순) 잠금 → 예산 가드 → 잔액·1회·1일 한도
+    #       → 장부 두 줄(TRANSFER_OUT −, TRANSFER_IN +, 같은 transfer_id) + 잔액 변경
     pass
 
 

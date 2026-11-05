@@ -8,6 +8,7 @@
 | [budget.md](budget.md) | **예산 관리**: 이 프로젝트만의 기능 명세 |
 | [features.md](features.md) | 팀 기획의 기능 구조도와 영역별 명세 (41개) |
 | [user-flows.md](user-flows.md) | 이용 흐름 8개와 실패 상황 모음 |
+| [screens.md](screens.md) | 화면 구성: 로그인, 메인(총자산·대표 계좌 3개·메뉴), 메뉴별 화면 |
 | [../ERD.md](../ERD.md) | DB 구조 (팀 확정 ERD) |
 
 `features.md`와 이용 흐름 ①~⑥은 팀이 FigJam에서 함께 만든 기획을 옮긴 것이고, `scope.md`, `budget.md`, 흐름 ⑦⑧은 이 레포에서 추가한 것입니다.
@@ -46,8 +47,8 @@
 
 | 필수 범위 | 기획 | DB (`docs/ERD.md`) | 비고 |
 |---|---|---|---|
-| 회원가입·인증 | ✅ 기능 트리, 흐름 ① | 📐 `users` 확장 (+ 예정: `refresh_tokens`, `passkeys`) | ADR 0005. 휴대폰 본인확인은 뺌 |
-| 계좌·이체 | ✅ 명세, 흐름 ②③ | 📐 `accounts`, `account_transactions` | ADR 0003 |
+| 회원가입·인증 | ✅ 기능 트리, 흐름 ① | ✅ `users` 확장 (+ 예정: `refresh_tokens`, `passkeys`) | ADR 0005. ✅ 회원가입(생년월일), 로그인, **5회 실패 잠금**. 휴대폰 본인확인은 뺌 |
+| 계좌·이체 | ✅ 명세, 흐름 ②③ | ✅ `accounts`, `account_terms`, `account_transactions`, `pending_actions` (테이블만) | ADR 0003. API는 다음 PR |
 | 상품 가입 조건 | ✅ 명세(예·적금 1번) | 📐 기간·금액·나이·조건·우대·특판 | |
 | 카드 | ✅ 명세, 흐름 ④ | 📐 `cards`, `card_transactions` (상태·한도 포함) | |
 | 대출 | ✅ 명세 16개 중 9개, 흐름 ⑤ | 📐 `loans`, `loan_schedules` | 가볍게 구현 ([scope.md](scope.md)) |
@@ -56,4 +57,4 @@
 | RAG | ⚠️ 흐름 ⑥만 있음 | 📐 `rag_chunks` (pgvector) | |
 | **예산 관리** (추가 기능) | ✅ budget.md, 흐름 ⑦⑧ | 📐 예산 테이블 7개 | |
 
-📐 = [ERD](../ERD.md)에 설계됨(핵심 6개는 본문, 나머지는 "예정" 표), 아직 구현 안 됨. 현재 코드의 DB는 팀 뼈대 구조(계좌 3종 등)이고, 구현 PR에서 새 ERD로 바꿉니다.
+✅ = 테이블이 코드·마이그레이션에 있음. 📐 = [ERD](../ERD.md) "예정" 표에 설계됨, 그 기능의 PR에서 추가합니다.
