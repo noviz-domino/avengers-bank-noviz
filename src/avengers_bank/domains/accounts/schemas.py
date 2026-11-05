@@ -89,6 +89,9 @@ class TransactionResponse(BaseModel):
 class TransactionFilter(BaseModel):
     """거래내역 검색 조건. 날짜는 한국 날짜, 금액은 부호와 상관없이 크기로 비교한다"""
 
+    # 오타(?catgory=식사)를 조용히 무시하면 거르지 않은 합계가 나가서, Agent가 틀린 숫자를 말한다
+    model_config = ConfigDict(extra="forbid")
+
     account_id: int | None = None  # 없으면 내 모든 계좌
     from_date: date | None = None
     to_date: date | None = None
@@ -119,7 +122,15 @@ class TransactionSearchResponse(BaseModel):
 
 
 class TransactionUpdate(BaseModel):
-    """사용자가 카테고리·메모를 고친다. 금액·상대방은 고칠 수 없다"""
+    """사용자가 카테고리·메모를 고친다. 금액·상대방은 고칠 수 없다 (보내면 422)"""
 
-    category: Category | None = None
-    memo: str | None = Field(default=None, min_length=1, max_length=100)
+    model_config = ConfigDict(extra="forbid")
+
+    category: Category | None = None  # 지울 수는 없다: null이면 카테고리 검색·예산 합계에서 빠진다
+    memo: str | None = Field(default=None, min_length=1, max_length=100)  # null이면 메모 지움
+
+    @model_validator(mode="after")
+    def category_not_null(self):
+        if "category" in self.model_fields_set and self.category is None:
+            raise ValueError("카테고리는 지울 수 없습니다. 다른 카테고리를 골라 주세요.")
+        return self

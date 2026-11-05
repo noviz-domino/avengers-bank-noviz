@@ -87,21 +87,23 @@ class AccountRepository:
 
     async def search_transactions(
         self, db: AsyncSession, user_id: int, f: TransactionFilter
-    ) -> tuple[list[AccountTransaction], int, int]:
-        """(이번 쪽 거래, 들어온 합계, 나간 합계). 합계는 쪽과 상관없이 조건 전체"""
+    ) -> tuple[list[AccountTransaction], bool, int, int]:
+        """(이번 쪽 거래, 다음 쪽이 있는지, 들어온 합계, 나간 합계). 합계는 쪽과 상관없이 조건 전체"""
         conds = self._filtered(user_id, f)
         base = select(AccountTransaction).join(Account, Account.account_id == AccountTransaction.account_id)
         page = base.where(*conds)
         if f.before is not None:
             page = page.where(AccountTransaction.tx_id < f.before)
-        rows = list(await db.scalars(page.order_by(AccountTransaction.tx_id.desc()).limit(f.limit)))
+        rows = list(await db.scalars(page.order_by(AccountTransaction.tx_id.desc()).limit(f.limit + 1)))
+        has_more = len(rows) > f.limit  # 하나 더 읽어 봐서 다음 쪽이 있는지 안다
+        rows = rows[:f.limit]
         total_in, total_out = (await db.execute(
             select(
                 func.coalesce(func.sum(AccountTransaction.amount).filter(AccountTransaction.amount > 0), 0),
                 func.coalesce(func.sum(AccountTransaction.amount).filter(AccountTransaction.amount < 0), 0),
             ).join(Account, Account.account_id == AccountTransaction.account_id).where(*conds)
         )).one()
-        return rows, total_in, -total_out
+        return rows, has_more, total_in, -total_out
 
     async def find_my_transaction(self, db: AsyncSession, user_id: int, tx_id: int) -> AccountTransaction | None:
         return await db.scalar(

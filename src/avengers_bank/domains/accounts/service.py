@@ -224,11 +224,11 @@ class AccountService:
     async def search_transactions(self, db: AsyncSession, user_id: int, f: TransactionFilter) -> TransactionSearchResponse:
         if f.account_id is not None:
             await self.get_my_account(db, user_id, f.account_id)  # 남의 계좌면 404 (빈 결과로 숨기지 않고 명확히)
-        rows, total_in, total_out = await account_repository.search_transactions(db, user_id, f)
+        rows, has_more, total_in, total_out = await account_repository.search_transactions(db, user_id, f)
         return TransactionSearchResponse(
             transactions=[TransactionResponse.model_validate(r) for r in rows],
             total_in=total_in, total_out=total_out,
-            next_before=rows[-1].tx_id if len(rows) == f.limit else None,
+            next_before=rows[-1].tx_id if has_more else None,
         )
 
     async def update_transaction(

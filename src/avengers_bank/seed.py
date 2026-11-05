@@ -154,6 +154,15 @@ async def seed_demo_user(db: AsyncSession) -> bool:
     return True
 
 
+async def backfill_categories(db: AsyncSession) -> int:
+    """카테고리 기능 전에 쌓인 거래(카테고리 NULL)를 규칙으로 채운다. 이미 있는 값은 건드리지 않는다"""
+    async with db.begin():
+        rows = list(await db.scalars(select(AccountTransaction).where(AccountTransaction.category.is_(None))))
+        for tx in rows:
+            tx.category = classify(tx.tx_type, tx.memo, tx.counterparty_name)
+    return len(rows)
+
+
 async def main() -> None:
     try:
         async with SessionLocal() as db:
@@ -161,6 +170,9 @@ async def main() -> None:
         async with SessionLocal() as db:
             if await seed_demo_user(db):
                 print(f"데모 사용자를 만들었습니다: {DEMO_LOGIN_ID}")
+        async with SessionLocal() as db:
+            if filled := await backfill_categories(db):
+                print(f"카테고리가 없던 거래 {filled}건을 채웠습니다.")
     finally:
         await engine.dispose()
 

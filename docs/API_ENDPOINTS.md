@@ -187,7 +187,8 @@
 | `limit`, `before` | 최근부터. 다음 쪽은 응답의 `next_before`를 `before`로 |
 
 - `total_in`, `total_out`은 이번 쪽이 아니라 **조건 전체**의 합계(`total_out`은 양수)
-- 실패: `422`(기간·금액 범위가 거꾸로, 없는 카테고리), `404 TRANSACTION_NOT_FOUND`(없거나 남의 거래)
+- 실패: `422`(기간·금액 범위가 거꾸로, 없는 카테고리, **모르는 조건 이름**(오타), PATCH에 금액 등 고칠 수 없는 칸, 카테고리를 `null`로), `404 TRANSACTION_NOT_FOUND`(없거나 남의 거래)
+- `next_before`는 다음 쪽이 정말 있을 때만 값이 있습니다
 </details>
 
 ## transfers: 돈 이동 (`domains/transfers`)

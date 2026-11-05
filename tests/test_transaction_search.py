@@ -1,9 +1,9 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from sqlalchemy import select, update
 
-from avengers_bank.core.clock import KST, today_kst
+from avengers_bank.core.clock import KST
 from avengers_bank.core.database import SessionLocal
 from avengers_bank.domains.accounts.categories import classify
 from avengers_bank.domains.accounts.models import AccountTransaction
@@ -35,6 +35,9 @@ def test_classify_rules():
     assert classify("TRANSFER_OUT", None, "피터") == "이체"
     assert classify("INTERNAL_OUT", "점심") == "저축·내 계좌"  # 거래 종류가 먼저
     assert classify("DEPOSIT", "급여") == "수입"
+    assert classify("CARD_PAYMENT", "저녁 외식") == "외식·술자리"
+    assert classify("CARD_PAYMENT", "수술비") == "의료"  # "술"이 들어 있어도 술자리가 아님
+    assert classify("CARD_PAYMENT", "미술학원") == "기타"
 
 
 async def test_search_all_accounts_with_totals(demo):
@@ -56,15 +59,16 @@ async def test_filters(demo):
 
 
 async def test_date_range_uses_korean_date(demo):
+    """한국 시간 0~9시는 UTC로 전날이다. 이 구간의 거래가 한국 날짜로 잡히는지 (UTC 날짜를 쓰면 실패)"""
     client, me = demo
-    yesterday = today_kst() - timedelta(days=1)
-    async with SessionLocal() as db:  # 월세를 "어제 한국 시간 23:30"으로
-        late = datetime.combine(yesterday, datetime.min.time(), KST).replace(hour=23, minute=30).astimezone(UTC)
-        await db.execute(update(AccountTransaction).where(AccountTransaction.memo == "월세").values(created_at=late))
+    day = date(2026, 11, 5)
+    async with SessionLocal() as db:  # 월세: 11/5 한국 08:00 = UTC 11/4 23:00
+        early = datetime(2026, 11, 5, 8, 0, tzinfo=KST).astimezone(UTC)
+        await db.execute(update(AccountTransaction).where(AccountTransaction.memo == "월세").values(created_at=early))
         await db.commit()
-    memos = [t["memo"] for t in (await search(client, me, from_date=str(yesterday), to_date=str(yesterday)))["transactions"]]
-    assert memos == ["월세"]  # UTC로는 어제 14:30이지만 한국 날짜로 어제
-    assert "월세" not in [t["memo"] for t in (await search(client, me, from_date=str(today_kst())))["transactions"]]
+    on_day = [t["memo"] for t in (await search(client, me, from_date=str(day), to_date=str(day)))["transactions"]]
+    day_before = [t["memo"] for t in (await search(client, me, from_date=str(day - timedelta(days=1)), to_date=str(day - timedelta(days=1))))["transactions"]]
+    assert "월세" in on_day and "월세" not in day_before
 
 
 async def test_paging_and_totals_cover_all_pages(demo):
@@ -98,6 +102,35 @@ async def test_user_can_fix_category_and_memo(demo):
     assert (await client.patch(f"/transactions/{tx['tx_id']}", json={"category": "로또"}, headers=me)).status_code == 422
     async with SessionLocal() as db:
         assert await db.scalar(select(AccountTransaction.amount).where(AccountTransaction.tx_id == tx["tx_id"])) == -38_000
+
+
+async def test_unknown_fields_rejected(demo):
+    client, me = demo
+    assert (await client.get("/transactions", params={"catgory": "식사"}, headers=me)).status_code == 422  # 오타
+    tx = (await search(client, me, limit=1))["transactions"][0]
+    assert (await client.patch(f"/transactions/{tx['tx_id']}", json={"amount": 1}, headers=me)).status_code == 422
+    assert (await client.patch(f"/transactions/{tx['tx_id']}", json={"category": None}, headers=me)).status_code == 422
+    assert (await client.patch(f"/transactions/{tx['tx_id']}", json={"memo": None}, headers=me)).json()["data"]["memo"] is None
+
+
+async def test_no_next_page_when_exactly_limit_left(demo):
+    client, me = demo
+    total = len((await search(client, me, limit=100))["transactions"])
+    assert (await search(client, me, limit=total))["next_before"] is None
+    assert (await search(client, me, limit=total - 1))["next_before"] is not None
+
+
+async def test_backfill_fills_only_missing(demo):
+    from avengers_bank.seed import backfill_categories
+    async with SessionLocal() as db:
+        await db.execute(update(AccountTransaction).where(AccountTransaction.memo == "점심").values(category=None))
+        await db.execute(update(AccountTransaction).where(AccountTransaction.memo == "월세").values(category="여가"))
+        await db.commit()
+    async with SessionLocal() as db:
+        assert await backfill_categories(db) == 1
+    async with SessionLocal() as db:
+        cats = dict((await db.execute(select(AccountTransaction.memo, AccountTransaction.category))).all())
+    assert cats["점심"] == "식사" and cats["월세"] == "여가"  # 사용자가 고친 값은 그대로
 
 
 async def test_invalid_ranges(demo):
