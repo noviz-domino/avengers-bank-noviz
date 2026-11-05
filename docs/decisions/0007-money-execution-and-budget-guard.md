@@ -1,6 +1,6 @@
 # 0007. 돈 실행 지점 하나와 예산 가드
 
-- 상태: 제안 (이 PR에서 리뷰)
+- 상태: 채택 (실행 함수 구현: `domains/accounts/money.py`, 이체부터 적용. 예산 가드는 예산 기능 PR에서)
 - 날짜: 2026-11-04
 - 관련 PR: #5
 - 관련: [ADR 0002](0002-budget-guard-and-scope.md) 예산 관리, [ADR 0004](0004-agent-integration.md) 승인은 서버가 강제, [budget.md](../planning/budget.md) 결제 검사

@@ -20,6 +20,7 @@ from avengers_bank.core.clock import today_kst
 from avengers_bank.core.database import SessionLocal, engine
 from avengers_bank.core.security import hash_password
 import avengers_bank.domains.approvals.models  # noqa: F401  장부의 action_id FK가 가리키는 테이블
+import avengers_bank.domains.audit.models  # noqa: F401
 from avengers_bank.domains.accounts.account_number import BANK_CODE, TYPE_CODES, make_account_num
 from avengers_bank.domains.accounts.repository import account_repository
 from avengers_bank.domains.accounts.service import DEFAULT_DAILY_TRANSFER_LIMIT, DEFAULT_PER_TRANSFER_LIMIT

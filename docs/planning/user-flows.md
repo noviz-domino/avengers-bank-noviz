@@ -159,9 +159,15 @@ README의 "실패 상황 동작 확인"에 쓸 후보입니다. 구현하면서 
 | ② | 판매가 끝났거나 없는 상품 | `404 PRODUCT_NOT_FOUND` ✅ 구현됨 (특판 기간이 지나면 목록·상세·가입 모두 막힘) |
 | ② | 가입 조건 불충족 (나이·기간·금액) | `400 AGE_NOT_ELIGIBLE`, `400 TERM_OUT_OF_RANGE`, `400 AMOUNT_OUT_OF_RANGE` ✅ 구현됨 |
 | ② | 출금 계좌 잔액 부족 | `400 INSUFFICIENT_BALANCE` (예정) |
-| ③ | 없는 계좌로 이체 | `404 ACCOUNT_NOT_FOUND` (예정) |
-| ③ | 1회·1일 한도 초과 | `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED` (예정) |
-| ③ | 남의 계좌 조회·출금 | `404 ACCOUNT_NOT_FOUND` (있다는 것도 알려 주지 않음) ✅ 조회 구현됨, 출금은 이체 PR |
+| ③ | 없는 계좌로 이체 | `400 RECEIVER_NOT_FOUND` ✅ 구현됨 |
+| ③ | 1회·1일 한도 초과 | `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED`(남은 금액 안내) ✅ 구현됨 |
+| ③ | 잔액 부족 | `400 INSUFFICIENT_BALANCE` ✅ 요청 때와 승인 때 모두 |
+| ③ | 요청 뒤 다른 출금으로 잔액이 줄었는데 승인 | `400 INSUFFICIENT_BALANCE`, 요청은 `FAILED`로 남고 돈은 안 움직임 ✅ 구현됨 |
+| ③ | PIN 5회 틀림 | `423 PIN_LOCKED` (15분, 로그인은 안 잠김) ✅ 구현됨 |
+| ③ | 같은 승인을 두 번 | `409 ACTION_NOT_PENDING`, 돈은 한 번만 ✅ 구현됨 |
+| ③ | 10분 지나서 승인 | `409 ACTION_EXPIRED` (PIN을 확인하기 전에 알림) ✅ 구현됨 |
+| ③ | 같은 계정으로 PIN을 동시에 많이 보냄 | 시도를 먼저 예약해서 5번까지만 확인, 나머지는 `423 PIN_LOCKED` ✅ 구현됨 |
+| ③ | 남의 계좌 조회·출금 | 조회 `404 ACCOUNT_NOT_FOUND`, 출금 요청 `400 ACCOUNT_NOT_FOUND` ✅ 구현됨 |
 | ④ | 정지·분실 카드 결제 | 미정 |
 | ④ | 카드 한도 초과, 연결 계좌 잔액 부족 | 미정 |
 | ⑤ | 대출 심사 거절 | 미정 |

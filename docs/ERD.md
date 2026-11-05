@@ -6,7 +6,7 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token)
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록)
 
 ## 핵심 테이블 (구현됨)
 
@@ -19,6 +19,7 @@ erDiagram
     accounts ||--o{ account_transactions : "장부"
     users ||--o{ pending_actions : "승인 대기"
     users ||--o{ refresh_tokens : "로그인 유지"
+    users |o--o{ audit_logs : "보안 기록"
     pending_actions |o--o{ account_transactions : "실행 결과"
     users {
         int user_id PK
@@ -53,6 +54,16 @@ erDiagram
         date sale_start "NULL, 특판"
         date sale_end "NULL, 특판"
         bool is_active
+    }
+    audit_logs {
+        int log_id PK
+        int user_id FK "NULL"
+        string actor "USER AGENT MCP SYSTEM"
+        string action "LOGIN_FAILED PIN_FAILED PIN_SET"
+        string target "NULL, 대상 id"
+        json detail "NULL"
+        string ip "NULL"
+        datetime created_at
     }
     refresh_tokens {
         int token_id PK
@@ -177,7 +188,6 @@ erDiagram
 
 | 기능 (구현 순서) | 테이블 | 주요 컬럼 |
 |---|---|---|
-| 보안 보강 | `audit_logs` | user_id, actor(USER/AGENT/MCP/SYSTEM), action, target, detail. **로그인 실패·승인 실패처럼 장부와 승인 대기에 남지 않는 것만** |
 | 카드 | `card_products` | type(CREDIT/DEBIT), name, annual_fee, benefits |
 | 카드 | `cards` | user_id, product_id, card_type, card_num, linked_account_id, daily_limit, monthly_limit, payment_day, status(ACTIVE/SUSPENDED/LOST) |
 | 카드 | `card_transactions` | card_id, merchant_name, category, amount, is_overseas, status(APPROVED/CANCELED), billing_status, account_tx_id |

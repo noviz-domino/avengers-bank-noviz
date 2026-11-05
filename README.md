@@ -97,5 +97,5 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 | users | ✅ 회원가입(생년월일·마케팅 동의), 로그인(5회 실패 15분 잠금), refresh token 교체·도난 감지, 로그아웃(기기별), 내 정보 조회 |
 | products | ✅ 판매 중인 상품 목록·상세(우대금리 조건 포함), 데모 상품 seed |
 | accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), 내 계좌 목록과 총자산, 상세, 거래내역, 별칭 |
-| approvals | 📝 테이블만 완성. API는 이체 PR에서 |
-| transfers, cards | 📝 TODO 주석. 카드 테이블은 카드 기능 PR에서 새로 만듦 |
+| transfers, approvals | ✅ 이체 요청 → 승인 대기 → 거래 PIN 승인 → 실행(잔액·한도 재검사, 장부 두 줄), 거절, 멱등키, PIN 5회 잠금, 감사 기록 |
+| cards | 📝 TODO 주석. 카드 테이블은 카드 기능 PR에서 새로 만듦 |

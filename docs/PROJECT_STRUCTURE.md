@@ -24,6 +24,7 @@ avengers-bank/
 │   ├── test_products.py        # 상품 목록·상세, 특판 기간, seed
 │   ├── test_refresh_tokens.py  # 토큰 교체, 재사용 감지, 만료, 기기별 로그아웃
 │   ├── test_accounts.py        # 계좌 개설·가입 조건·적용 금리, 메인 화면 총자산, 남의 계좌 404, 거래내역
+│   ├── test_transfers.py       # 이체 승인 흐름, 두 번 승인, 멱등키, PIN 잠금, 승인 전 잔액 변화, 한도
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/
@@ -40,9 +41,10 @@ avengers-bank/
     └── domains/
         ├── users/          # 회원가입, 로그인, 내 정보          ✅ 구현됨
         ├── products/       # 계좌·대출 상품 조회, 우대금리       ✅ 목록·상세, 가입 조건·적용 금리(eligibility.py)
-        ├── accounts/       # 계좌·예적금 조건·장부              ✅ 개설·조회 + 계좌번호 규칙(account_number.py)
-        ├── approvals/      # 승인 대기 작업(pending_actions)     📝 모델만. API는 이체 PR에서
-        ├── transfers/      # 이체 (테이블 없음, 장부는 accounts) 📝
+        ├── accounts/       # 계좌·예적금 조건·장부              ✅ 개설·조회, 계좌번호 규칙, **돈 실행 지점(money.py)**
+        ├── approvals/      # 승인 대기 작업, PIN 승인·거절        ✅
+        ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
+        ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성
         └── cards/          # 카드                              📝 TODO만. 테이블은 카드 기능 PR에서
 ```
 
@@ -84,6 +86,7 @@ users ◀── approvals ◀── transfers   (이체는 승인 대기를 만�
 | `account_products`, `product_preferential_rates` | `AccountProduct`, `ProductPreferentialRate` | `domains/products/models.py` |
 | `accounts`, `account_terms`, `account_transactions` | `Account`, `AccountTerms`, `AccountTransaction` | `domains/accounts/models.py` |
 | `pending_actions` | `PendingAction` | `domains/approvals/models.py` |
+| `audit_logs` | `AuditLog` | `domains/audit/models.py` |
 
 > 팀 뼈대의 계좌 3종·거래내역 3종·카드 5개 모델은 [ADR 0003](decisions/0003-db-redesign.md)에 따라 지웠습니다. CHECK 제약용 `in_sql()`은 `core/database.py`에 있고, 마이그레이션에는 결과 문자열을 그대로 적습니다.
 
