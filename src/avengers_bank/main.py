@@ -9,6 +9,7 @@ from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.accounts.router import router as account_router
 from avengers_bank.domains.accounts.router import tx_router as transaction_router
 from avengers_bank.domains.approvals.router import router as approval_router
+from avengers_bank.domains.cards.router import products_router as card_product_router
 from avengers_bank.domains.cards.router import router as card_router
 from avengers_bank.domains.products.router import router as product_router
 from avengers_bank.domains.transfers.router import router as transfer_router
@@ -38,6 +39,7 @@ app.include_router(transaction_router)
 app.include_router(transfer_router)
 app.include_router(approval_router)
 app.include_router(card_router)
+app.include_router(card_product_router)
 
 
 @app.get("/", response_model=SuccessResponse[dict[str, str]])

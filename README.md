@@ -100,4 +100,4 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 | accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), **예금 개설(PIN 승인)**, 내 계좌 목록과 총자산, 상세, 거래내역, 별칭 |
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → 거래 PIN 승인 → 실행(잔액·한도 재검사, 장부 두 줄), 거절, 멱등키, PIN 5회 잠금, 감사 기록 |
-| cards | 📝 TODO 주석. 카드 테이블은 카드 기능 PR에서 새로 만듦 |
+| cards | ✅ 카드 상품, 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN 승인). 결제는 다음 PR |

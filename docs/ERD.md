@@ -6,7 +6,7 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록)
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs), `cards`(card_products, cards). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록), `a7c3e9f15b20`(승인 결과), `b6e1f3a8c442`(카드)
 
 ## 핵심 테이블 (구현됨)
 
@@ -20,6 +20,9 @@ erDiagram
     users ||--o{ pending_actions : "승인 대기"
     users ||--o{ refresh_tokens : "로그인 유지"
     users |o--o{ audit_logs : "보안 기록"
+    users ||--o{ cards : "보유"
+    card_products ||--o{ cards : "상품"
+    accounts ||--o{ cards : "결제 계좌"
     pending_actions |o--o{ account_transactions : "실행 결과"
     users {
         int user_id PK
@@ -54,6 +57,29 @@ erDiagram
         date sale_start "NULL, 특판"
         date sale_end "NULL, 특판"
         bool is_active
+    }
+    card_products {
+        int product_id PK
+        string type "CREDIT DEBIT"
+        smallint product_code "카드번호 PP, 종류 안에서 1~99"
+        string name
+        bigint annual_fee "0 이상"
+        text benefits "RAG 문서로도 사용"
+        bool is_active
+    }
+    cards {
+        int card_id PK
+        int user_id FK
+        int product_id FK
+        int linked_account_id FK "주인의 입출금 계좌"
+        string card_type "CREDIT DEBIT"
+        string card_num UK "9410 T PP N8 C (Luhn), 응답은 가린 번호"
+        string nickname "NULL"
+        bigint daily_limit "0보다 큼"
+        bigint monthly_limit "신용만, 1일 한도 이상"
+        smallint payment_day "신용만, 1~28"
+        string status "ACTIVE SUSPENDED LOST"
+        datetime issued_at
     }
     audit_logs {
         int log_id PK
@@ -153,7 +179,7 @@ erDiagram
 | 이체·출금 (**웹에서 시작해도** PIN) | 예산 안 카드 결제, 항상 통과 업종의 카드 결제 ([budget.md](planning/budget.md) "결제 검사") |
 | 대출 **실행** (계좌로 입금) | 대출 **신청**·자동 심사 (돈이 움직이지 않음) |
 | 예산 초과 확인 (카드 결제는 따로, 이체는 이체 승인과 같은 PIN 한 번) | 월급·이자 같은 시스템 입금, 주기 끝 목표 저축 이체 (사용자가 예산 신청 때 정함) |
-| 카드 정지 **해제** | 카드 **정지** (분실 신고는 바로) |
+| 카드 정지 **해제** ✅ | 카드 **정지**·분실 신고 ✅ (분실은 되돌릴 수 없음, ADR 0009) |
 | 예산 검사를 **약하게** 하는 변경 (목록: [ADR 0007](decisions/0007-money-execution-and-budget-guard.md#가드를-약하게-하는-변경)) | 예산 검사를 **강하게** 하는 변경 (같은 표) |
 | 잔액이 남은 계좌 해지: 남은 돈을 먼저 이체(승인) | 잔액 0인 계좌 해지 |
 
@@ -189,8 +215,6 @@ erDiagram
 
 | 기능 (구현 순서) | 테이블 | 주요 컬럼 |
 |---|---|---|
-| 카드 | `card_products` | type(CREDIT/DEBIT), name, annual_fee, benefits |
-| 카드 | `cards` | user_id, product_id, card_type, card_num, linked_account_id, daily_limit, monthly_limit, payment_day, status(ACTIVE/SUSPENDED/LOST) |
 | 카드 | `card_transactions` | card_id, merchant_name, category, amount, is_overseas, status(APPROVED/CANCELED), billing_status, account_tx_id |
 | 대출 | `loans` | user_id, product_id, loan_num(110-4PP-…), account_id, principal, remaining_principal, applied_rate, term_months, status. `account_products`에 `income_multiplier`(한도 = 연소득 × 배수) 추가 |
 | 대출 | `loan_schedules` | loan_id, seq, due_date, principal_amount, interest_amount, status, paid_tx_id |
@@ -234,4 +258,4 @@ DB 제약으로 막는 것은 ✅, 코드에서 지켜야 하는 것은 📝입�
 
 ## 팀에서 정해야 할 것
 
-- 카드번호 형식
+(카드번호 형식은 [ADR 0009](decisions/0009-card-policy.md)에서 정함)

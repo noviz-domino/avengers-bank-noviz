@@ -33,4 +33,4 @@ async def get_account_product(product_id: int, db: Annotated[AsyncSession, Depen
     return SuccessResponse[AccountProductDetailResponse](data=product)
 
 
-# TODO: GET /products/cards?type=               카드 상품 목록 (카드 기능 PR)
+# 카드 상품 목록 GET /products/cards 는 domains/cards/router.py (카드 도메인이 card_products를 가진다)
