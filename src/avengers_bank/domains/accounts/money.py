@@ -63,7 +63,7 @@ def check_transfer(src: Account | None, dst: Account | None, amount: int, sent_t
 
 
 async def execute_transfer(
-    db: AsyncSession, *, from_account_id: int, to_account_id: int, amount: int,
+    db: AsyncSession, *, owner_user_id: int, from_account_id: int, to_account_id: int, amount: int,
     action_id: uuid.UUID | None, memo: str | None,
 ) -> uuid.UUID:
     """호출한 쪽의 트랜잭션 안에서 실행한다. 잔액 변경 + 장부 두 줄 + (호출한 쪽의) 승인 상태 변경이 함께 커밋된다."""
@@ -72,9 +72,13 @@ async def execute_transfer(
         a.account_id: a for a in await db.scalars(
             select(Account).where(Account.account_id.in_({from_account_id, to_account_id}))
             .order_by(Account.account_id).with_for_update()
+            # 같은 세션에 예전에 읽은 계좌가 있어도 잠근 뒤의 최신 값으로 덮어쓴다 (잔액 유실 방지)
+            .execution_options(populate_existing=True)
         )
     }
     src, dst = accounts.get(from_account_id), accounts.get(to_account_id)
+    if src is not None and src.user_id != owner_user_id:  # 실행 직전 소유권 재검사 (승인·실행 규칙 3)
+        src = None
     internal = check_transfer(src, dst, amount, await today_transfer_out(db, from_account_id))
     # 가드 목록 (ADR 0007): 예산 가드는 예산 기능 PR에서 여기에 들어간다
 

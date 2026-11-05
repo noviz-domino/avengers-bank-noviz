@@ -34,7 +34,7 @@
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
-| ✅ | POST | `/users/signup` | | 회원가입 (생년월일 필수, 마케팅 동의 선택) |
+| ✅ | POST | `/users/signup` | | 회원가입 (생년월일 필수, 마케팅 동의 선택). 이름은 한글·영문과 띄어쓰기만, 30자까지 (승인 화면에 받는 사람 이름으로 들어가서 숫자·기호로 금액처럼 꾸미지 못하게) |
 | ✅ | POST | `/users/login` | | 로그인, access token(15분) + refresh token(14일) 발급. 5회 실패하면 15분 잠금 |
 | ✅ | POST | `/users/token/refresh` | | refresh token을 새 것으로 바꾸고 access token 재발급. 이미 바꾼 토큰이 다시 오면 그 기기 전체 폐기 |
 | ✅ | POST | `/users/logout` | | 이 기기의 refresh token 폐기 (없는 토큰이어도 성공) |
@@ -173,7 +173,7 @@
   "expires_at": "…(10분 뒤)", "created_at": "…", "executed_at": null, "failure_reason": null },
   "message": "승인 화면에서 PIN을 입력하면 보내집니다." }
 ```
-실패: `400 INSUFFICIENT_BALANCE`, `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED`, `400 ACCOUNT_NOT_FOUND`(보내는 계좌가 없거나 남의 것), `400 RECEIVER_NOT_FOUND`, `400 ACCOUNT_CANNOT_SEND`(입출금 아님), `400 ACCOUNT_CANNOT_RECEIVE`, `400 SAME_ACCOUNT`, `409 IDEMPOTENCY_KEY_REUSED`(같은 키, 다른 내용)
+실패: `400 INSUFFICIENT_BALANCE`, `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED`, `400 ACCOUNT_NOT_FOUND`(보내는 계좌가 없거나 남의 것), `400 RECEIVER_NOT_FOUND`, `400 ACCOUNT_CANNOT_SEND`(입출금 아님), `400 ACCOUNT_CANNOT_RECEIVE`, `400 SAME_ACCOUNT`, `409 IDEMPOTENCY_KEY_REUSED`(같은 키, 다른 내용. 메모도 비교), `409 DUPLICATE_REQUEST`(같은 키가 동시에 옴)
 </details>
 
 ## approvals: 승인 (`domains/approvals`)
@@ -188,7 +188,7 @@
 | ✅ | POST | `/approvals/{action_id}/reject` | 🔒 | 거절 (안전한 쪽이라 PIN 없음) |
 | ✅ | PUT | `/users/me/pin` | 🔒 | 거래 PIN 6자리 설정·변경. **비밀번호를 다시 받음**(토큰만으로는 못 바꿈) |
 
-실패: `400 PIN_NOT_SET`, `400 INVALID_PIN`(남은 횟수 안내), `423 PIN_LOCKED`(5회, 15분. 로그인은 안 잠김), `409 ACTION_EXPIRED`(10분), `409 ACTION_NOT_PENDING`(이미 처리), `404 ACTION_NOT_FOUND`(없거나 남의 것), 실행 때 재검사 실패는 그 이유(예: `400 INSUFFICIENT_BALANCE`)로 답하고 요청은 `FAILED`로 남습니다.
+실패: `400 PIN_NOT_SET`, `400 INVALID_PIN`(남은 횟수 안내), `423 PIN_LOCKED`(5회, 15분. 로그인은 안 잠김), `409 ACTION_EXPIRED`(10분), `409 ACTION_NOT_PENDING`(이미 처리. 이 둘은 **PIN을 확인하기 전에** 알려서 PIN 실패로 세지 않음), `404 ACTION_NOT_FOUND`(없거나 남의 것), 실행 때 재검사 실패는 그 이유(예: `400 INSUFFICIENT_BALANCE`)로 답하고 요청은 `FAILED`로 남습니다.
 
 ## cards: 카드 (`domains/cards`)
 

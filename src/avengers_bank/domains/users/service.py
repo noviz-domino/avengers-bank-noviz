@@ -78,28 +78,29 @@ class UserService:
         return user
 
     async def login(self, db: AsyncSession, data: UserLogin, ip: str | None = None) -> TokenResponse:
-        # 비밀번호 확인(Argon2, 느림)은 행을 잠그지 않고 하고, 실패 횟수는 UPDATE 한 문장으로 올린다.
-        # 동시에 여러 번 틀려도 횟수가 덮어써지지 않고, 연결을 오래 붙잡지 않는다.
+        # 시도를 먼저 예약하고(UPDATE 한 문장), 느린 비밀번호 확인은 트랜잭션 밖에서 한다.
+        # 동시에 여러 번 보내도 5번까지만 확인하고, 연결을 오래 붙잡지 않는다.
+        now = datetime.now(UTC)
         async with db.begin():
             user = await user_repository.find_by_login_id(db, data.login_id)
             if user is None:
                 raise UnauthorizedException(
                     message="아이디 또는 비밀번호가 올바르지 않습니다.", code="INVALID_CREDENTIALS"
                 )
-            now = datetime.now(UTC)
-            if is_locked(user.login_locked_until, now):
-                raise login_locked()
             user_id, hashed_password = user.user_id, user.hashed_password
+            if await user_repository.reserve_attempt(db, user_id, "login", LOGIN_MAX_FAILS, now) is None:
+                raise login_locked()
 
         ok = await run_in_threadpool(verify_password, data.password, hashed_password)
 
         async with db.begin():
-            if ok:
-                await user_repository.reset_failures(db, user_id, "login")
+            if ok and await user_repository.succeed_attempt(db, user_id, "login", now):
                 # 로그인마다 새 family: 기기별로 따로 로그아웃·도난 대응
                 refresh = await self._issue_refresh(db, user_id, uuid.uuid4(), data.device_name, now)
                 return TokenResponse(access_token=create_access_token(user_id), refresh_token=refresh)
-            _, locked_until = await user_repository.add_failure(
+            if ok:  # 맞았지만 그사이 다른 시도가 잠갔다
+                raise login_locked()
+            _, locked_until = await user_repository.fail_attempt(
                 db, user_id, "login", LOGIN_MAX_FAILS, now + LOGIN_LOCK_DURATION
             )
             await audit_repository.record(db, user_id=user_id, actor="USER", action="LOGIN_FAILED", ip=ip)
@@ -174,26 +175,33 @@ class UserService:
             await user_repository.reset_failures(db, user_id, "pin")
             await audit_repository.record(db, user_id=user_id, actor="USER", action="PIN_SET")
 
-    async def verify_pin(self, db: AsyncSession, user_id: int, pin: str, ip: str | None = None) -> None:
-        """거래 PIN 확인 (ADR 0005). 5번 틀리면 PIN만 15분 잠근다. 로그인은 잠기지 않는다."""
+    async def verify_pin(
+        self, db: AsyncSession, user_id: int, pin: str, ip: str | None = None, target: str | None = None
+    ) -> None:
+        """거래 PIN 확인 (ADR 0005). 5번 틀리면 PIN만 15분 잠근다. 로그인은 잠기지 않는다.
+        로그인과 같이 시도를 먼저 예약해서, 동시에 수백 번 보내도 5번까지만 확인한다."""
         now = datetime.now(UTC)
-        user = await user_repository.find_by_id(db, user_id)
-        pin_hash, pin_locked_until = user.transaction_pin_hash, user.pin_locked_until
-        await db.rollback()  # 느린 PIN 확인 동안 트랜잭션을 열어 두지 않는다
-        if pin_hash is None:
-            raise BadRequestException(message="거래 PIN을 먼저 설정해 주세요.", code="PIN_NOT_SET")
-        if is_locked(pin_locked_until, now):
-            raise pin_locked()
-
-        if await run_in_threadpool(verify_password, pin, pin_hash):
-            async with db.begin():
-                await user_repository.reset_failures(db, user_id, "pin")
-            return
         async with db.begin():
-            fails, locked_until = await user_repository.add_failure(
+            user = await user_repository.find_by_id(db, user_id)
+            pin_hash = user.transaction_pin_hash
+            if pin_hash is None:
+                raise BadRequestException(message="거래 PIN을 먼저 설정해 주세요.", code="PIN_NOT_SET")
+            if await user_repository.reserve_attempt(db, user_id, "pin", PIN_MAX_FAILS, now) is None:
+                raise pin_locked()
+
+        ok = await run_in_threadpool(verify_password, pin, pin_hash)
+
+        async with db.begin():
+            if ok and await user_repository.succeed_attempt(db, user_id, "pin", now):
+                return
+            if ok:
+                raise pin_locked()
+            fails, locked_until = await user_repository.fail_attempt(
                 db, user_id, "pin", PIN_MAX_FAILS, now + PIN_LOCK_DURATION
             )
-            await audit_repository.record(db, user_id=user_id, actor="USER", action="PIN_FAILED", ip=ip)
+            await audit_repository.record(
+                db, user_id=user_id, actor="USER", action="PIN_FAILED", target=target, ip=ip
+            )
         if is_locked(locked_until, now):
             raise pin_locked()
         raise BadRequestException(

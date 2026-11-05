@@ -207,3 +207,58 @@ async def test_expired_reject_and_other_users_action(bank):
     response = await client.post(f"/approvals/{a2['action_id']}/approve", json={"pin": PIN}, headers=tony)
     assert response.json()["error"]["code"] == "ACTION_NOT_PENDING"
     assert await balance(src["account_id"]) == 1_000_000
+
+
+async def test_attempts_are_reserved_before_checking(bank):
+    """느린 PIN 확인이 동시에 많이 돌아도 예약은 5번까지만 성공한다 (동시 추측 차단)"""
+    from avengers_bank.domains.users.repository import user_repository
+    from avengers_bank.domains.users.models import User
+
+    now = datetime.now(UTC)
+    async with SessionLocal() as db:
+        uid = await db.scalar(select(User.user_id).where(User.login_id == "ironman"))
+        reserved = [await user_repository.reserve_attempt(db, uid, "pin", 5, now) for _ in range(10)]
+        assert reserved == [1, 2, 3, 4, 5, None, None, None, None, None]
+        await user_repository.fail_attempt(db, uid, "pin", 5, now + timedelta(minutes=15))  # 하나가 틀려서 잠김
+        assert await user_repository.succeed_attempt(db, uid, "pin", now) is False  # 늦게 끝난 정답은 인정 안 함
+        await db.commit()
+
+
+async def test_no_pin_attempt_for_expired_action(bank):
+    client, tony, _, src, dst = bank
+    action = (await client.post("/transfers", json=transfer(src, dst), headers=tony)).json()["data"]
+    async with SessionLocal() as db:
+        await db.execute(update(PendingAction).values(expires_at=datetime.now(UTC) - timedelta(seconds=1)))
+        await db.commit()
+    response = await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": "000000"}, headers=tony)
+    assert response.json()["error"]["code"] == "ACTION_EXPIRED"  # 틀린 PIN이어도 PIN 실패로 세지 않음
+    async with SessionLocal() as db:
+        assert await db.scalar(select(func.count()).where(AuditLog.action == "PIN_FAILED")) == 0
+
+
+async def test_daily_limit_rechecked_at_execution(bank):
+    client, tony, _, src, dst = bank
+    async with SessionLocal() as db:
+        await db.execute(update(Account).where(Account.account_id == src["account_id"]).values(balance=10_000_000))
+        await db.commit()
+    # 요청 때는 각각 한도 안이지만, 승인할수록 오늘 보낸 금액이 쌓인다 (90만 × 6 = 540만 > 500만)
+    actions = [(await client.post("/transfers", json=transfer(src, dst, amount=900_000, key=f"key-daily-{i}"), headers=tony)).json()["data"]
+               for i in range(6)]
+    results = [await client.post(f"/approvals/{a['action_id']}/approve", json={"pin": PIN}, headers=tony) for a in actions]
+    assert [r.status_code for r in results] == [200] * 5 + [400]
+    assert results[-1].json()["error"]["code"] == "DAILY_LIMIT_EXCEEDED"
+    assert await balance(dst["account_id"]) == 4_500_000
+
+
+async def test_memo_is_part_of_idempotency(bank):
+    client, tony, _, src, dst = bank
+    await client.post("/transfers", json=transfer(src, dst, memo="밥값"), headers=tony)
+    response = await client.post("/transfers", json=transfer(src, dst, memo="월세"), headers=tony)
+    assert response.json()["error"]["code"] == "IDEMPOTENCY_KEY_REUSED"
+
+
+async def test_name_cannot_look_like_amount(client):
+    body = {"login_id": "tricky", "password": "password1234", "phone": "010-1234-5678", "birth_date": "1990-05-29"}
+    for name in ["피터 500만원", "1,000,000", "피터(관리자)"]:
+        assert (await client.post("/users/signup", json={**body, "name": name})).status_code == 422, name
+    assert (await client.post("/users/signup", json={**body, "name": "Peter Parker"})).status_code == 201

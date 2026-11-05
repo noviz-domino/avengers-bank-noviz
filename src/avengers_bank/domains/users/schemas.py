@@ -7,7 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, PastDate
 class UserCreate(BaseModel):
     login_id: str = Field(min_length=4, max_length=50)
     password: str = Field(min_length=8, max_length=128, repr=False)
-    name: str = Field(min_length=1, max_length=50)
+    # 승인 화면 문장에 받는 사람 이름으로 들어간다. 숫자·기호로 금액처럼 보이게 꾸미지 못하게 글자만 받는다
+    name: str = Field(min_length=1, max_length=30, pattern=r"^[가-힣a-zA-Z]+( [가-힣a-zA-Z]+)*$")
     nick_name: str | None = Field(default=None, max_length=50)
     phone: str = Field(min_length=9, max_length=20)
     birth_date: PastDate  # 상품 가입 나이 조건 검사 (ADR 0003)

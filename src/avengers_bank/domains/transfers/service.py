@@ -54,14 +54,17 @@ class TransferService:
             )
             try:
                 await approval_repository.save(db, action)
-            except IntegrityError:  # 같은 키가 동시에 와서 다른 요청이 먼저 저장함
+            except IntegrityError as e:
+                if "idempotency_key" not in str(e.orig):  # 같은 키가 동시에 온 경우만 409, 다른 위반은 버그
+                    raise
                 raise ConflictException(message="같은 요청을 처리하고 있습니다.", code="DUPLICATE_REQUEST") from None
             return action, True
 
     def _same_request(self, existing: PendingAction, data: TransferCreate) -> PendingAction:
         p = existing.payload
         same = (existing.action_type == "TRANSFER" and p["from_account_id"] == data.from_account_id
-                and p["to_account_num"] == data.to_account_num and p["amount"] == data.amount)
+                and p["to_account_num"] == data.to_account_num and p["amount"] == data.amount
+                and p.get("memo") == data.memo)
         if not same:
             raise ConflictException(
                 message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"

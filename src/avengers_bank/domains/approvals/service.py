@@ -15,13 +15,17 @@ from avengers_bank.domains.users.service import user_service
 async def run_transfer(db: AsyncSession, action: PendingAction) -> None:
     p = action.payload
     await execute_transfer(
-        db, from_account_id=p["from_account_id"], to_account_id=p["to_account_id"],
+        db, owner_user_id=action.user_id, from_account_id=p["from_account_id"], to_account_id=p["to_account_id"],
         amount=p["amount"], action_id=action.action_id, memo=p.get("memo"),
     )
 
 
 # action_type → 실행 함수. 새 승인 대상(예금 개설, 카드 해제 등)은 여기에 추가한다
 EXECUTORS = {"TRANSFER": run_transfer}
+
+
+def as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=UTC)  # SQLite는 시간대를 버리고 돌려준다
 
 
 def not_found() -> NotFoundException:
@@ -41,9 +45,12 @@ class ApprovalService:
     async def approve(
         self, db: AsyncSession, user_id: int, action_id: uuid.UUID, pin: str, ip: str | None = None
     ) -> PendingAction:
-        await self.get(db, user_id, action_id)  # 남의 작업이면 PIN을 묻기 전에 404
+        # 남의 작업(404)이나 이미 처리·만료된 작업(409)이면 PIN을 묻기 전에 알린다: PIN 실패로 세지 않게
+        action = await self.get(db, user_id, action_id)
+        if action.status != "PENDING" or as_utc(action.expires_at) <= datetime.now(UTC):
+            await self._explain_not_claimable(db, user_id, action_id, datetime.now(UTC))
         await db.rollback()
-        await user_service.verify_pin(db, user_id, pin, ip=ip)
+        await user_service.verify_pin(db, user_id, pin, ip=ip, target=str(action_id))
 
         failure: TransferRejected | None = None
         async with db.begin():
@@ -75,8 +82,7 @@ class ApprovalService:
         action = await approval_repository.find(db, action_id)
         if action is None or action.user_id != user_id:
             raise not_found()
-        expires_at = action.expires_at if action.expires_at.tzinfo else action.expires_at.replace(tzinfo=UTC)
-        if action.status == "PENDING" and expires_at <= now:
+        if action.status == "PENDING" and as_utc(action.expires_at) <= now:
             raise ConflictException(message="승인 시간이 지났습니다. 다시 요청해 주세요.", code="ACTION_EXPIRED")
         raise ConflictException(message="이미 처리된 요청입니다.", code="ACTION_NOT_PENDING")
 
