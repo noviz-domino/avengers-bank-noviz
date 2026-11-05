@@ -116,7 +116,7 @@ erDiagram
         string counterparty_name "NULL"
         string counterparty_account "NULL"
         string memo "NULL"
-        string category "NULL, 예산 기능에서 categories FK로"
+        string category "기록할 때 규칙으로, 사용자가 고침. 예산 기능에서 categories FK로"
         datetime created_at
     }
     pending_actions {

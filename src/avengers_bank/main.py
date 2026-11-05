@@ -7,6 +7,7 @@ from avengers_bank.core.database import engine
 from avengers_bank.core.exception_handlers import register_exception_handlers
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.accounts.router import router as account_router
+from avengers_bank.domains.accounts.router import tx_router as transaction_router
 from avengers_bank.domains.approvals.router import router as approval_router
 from avengers_bank.domains.cards.router import router as card_router
 from avengers_bank.domains.products.router import router as product_router
@@ -33,6 +34,7 @@ register_exception_handlers(app)
 app.include_router(user_router)
 app.include_router(product_router)
 app.include_router(account_router)
+app.include_router(transaction_router)
 app.include_router(transfer_router)
 app.include_router(approval_router)
 app.include_router(card_router)

@@ -157,6 +157,39 @@
 ```
 </details>
 
+## transactions: 거래내역 검색 (`domains/accounts`)
+
+| 상태 | 메서드 | 경로 | 인증 | 설명 |
+|---|---|---|---|---|
+| ✅ | GET | `/transactions` | 🔒 | 내 모든 계좌의 거래 검색 + 조건 전체 합계 |
+| ✅ | PATCH | `/transactions/{tx_id}` | 🔒 | 카테고리·메모 고치기 (보낸 칸만, 금액·상대방은 못 고침) |
+
+<details>
+<summary>요청·응답 예시</summary>
+
+`GET /transactions?from_date=2026-11-01&to_date=2026-11-30&direction=OUT&category=식사&limit=20`
+→ `200`
+```json
+{ "data": {
+  "transactions": [ { "tx_id": 4, "account_id": 1, "tx_type": "CARD_PAYMENT", "amount": -12000, "balance_after": 2350000,
+                      "counterparty_name": null, "counterparty_account": null, "memo": "점심", "category": "식사", "created_at": "…" } ],
+  "total_in": 0, "total_out": 12000, "next_before": null
+}, "message": null }
+```
+| 조건 | 뜻 |
+|---|---|
+| `account_id` | 없으면 내 모든 계좌. 남의 계좌는 `404 ACCOUNT_NOT_FOUND` |
+| `from_date`, `to_date` | **한국 날짜** (양 끝 포함) |
+| `min_amount`, `max_amount` | 금액의 크기(부호 무시) |
+| `keyword` | 메모·상대방 이름에 포함 (대소문자 무시, `%`·`_`는 글자 그대로) |
+| `direction` | `IN` / `OUT` |
+| `category` | 식사, 카페·간식, 외식·술자리, 교통, 쇼핑, 의료, 주거·통신, 여가, 이체, 저축·내 계좌, 수입, 대출, 카드 대금, 기타 |
+| `limit`, `before` | 최근부터. 다음 쪽은 응답의 `next_before`를 `before`로 |
+
+- `total_in`, `total_out`은 이번 쪽이 아니라 **조건 전체**의 합계(`total_out`은 양수)
+- 실패: `422`(기간·금액 범위가 거꾸로, 없는 카테고리), `404 TRANSACTION_NOT_FOUND`(없거나 남의 거래)
+</details>
+
 ## transfers: 돈 이동 (`domains/transfers`)
 
 이체는 바로 실행하지 않고 **승인 대기 작업(`pending_actions`)을 만든 뒤 PIN 승인으로 실행**합니다([ADR 0004](decisions/0004-agent-integration.md), [ADR 0007](decisions/0007-money-execution-and-budget-guard.md)). **웹에서 시작해도** 같습니다.

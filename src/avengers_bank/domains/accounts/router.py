@@ -12,7 +12,10 @@ from avengers_bank.domains.accounts.schemas import (
     AccountListResponse,
     AccountUpdate,
     DepositCreate,
+    TransactionFilter,
     TransactionResponse,
+    TransactionSearchResponse,
+    TransactionUpdate,
 )
 from avengers_bank.domains.accounts.service import account_service
 from avengers_bank.domains.approvals.schemas import ActionResponse
@@ -73,3 +76,19 @@ async def list_transactions(
 async def rename_account(account_id: int, data: AccountUpdate, db: DB, me: Me):
     account = await account_service.rename(db, me.user_id, account_id, data.nickname)
     return SuccessResponse[AccountDetailResponse](data=account)
+
+
+# 계좌를 가로지르는 거래 검색 (Agent의 search_transactions 도구도 이걸 쓴다: ADR 0006)
+tx_router = APIRouter(prefix="/transactions", tags=["transactions"], responses=error_responses(401, 422))
+
+
+@tx_router.get("", response_model=SuccessResponse[TransactionSearchResponse], responses=error_responses(404))
+async def search_transactions(f: Annotated[TransactionFilter, Query()], db: DB, me: Me):
+    """기간(한국 날짜)·금액·키워드(메모·상대방)·방향·카테고리로 검색. 합계는 조건 전체"""
+    return SuccessResponse[TransactionSearchResponse](data=await account_service.search_transactions(db, me.user_id, f))
+
+
+@tx_router.patch("/{tx_id}", response_model=SuccessResponse[TransactionResponse], responses=error_responses(404))
+async def update_transaction(tx_id: int, data: TransactionUpdate, db: DB, me: Me):
+    """카테고리·메모 고치기 (금액·상대방은 못 고침)"""
+    return SuccessResponse[TransactionResponse](data=await account_service.update_transaction(db, me.user_id, tx_id, data))

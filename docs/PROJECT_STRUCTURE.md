@@ -26,6 +26,7 @@ avengers-bank/
 │   ├── test_accounts.py        # 계좌 개설·가입 조건·적용 금리, 메인 화면 총자산, 남의 계좌 404, 거래내역
 │   ├── test_transfers.py       # 이체 승인 흐름, 두 번 승인, 멱등키, PIN 잠금, 승인 전 잔액 변화, 한도
 │   ├── test_deposits.py        # 예금 개설 승인, 실패 때 빈 계좌가 남지 않음, 특판 종료, 예금 추가 입금 불가
+│   ├── test_transaction_search.py  # 검색 조건·합계·한국 날짜·쪽, 남의 거래 404, 카테고리 규칙·수정
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/
@@ -42,7 +43,7 @@ avengers-bank/
     └── domains/
         ├── users/          # 회원가입, 로그인, 내 정보          ✅ 구현됨
         ├── products/       # 계좌·대출 상품 조회, 우대금리       ✅ 목록·상세, 가입 조건·적용 금리(eligibility.py)
-        ├── accounts/       # 계좌·예적금 조건·장부              ✅ 개설·조회, 계좌번호 규칙, **돈 실행 지점(money.py)**
+        ├── accounts/       # 계좌·예적금 조건·장부              ✅ 개설·조회, 거래 검색, 카테고리(categories.py), 계좌번호 규칙, **돈 실행 지점(money.py)**
         ├── approvals/      # 승인 대기 작업, PIN 승인·거절        ✅
         ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
         ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성

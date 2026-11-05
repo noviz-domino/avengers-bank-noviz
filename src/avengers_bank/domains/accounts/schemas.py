@@ -1,7 +1,12 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from avengers_bank.domains.accounts.categories import CATEGORIES
+
+Category = Literal[CATEGORIES]
 
 
 class AccountCreate(BaseModel):
@@ -68,6 +73,7 @@ class AccountDetailResponse(AccountSummaryResponse):
 
 class TransactionResponse(BaseModel):
     tx_id: int
+    account_id: int
     tx_type: str
     amount: int
     balance_after: int
@@ -78,3 +84,42 @@ class TransactionResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TransactionFilter(BaseModel):
+    """거래내역 검색 조건. 날짜는 한국 날짜, 금액은 부호와 상관없이 크기로 비교한다"""
+
+    account_id: int | None = None  # 없으면 내 모든 계좌
+    from_date: date | None = None
+    to_date: date | None = None
+    min_amount: int | None = Field(default=None, ge=0)
+    max_amount: int | None = Field(default=None, ge=0)
+    keyword: str | None = Field(default=None, min_length=1, max_length=50)  # 메모·상대방 이름
+    direction: Literal["IN", "OUT"] | None = None
+    category: Category | None = None
+    limit: int = Field(default=20, ge=1, le=100)
+    before: int | None = None  # 이전 쪽의 마지막 tx_id
+
+    @model_validator(mode="after")
+    def check_ranges(self):
+        if self.from_date and self.to_date and self.from_date > self.to_date:
+            raise ValueError("from_date가 to_date보다 늦습니다.")
+        if self.min_amount is not None and self.max_amount is not None and self.min_amount > self.max_amount:
+            raise ValueError("min_amount가 max_amount보다 큽니다.")
+        return self
+
+
+class TransactionSearchResponse(BaseModel):
+    """GET /transactions — 이번 쪽 거래 + 조건 전체의 합계 (Agent가 \"지난달 식비 얼마?\"에 바로 답할 수 있게)"""
+
+    transactions: list[TransactionResponse]
+    total_in: int   # 조건에 맞는 들어온 돈 합계 (쪽과 상관없이 전체)
+    total_out: int  # 조건에 맞는 나간 돈 합계 (양수)
+    next_before: int | None  # 다음 쪽을 부를 때 before에 넣을 값. 없으면 끝
+
+
+class TransactionUpdate(BaseModel):
+    """사용자가 카테고리·메모를 고친다. 금액·상대방은 고칠 수 없다"""
+
+    category: Category | None = None
+    memo: str | None = Field(default=None, min_length=1, max_length=100)

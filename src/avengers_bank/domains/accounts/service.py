@@ -19,6 +19,10 @@ from avengers_bank.domains.accounts.schemas import (
     AccountSummaryResponse,
     AccountTermsResponse,
     DepositCreate,
+    TransactionFilter,
+    TransactionResponse,
+    TransactionSearchResponse,
+    TransactionUpdate,
 )
 from avengers_bank.domains.products.eligibility import add_months, applied_rate, check_eligibility
 from avengers_bank.domains.products.models import AccountProduct
@@ -216,6 +220,27 @@ class AccountService:
     ):
         await self.get_my_account(db, user_id, account_id)  # 소유권 검사
         return await account_repository.find_transactions(db, account_id, limit, before)
+
+    async def search_transactions(self, db: AsyncSession, user_id: int, f: TransactionFilter) -> TransactionSearchResponse:
+        if f.account_id is not None:
+            await self.get_my_account(db, user_id, f.account_id)  # 남의 계좌면 404 (빈 결과로 숨기지 않고 명확히)
+        rows, total_in, total_out = await account_repository.search_transactions(db, user_id, f)
+        return TransactionSearchResponse(
+            transactions=[TransactionResponse.model_validate(r) for r in rows],
+            total_in=total_in, total_out=total_out,
+            next_before=rows[-1].tx_id if len(rows) == f.limit else None,
+        )
+
+    async def update_transaction(
+        self, db: AsyncSession, user_id: int, tx_id: int, data: TransactionUpdate
+    ) -> TransactionResponse:
+        async with db.begin():
+            tx = await account_repository.find_my_transaction(db, user_id, tx_id)
+            if tx is None:
+                raise NotFoundException(message="거래를 찾을 수 없습니다.", code="TRANSACTION_NOT_FOUND")
+            for field in data.model_fields_set:  # 보낸 칸만 바꾼다 (null이면 지움)
+                setattr(tx, field, getattr(data, field))
+        return TransactionResponse.model_validate(tx)
 
     async def rename(self, db: AsyncSession, user_id: int, account_id: int, nickname: str | None) -> AccountDetailResponse:
         async with db.begin():
