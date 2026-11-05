@@ -53,7 +53,8 @@ class AccountProduct(Base):
         Boolean, default=True, server_default=true(), nullable=False
     )
     preferential_rates: Mapped[list["ProductPreferentialRate"]] = relationship(
-        lazy="selectin", order_by="ProductPreferentialRate.rate_id"
+        # 목록에는 필요 없어서 자동으로 읽지 않는다. 필요한 곳에서 selectinload로 명시
+        lazy="raise", order_by="ProductPreferentialRate.rate_id"
     )
 
 

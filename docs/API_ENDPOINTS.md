@@ -89,7 +89,7 @@
   ]
 }, "message": null }
 ```
-금리는 소수점이 정확해야 해서 문자열로 보냅니다. 적금·예금의 `min_amount`·`max_amount`는 적금은 월 납입금, 예금은 맡기는 금액입니다.
+금리는 소수점이 정확해야 해서 문자열로 보냅니다. "판매 중"은 한국 날짜로 판단합니다(서버 시간대가 UTC여도 자정에 바뀜). 적금·예금의 `min_amount`·`max_amount`는 적금은 월 납입금, 예금은 맡기는 금액입니다.
 </details>
 
 ## accounts: 계좌 (`domains/accounts`)

@@ -63,7 +63,10 @@ def test_migration_creates_every_check():
     for revision in ["c3d9e1a47b20", "d81f4b6c2e90"]:
         migration = load_migration(revision)
         source = inspect.getsource(migration.upgrade)
-        missing = [n for n in migration.CHECKS if f"'{n}'" not in source]
+        created = lambda n: any(  # noqa: E731
+            p in source for p in (f"check('{n}')", f"create_check_constraint('{n}'", f"name='{n}'")
+        )
+        missing = [n for n in migration.CHECKS if not created(n)]
         assert not missing, (revision, missing)
 
 

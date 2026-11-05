@@ -114,7 +114,7 @@ erDiagram
     }
 ```
 
-- `account_products`: `(type, product_code)` unique, `product_code` 1~99 (ADR 0001). 대출 상품도 `type = LOAN`으로 여기에 둡니다. **판매 중** = `is_active`이고 특판 기간(`sale_start`~`sale_end`)이 있으면 오늘이 그 안에 있음.
+- `account_products`: `(type, product_code)` unique, `product_code` 1~99 (ADR 0001). 대출 상품도 `type = LOAN`으로 여기에 둡니다. **판매 중** = `is_active`이고 특판 기간(`sale_start`~`sale_end`)이 있으면 오늘(**한국 날짜**, `core/clock.py`)이 그 안에 있음. `max_preferential_rate`는 **우대 상한**이라 우대 조건 합계와 다를 수 있습니다(데모 seed는 합계를 넣음). 가입 때 적용 금리 = 기본금리 + min(충족한 우대 합계, 상한).
 - `product_preferential_rates`: 상품의 우대 조건. 처음에는 예산 그룹의 예정 테이블이었지만, 우대금리는 상품 기능이라 상품 PR에서 만들었습니다. 계좌에는 가입 때 적용된 우대만 `account_terms.rate_detail`에 스냅샷으로 남습니다.
 - `account_terms.rate_detail` 예: `[{"code": "SALARY_TRANSFER", "rate": 0.5}, {"code": "MARKETING_AGREED", "rate": 0.2}]`. 가입할 때 한 번 정해지고 바뀌지 않습니다.
 - PK는 `int`입니다(현재 코드와 같음). SQLite 테스트에서 `BIGINT PRIMARY KEY`는 자동 증가하지 않기 때문입니다. 금액 칸(`balance`, `amount`, 한도 등)만 `bigint`입니다.

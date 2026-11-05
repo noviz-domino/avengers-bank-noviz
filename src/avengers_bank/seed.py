@@ -2,6 +2,10 @@
 
 실행: uv run python -m avengers_bank.seed  (Docker는 시작할 때 자동 실행)
 상품 이름·금리는 데모용으로 지어낸 값이다.
+
+- 이미 있는 상품은 **고치지 않는다**. 운영 중인 상품 금리를 seed가 덮어쓰면 안 되기 때문이다.
+  데모 값을 바꾼 뒤 다시 넣으려면 DB를 초기화한다 (docker compose down -v).
+- max_preferential_rate는 "우대 상한"이다. 데모 상품은 우대 조건을 모두 채운 합계를 상한으로 넣는다.
 """
 
 import asyncio
@@ -30,9 +34,9 @@ PRODUCTS = [
          rates=[(*SALARY, Decimal("0.30")), (*MARKETING, Decimal("0.20"))]),
     dict(type="DEPOSIT", product_code=2, name="쉴드 특판 예금", base_rate=Decimal("3.80"),
          min_term_months=6, max_term_months=12, min_amount=1_000_000, max_amount=30_000_000,
-         sale_start=date(2026, 11, 1), sale_end=date(2026, 12, 31),
-         description="연말까지만 판매하는 특판 예금입니다.",
-         conditions="판매 기간 2026-11-01 ~ 2026-12-31. 100만 원부터 3천만 원까지, 6~12개월.", rates=[]),
+         sale_start=date(2026, 11, 1), sale_end=date(2027, 12, 31),  # 데모 기간 내내 보이게
+         description="정해진 기간에만 판매하는 특판 예금입니다.",
+         conditions="판매 기간 2026-11-01 ~ 2027-12-31. 100만 원부터 3천만 원까지, 6~12개월.", rates=[]),
     dict(type="SAVINGS", product_code=1, name="스타크 자유적금", base_rate=Decimal("3.50"),
          min_term_months=12, max_term_months=24, min_amount=10_000, max_amount=1_000_000,
          description="매달 정한 금액을 넣어 목돈을 만드는 적금입니다. 예산 관리의 목표 저축 계좌로 씁니다.",

@@ -1,6 +1,7 @@
 from datetime import date
 
 from sqlalchemy import or_, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.domains.products.models import AccountProduct
@@ -28,7 +29,9 @@ class ProductRepository:
         self, db: AsyncSession, product_id: int, today: date
     ) -> AccountProduct | None:
         return await db.scalar(
-            select(AccountProduct).where(AccountProduct.product_id == product_id, *on_sale(today))
+            select(AccountProduct)
+            .where(AccountProduct.product_id == product_id, *on_sale(today))
+            .options(selectinload(AccountProduct.preferential_rates))
         )
 
     # TODO: 카드 상품 조회는 카드 기능 PR에서
