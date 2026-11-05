@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.clock import KST, today_kst
+from avengers_bank.domains.accounts.categories import classify
 from avengers_bank.domains.accounts.models import Account, AccountTransaction
 from avengers_bank.domains.users.models import User
 
@@ -96,12 +97,12 @@ async def execute_transfer(
         AccountTransaction(
             account_id=src.account_id, action_id=action_id, transfer_id=transfer_id, tx_type=out_type,
             amount=-amount, balance_after=src.balance, counterparty_name=names[dst.user_id],
-            counterparty_account=dst.account_num, memo=memo,
+            counterparty_account=dst.account_num, memo=memo, category=classify(out_type, memo, names[dst.user_id]),
         ),
         AccountTransaction(
             account_id=dst.account_id, action_id=action_id, transfer_id=transfer_id, tx_type=in_type,
             amount=amount, balance_after=dst.balance, counterparty_name=names[src.user_id],
-            counterparty_account=src.account_num, memo=memo,
+            counterparty_account=src.account_num, memo=memo, category=classify(in_type, memo, names[src.user_id]),
         ),
     ])
     await db.flush()
