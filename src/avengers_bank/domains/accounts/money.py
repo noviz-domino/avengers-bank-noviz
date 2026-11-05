@@ -107,3 +107,29 @@ async def execute_transfer(
     ])
     await db.flush()
     return transfer_id
+
+
+async def execute_card_ledger(
+    db: AsyncSession, *, owner_user_id: int, account_id: int, tx_type: str, amount: int,
+    merchant_name: str, category: str,
+) -> AccountTransaction:
+    """체크카드 결제(CARD_PAYMENT, amount −)와 취소 환불(REFUND, +)을 결제 계좌 장부에 쓴다 (ADR 0010).
+    호출한 쪽 트랜잭션 안에서, 카드 행을 잠근 뒤에 부른다 (잠금 순서: 카드 → 계좌)"""
+    account = await db.scalar(
+        select(Account).where(Account.account_id == account_id)
+        .with_for_update().execution_options(populate_existing=True)
+    )
+    # 환불은 계좌 상태와 상관없이 돌려준다. 결제만 ACTIVE 계좌에서
+    if account is None or account.user_id != owner_user_id or (amount < 0 and account.status != "ACTIVE"):
+        raise TransferRejected("ACCOUNT_NOT_FOUND", "결제 계좌를 쓸 수 없습니다.")
+    if account.balance + amount < 0:
+        raise TransferRejected("INSUFFICIENT_BALANCE", "잔액이 부족합니다.")
+    # 가드 목록 (ADR 0007): 예산 가드는 예산 기능 PR에서 여기에도 들어간다 (결제만)
+    account.balance += amount
+    tx = AccountTransaction(
+        account_id=account.account_id, tx_type=tx_type, amount=amount, balance_after=account.balance,
+        counterparty_name=merchant_name[:50], category=category,
+    )
+    db.add(tx)
+    await db.flush()
+    return tx

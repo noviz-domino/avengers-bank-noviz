@@ -41,7 +41,38 @@ class CardResponse(BaseModel):
     nickname: str | None
     linked_account_id: int
     daily_limit: int
-    monthly_limit: int | None
+    credit_limit: int | None  # 신용만: 안 갚은 사용액의 한도
     payment_day: int | None
     status: str
     issued_at: datetime
+
+
+class CardPayment(BaseModel):
+    """POST /cards/{card_id}/payments — 가맹점 결제 흉내 (ADR 0010). 업종은 서버가 가맹점 이름으로 정한다"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    merchant_name: str = Field(min_length=1, max_length=100)
+    amount: int = Field(gt=0, le=100_000_000)
+    idempotency_key: str = Field(min_length=8, max_length=100)  # 가맹점이 다시 보내도 한 번만 결제
+
+
+class CardTransactionResponse(BaseModel):
+    card_tx_id: int
+    card_id: int
+    merchant_name: str
+    category: str
+    amount: int
+    status: str  # APPROVED / CANCELED
+    billing_status: str | None  # 신용만: UNBILLED / BILLED / PAID
+    approved_at: datetime
+    canceled_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CardLimitsResponse(BaseModel):
+    daily_limit: int
+    daily_used: int  # 오늘(한국 날짜) 쓴 금액, 취소 제외
+    credit_limit: int | None
+    credit_used: int | None  # 신용만: 안 갚은 사용액

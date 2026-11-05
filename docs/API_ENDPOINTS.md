@@ -244,9 +244,15 @@
 | ✅ | GET | `/cards`, `/cards/{card_id}` | 🔒 | 내 카드 목록·상세 |
 | ✅ | POST | `/cards/{card_id}/suspend` | 🔒 | 정지(`reason: SUSPENDED`) 또는 분실 신고(`LOST`). **바로** 적용. 분실은 되돌릴 수 없음 |
 | ✅ | POST | `/cards/{card_id}/unsuspend` | 🔒 | 정지 해제 요청 → `202` 승인 대기(`UNSUSPEND_CARD`). PIN 승인 때 상태를 다시 보고 풂 |
-| 📝 | POST | `/cards/{card_id}/payments` | 🔒 | 결제(체크는 바로 출금, 신용은 사용 기록), 취소, 사용내역, 한도 (카드 결제 PR) |
+| ✅ | POST | `/cards/{card_id}/payments` | 🔒 | **가맹점 결제 흉내**(`merchant_name`, `amount`, `idempotency_key`). PIN 없이 바로 `201`. 체크는 결제 계좌에서 출금, 신용은 사용 기록(`UNBILLED`). 같은 요청 번호면 처음 결과 `200`. Agent 도구에 없음 ([ADR 0010](decisions/0010-card-payments.md)) |
+| ✅ | GET | `/cards/{card_id}/transactions` | 🔒 | 사용내역 (최근 순) |
+| ✅ | POST | `/cards/{card_id}/transactions/{card_tx_id}/cancel` | 🔒 | 전액 취소. 체크는 결제 계좌로 환불(`REFUND`), 신용은 기록만 취소. 정지·분실 카드도 됨 |
+| ✅ | GET | `/cards/{card_id}/limits` | 🔒 | `daily_limit`·`daily_used`(오늘, 취소 제외), 신용은 `credit_limit`·`credit_used`(안 갚은 금액) |
+| 📝 | | | | 신용카드 대금 출금(`CARD_BILL`), 청구 후 취소 (대금 출금 PR) |
 
-- 기본 한도: 체크 1일 100만, 신용 1일 100만·월 300만
+- 기본 한도: 체크 1일 100만, 신용 1일 100만·신용 한도(안 갚은 금액) 300만. 카드 응답의 `monthly_limit`은 `credit_limit`으로 바뀜
+- 결제 실패: `409 CARD_NOT_ACTIVE`(정지·분실), `400 CARD_DAILY_LIMIT_EXCEEDED`, `400 CREDIT_LIMIT_EXCEEDED`, `400 INSUFFICIENT_BALANCE`, `400 ACCOUNT_NOT_FOUND`(결제 계좌를 쓸 수 없음), `409 IDEMPOTENCY_KEY_REUSED`
+- 취소 실패: `404 CARD_TX_NOT_FOUND`, `409 CARD_TX_ALREADY_CANCELED`, `409 CARD_TX_ALREADY_BILLED`
 - 실패: `400 ACCOUNT_NOT_FOUND`(결제 계좌가 내 입출금 계좌가 아님), `404 CARD_PRODUCT_NOT_FOUND`, `409 CARD_LOST`, `409 CARD_NOT_SUSPENDED`, `409 CARD_NUM_CONFLICT`(동시 발급, 다시 시도)
 
 ---

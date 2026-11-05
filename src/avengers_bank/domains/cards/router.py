@@ -8,7 +8,15 @@ from avengers_bank.core.database import get_db
 from avengers_bank.core.dependencies import get_current_user
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.approvals.schemas import ActionResponse
-from avengers_bank.domains.cards.schemas import CardIssue, CardProductResponse, CardResponse, CardSuspend
+from avengers_bank.domains.cards.schemas import (
+    CardIssue,
+    CardLimitsResponse,
+    CardPayment,
+    CardProductResponse,
+    CardResponse,
+    CardSuspend,
+    CardTransactionResponse,
+)
 from avengers_bank.domains.cards.service import card_service
 from avengers_bank.domains.users.schemas import UserResponse
 
@@ -60,3 +68,34 @@ async def request_unsuspend(card_id: int, data: UnsuspendRequest, response: Resp
     if not created:
         response.status_code = status.HTTP_200_OK
     return SuccessResponse[ActionResponse](data=action, message="승인 화면에서 PIN을 입력하면 정지가 풀립니다.")
+
+
+@router.post("/{card_id}/payments", response_model=SuccessResponse[CardTransactionResponse],
+             status_code=status.HTTP_201_CREATED, responses=error_responses(400, 404, 409))
+async def pay(card_id: int, data: CardPayment, response: Response, db: DB, me: Me):
+    """가맹점 결제 흉내 (ADR 0010): PIN 없이 바로. 체크는 결제 계좌에서 출금, 신용은 사용 기록.
+    Agent·MCP 도구에는 넣지 않는다. 같은 요청 번호로 다시 오면 처음 결과를 200으로 돌려준다"""
+    tx, created = await card_service.pay(db, me.user_id, card_id, data)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    message = "결제되었습니다." if created else "이미 처리된 결제 요청입니다."  # 재전송: 상태는 data.status로
+    return SuccessResponse[CardTransactionResponse](data=tx, message=message)
+
+
+@router.get("/{card_id}/transactions", response_model=SuccessResponse[list[CardTransactionResponse]],
+            responses=error_responses(404))
+async def list_card_transactions(card_id: int, db: DB, me: Me):
+    return SuccessResponse[list[CardTransactionResponse]](data=await card_service.list_txs(db, me.user_id, card_id))
+
+
+@router.post("/{card_id}/transactions/{card_tx_id}/cancel", response_model=SuccessResponse[CardTransactionResponse],
+             responses=error_responses(400, 404, 409))
+async def cancel_card_transaction(card_id: int, card_tx_id: int, db: DB, me: Me):
+    """전액 취소: 체크는 결제 계좌로 환불, 신용은 사용 기록만 취소"""
+    tx = await card_service.cancel(db, me.user_id, card_id, card_tx_id)
+    return SuccessResponse[CardTransactionResponse](data=tx, message="결제가 취소되었습니다.")
+
+
+@router.get("/{card_id}/limits", response_model=SuccessResponse[CardLimitsResponse], responses=error_responses(404))
+async def card_limits(card_id: int, db: DB, me: Me):
+    return SuccessResponse[CardLimitsResponse](data=await card_service.limits(db, me.user_id, card_id))
