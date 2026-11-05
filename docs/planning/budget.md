@@ -215,7 +215,7 @@
 
 ## 필요한 데이터
 
-[ERD의 "예정"](../ERD.md#예정) 표에 있습니다: `budget_profiles`, `fixed_expenses`, `savings_goals`, `budget_cycles`(결제 검사 때 잠그는 행), `budget_decisions`, `categories`, `product_preferential_rates`. 예산 기능을 구현하는 PR에서 컬럼을 확정하고 ERD 본문에 옮깁니다. 장부의 거래 종류(`tx_type`)는 이미 ERD에 있습니다.
+[ERD의 "예정"](../ERD.md#예정) 표에 있습니다: `budget_profiles`, `fixed_expenses`, `savings_goals`, `budget_cycles`(결제 검사 때 잠그는 행), `budget_decisions`, `categories`. 예산 기능을 구현하는 PR에서 컬럼을 확정하고 ERD 본문에 옮깁니다. 장부의 거래 종류(`tx_type`)는 이미 ERD에 있습니다.
 
 ## 결정 대기
 

@@ -49,12 +49,12 @@
 |---|---|---|---|
 | 회원가입·인증 | ✅ 기능 트리, 흐름 ① | ✅ `users` 확장 (+ 예정: `refresh_tokens`, `passkeys`) | ADR 0005. ✅ 회원가입(생년월일), 로그인, **5회 실패 잠금**. 휴대폰 본인확인은 뺌 |
 | 계좌·이체 | ✅ 명세, 흐름 ②③ | ✅ `accounts`, `account_terms`, `account_transactions`, `pending_actions` (테이블만) | ADR 0003. API는 다음 PR |
-| 상품 가입 조건 | ✅ 명세(예·적금 1번) | 📐 기간·금액·나이·조건·우대·특판 | |
+| 상품 가입 조건 | ✅ 명세(예·적금 1번) | ✅ 기간·금액·나이·조건·우대(`product_preferential_rates`)·특판 | ✅ 상품 목록·상세 API, 데모 상품 seed. 가입 조건 검사는 계좌 개설 PR |
 | 카드 | ✅ 명세, 흐름 ④ | 📐 `cards`, `card_transactions` (상태·한도 포함) | |
 | 대출 | ✅ 명세 16개 중 9개, 흐름 ⑤ | 📐 `loans`, `loan_schedules` | 가볍게 구현 ([scope.md](scope.md)) |
 | 수취인·알림 | ✅ 명세 | 📐 `recipients`, `notifications` | 자동이체는 예산의 저축 이체만 |
 | 자연어 입력 | ⚠️ 흐름 ⑥만 있음, 기능 명세 없음 | 📐 `chat_messages`, `pending_actions` | ADR 0004 |
 | RAG | ⚠️ 흐름 ⑥만 있음 | 📐 `rag_chunks` (pgvector) | |
-| **예산 관리** (추가 기능) | ✅ budget.md, 흐름 ⑦⑧ | 📐 예산 테이블 7개 | |
+| **예산 관리** (추가 기능) | ✅ budget.md, 흐름 ⑦⑧ | 📐 예산 테이블 6개 (우대금리 표는 상품으로 옮겨 구현) | |
 
 ✅ = 테이블이 코드·마이그레이션에 있음. 📐 = [ERD](../ERD.md) "예정" 표에 설계됨, 그 기능의 PR에서 추가합니다.

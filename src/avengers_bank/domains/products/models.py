@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    ForeignKey,
     Numeric,
     SmallInteger,
     String,
@@ -13,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     true,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from avengers_bank.core.database import Base
 
@@ -51,3 +52,24 @@ class AccountProduct(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default=true(), nullable=False
     )
+    preferential_rates: Mapped[list["ProductPreferentialRate"]] = relationship(
+        lazy="selectin", order_by="ProductPreferentialRate.rate_id"
+    )
+
+
+class ProductPreferentialRate(Base):
+    """상품의 우대금리 조건. 계좌에는 가입 때 적용된 것만 account_terms.rate_detail로 남는다"""
+
+    __tablename__ = "product_preferential_rates"
+    __table_args__ = (
+        UniqueConstraint("product_id", "code", name="uq_product_preferential_rates_product_id_code"),
+        CheckConstraint("rate > 0", name="ck_product_preferential_rates_rate"),
+    )
+
+    rate_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey("account_products.product_id"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(30), nullable=False)  # SALARY_TRANSFER 등
+    description: Mapped[str] = mapped_column(String(200), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)  # 가산 금리(%p)

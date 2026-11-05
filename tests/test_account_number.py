@@ -53,17 +53,18 @@ def test_account_type_of():
 def test_migration_checks_match_models():
     # alembic check는 CHECK 변경을 감지하지 못한다. 모델의 CHECK를 바꾸면 이 테스트가 깨지니,
     # 새 마이그레이션에 CHECKS를 적고 아래 revision을 그 파일로 바꾼다.
-    in_migrations = dict(load_migration("c3d9e1a47b20").CHECKS)
+    in_migrations = dict(load_migration("c3d9e1a47b20").CHECKS) | load_migration("d81f4b6c2e90").CHECKS
     in_migrations["ck_account_products_product_code"] = load_migration("ac577183c7ec").PRODUCT_CODE_CHECK
     assert in_migrations == model_checks()
 
 
 def test_migration_creates_every_check():
     # CHECKS에 적어 놓고 upgrade()에서 빠뜨려도 위 테스트·alembic check·SQLite 테스트는 모두 통과한다
-    migration = load_migration("c3d9e1a47b20")
-    source = inspect.getsource(migration.upgrade)
-    missing = [n for n in migration.CHECKS if f"check('{n}')" not in source and f"'{n}', " not in source]
-    assert not missing, missing
+    for revision in ["c3d9e1a47b20", "d81f4b6c2e90"]:
+        migration = load_migration(revision)
+        source = inspect.getsource(migration.upgrade)
+        missing = [n for n in migration.CHECKS if f"'{n}'" not in source]
+        assert not missing, (revision, missing)
 
 
 async def seed(db) -> None:
