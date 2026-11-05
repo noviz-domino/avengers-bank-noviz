@@ -76,7 +76,7 @@
 |---|---|---|---|---|
 | ✅ | GET | `/products/accounts?type=` | | **판매 중인** 계좌·대출 상품 목록 (`type` = CHECKING·DEPOSIT·SAVINGS·LOAN, 생략하면 전체) |
 | ✅ | GET | `/products/accounts/{product_id}` | | 상품 상세: 설명, 가입 조건, 우대금리 조건. 판매 중이 아니면 `404 PRODUCT_NOT_FOUND` |
-| 📝 | GET | `/products/cards?type=` | | 카드 상품 목록 (카드 기능 PR에서 `card_products`와 함께) |
+| ✅ | GET | `/products/cards?type=` | | 카드 상품 목록 (아래 cards 절) |
 
 <details>
 <summary>응답 예시</summary>
@@ -235,7 +235,19 @@
 
 ## cards: 카드 (`domains/cards`)
 
-카드 테이블(`card_products`, `cards`, `card_transactions`)은 카드 기능 PR에서 새로 만듭니다([ERD](ERD.md) "예정"). 팀 뼈대의 신용·체크 분리 경로(`/cards/{type}/...`)는 쓰지 않고, 그 PR에서 경로를 정합니다.
+카드번호는 응답에 **가린 번호**(`masked_card_num`, 앞 6자리·뒤 4자리)만 나갑니다. 남의 카드는 `404 CARD_NOT_FOUND`. 결정 이유: [ADR 0009](decisions/0009-card-policy.md)
+
+| 상태 | 메서드 | 경로 | 인증 | 설명 |
+|---|---|---|---|---|
+| ✅ | GET | `/products/cards?type=` | | 판매 중인 카드 상품 (CREDIT·DEBIT) |
+| ✅ | POST | `/cards` | 🔒 | 발급 (`product_id`, `linked_account_id`=내 입출금 계좌, 신용은 `payment_day` 1~28, 기본 14) |
+| ✅ | GET | `/cards`, `/cards/{card_id}` | 🔒 | 내 카드 목록·상세 |
+| ✅ | POST | `/cards/{card_id}/suspend` | 🔒 | 정지(`reason: SUSPENDED`) 또는 분실 신고(`LOST`). **바로** 적용. 분실은 되돌릴 수 없음 |
+| ✅ | POST | `/cards/{card_id}/unsuspend` | 🔒 | 정지 해제 요청 → `202` 승인 대기(`UNSUSPEND_CARD`). PIN 승인 때 상태를 다시 보고 풂 |
+| 📝 | POST | `/cards/{card_id}/payments` | 🔒 | 결제(체크는 바로 출금, 신용은 사용 기록), 취소, 사용내역, 한도 (카드 결제 PR) |
+
+- 기본 한도: 체크 1일 100만, 신용 1일 100만·월 300만
+- 실패: `400 ACCOUNT_NOT_FOUND`(결제 계좌가 내 입출금 계좌가 아님), `404 CARD_PRODUCT_NOT_FOUND`, `409 CARD_LOST`, `409 CARD_NOT_SUSPENDED`, `409 CARD_NUM_CONFLICT`(동시 발급, 다시 시도)
 
 ---
 

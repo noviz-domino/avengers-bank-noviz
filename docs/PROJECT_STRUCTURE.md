@@ -27,6 +27,7 @@ avengers-bank/
 │   ├── test_transfers.py       # 이체 승인 흐름, 두 번 승인, 멱등키, PIN 잠금, 승인 전 잔액 변화, 한도
 │   ├── test_deposits.py        # 예금 개설 승인, 실패 때 빈 계좌가 남지 않음, 특판 종료, 예금 추가 입금 불가
 │   ├── test_transaction_search.py  # 검색 조건·합계·한국 날짜·쪽, 남의 거래 404, 카테고리 규칙·수정
+│   ├── test_cards.py           # 카드번호·Luhn, 발급, 결제 계좌 규칙, 정지·분실·해제(PIN), 남의 카드 404
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/
@@ -47,7 +48,7 @@ avengers-bank/
         ├── approvals/      # 승인 대기 작업, PIN 승인·거절        ✅
         ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
         ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성
-        └── cards/          # 카드                              📝 TODO만. 테이블은 카드 기능 PR에서
+        └── cards/          # 카드 상품·카드, 번호 규칙(card_number.py) ✅ 발급·정지·해제
 ```
 
 ## 도메인 안의 5개 파일
@@ -89,6 +90,7 @@ users ◀── approvals ◀── transfers   (이체는 승인 대기를 만�
 | `accounts`, `account_terms`, `account_transactions` | `Account`, `AccountTerms`, `AccountTransaction` | `domains/accounts/models.py` |
 | `pending_actions` | `PendingAction` | `domains/approvals/models.py` |
 | `audit_logs` | `AuditLog` | `domains/audit/models.py` |
+| `card_products`, `cards` | `CardProduct`, `Card` | `domains/cards/models.py` |
 
 > 팀 뼈대의 계좌 3종·거래내역 3종·카드 5개 모델은 [ADR 0003](decisions/0003-db-redesign.md)에 따라 지웠습니다. CHECK 제약용 `in_sql()`은 `core/database.py`에 있고, 마이그레이션에는 결과 문자열을 그대로 적습니다.
 

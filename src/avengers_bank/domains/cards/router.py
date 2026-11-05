@@ -1,7 +1,62 @@
-from fastapi import APIRouter
+from typing import Annotated, Literal
 
-from avengers_bank.core.responses import error_responses
+from fastapi import APIRouter, Depends, Response, status
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/cards", tags=["cards"], responses=error_responses(422))
+from avengers_bank.core.database import get_db
+from avengers_bank.core.dependencies import get_current_user
+from avengers_bank.core.responses import SuccessResponse, error_responses
+from avengers_bank.domains.approvals.schemas import ActionResponse
+from avengers_bank.domains.cards.schemas import CardIssue, CardProductResponse, CardResponse, CardSuspend
+from avengers_bank.domains.cards.service import card_service
+from avengers_bank.domains.users.schemas import UserResponse
 
-# TODO: 카드 기능 PR (경로 초안: docs/API_ENDPOINTS.md)
+router = APIRouter(prefix="/cards", tags=["cards"], responses=error_responses(401, 422))
+products_router = APIRouter(prefix="/products", tags=["products"], responses=error_responses(422))
+
+DB = Annotated[AsyncSession, Depends(get_db)]
+Me = Annotated[UserResponse, Depends(get_current_user)]
+
+
+class UnsuspendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(min_length=8, max_length=100)
+
+
+@products_router.get("/cards", response_model=SuccessResponse[list[CardProductResponse]])
+async def list_card_products(db: DB, type: Literal["CREDIT", "DEBIT"] | None = None):
+    return SuccessResponse[list[CardProductResponse]](data=await card_service.list_products(db, type))
+
+
+@router.get("", response_model=SuccessResponse[list[CardResponse]])
+async def list_my_cards(db: DB, me: Me):
+    return SuccessResponse[list[CardResponse]](data=await card_service.list_mine(db, me.user_id))
+
+
+@router.post("", response_model=SuccessResponse[CardResponse], status_code=status.HTTP_201_CREATED,
+             responses=error_responses(400, 404, 409))
+async def issue_card(data: CardIssue, db: DB, me: Me):
+    return SuccessResponse[CardResponse](data=await card_service.issue(db, me.user_id, data), message="카드가 발급되었습니다.")
+
+
+@router.get("/{card_id}", response_model=SuccessResponse[CardResponse], responses=error_responses(404))
+async def get_my_card(card_id: int, db: DB, me: Me):
+    return SuccessResponse[CardResponse](data=await card_service.get_mine(db, me.user_id, card_id))
+
+
+@router.post("/{card_id}/suspend", response_model=SuccessResponse[CardResponse], responses=error_responses(404, 409))
+async def suspend_card(card_id: int, data: CardSuspend, db: DB, me: Me):
+    """정지·분실 신고: 바로 적용 (안전해지는 쪽은 승인 없이, ADR 0004)"""
+    return SuccessResponse[CardResponse](data=await card_service.suspend(db, me.user_id, card_id, data.reason))
+
+
+@router.post("/{card_id}/unsuspend", response_model=SuccessResponse[ActionResponse],
+             status_code=status.HTTP_202_ACCEPTED, responses=error_responses(404, 409))
+async def request_unsuspend(card_id: int, data: UnsuspendRequest, response: Response, db: DB, me: Me):
+    """정지 해제: 승인 대기만 만든다. `POST /approvals/{action_id}/approve`(PIN)로 풀린다"""
+    action, created = await card_service.request_unsuspend(db, me.user_id, card_id, data.idempotency_key)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return SuccessResponse[ActionResponse](data=action, message="승인 화면에서 PIN을 입력하면 정지가 풀립니다.")

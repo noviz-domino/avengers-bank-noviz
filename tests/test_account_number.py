@@ -17,7 +17,7 @@ pytestmark = pytest.mark.anyio
 
 VERSIONS = Path(__file__).parent.parent / "alembic" / "versions"
 # CHECK를 만드는 마이그레이션. 새로 만들면 여기에 추가한다
-CHECK_MIGRATIONS = ["c3d9e1a47b20", "d81f4b6c2e90", "f2b8d4e6a913"]
+CHECK_MIGRATIONS = ["c3d9e1a47b20", "d81f4b6c2e90", "f2b8d4e6a913", "b6e1f3a8c442"]
 
 
 def load_migration(revision: str):

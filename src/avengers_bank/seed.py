@@ -28,6 +28,7 @@ from avengers_bank.domains.accounts.service import DEFAULT_DAILY_TRANSFER_LIMIT,
 from avengers_bank.domains.accounts.models import Account, AccountTerms, AccountTransaction
 from avengers_bank.domains.products.eligibility import add_months
 from avengers_bank.domains.products.models import AccountProduct, ProductPreferentialRate
+from avengers_bank.domains.cards.models import CardProduct
 from avengers_bank.domains.users.models import User
 
 # 데모 화면 확인용 로그인 정보 (실제 비밀이 아님). README "데모 계정"과 같다
@@ -66,6 +67,26 @@ PRODUCTS = [
          description="연소득을 기준으로 한도를 정하는 신용대출입니다. 원리금균등 상환.",
          conditions="만 19세 이상, 소득이 있는 분. 100만 원부터 5천만 원까지, 12~60개월.", rates=[]),
 ]
+
+
+CARD_PRODUCTS = [
+    dict(type="DEBIT", product_code=1, name="어벤져스 체크카드", annual_fee=0,
+         benefits="연회비 없음. 결제하면 연결된 입출금 계좌에서 바로 빠져나갑니다. 편의점·카페 5% 할인."),
+    dict(type="CREDIT", product_code=1, name="스타크 신용카드", annual_fee=15_000,
+         benefits="연회비 1만 5천 원. 쓴 금액은 대금 출금일에 한 번에 빠져나갑니다. 해외 결제 수수료 없음."),
+]
+
+
+async def seed_card_products(db: AsyncSession) -> int:
+    added = 0
+    async with db.begin():
+        for spec in CARD_PRODUCTS:
+            exists = await db.scalar(select(CardProduct.product_id).where(
+                CardProduct.type == spec["type"], CardProduct.product_code == spec["product_code"]))
+            if exists is None:
+                db.add(CardProduct(**spec))
+                added += 1
+    return added
 
 
 async def seed_products(db: AsyncSession) -> int:
@@ -167,6 +188,8 @@ async def main() -> None:
     try:
         async with SessionLocal() as db:
             print(f"상품 {await seed_products(db)}개를 넣었습니다.")
+        async with SessionLocal() as db:
+            print(f"카드 상품 {await seed_card_products(db)}개를 넣었습니다.")
         async with SessionLocal() as db:
             if await seed_demo_user(db):
                 print(f"데모 사용자를 만들었습니다: {DEMO_LOGIN_ID}")
