@@ -20,7 +20,7 @@
 |---|---|---|
 | 400 | 잔액 부족, 한도 초과 등 처리 불가 | `BadRequestException` |
 | 401 | 로그인 안 함, 토큰 만료 | `UnauthorizedException` |
-| 403 | 남의 계좌·카드에 접근 | `ForbiddenException` |
+| 403 | 권한이 없는 작업 (남의 계좌·카드는 403이 아니라 **404**: 있다는 것을 알려 주지 않으려고) | `ForbiddenException` |
 | 404 | 계좌·카드·상품 없음 | `NotFoundException` |
 | 409 | 아이디·계좌번호 중복 | `ConflictException` |
 | 423 | 로그인 5회 실패로 잠김 | `LockedException` |
@@ -102,30 +102,50 @@
 
 ## accounts: 계좌 (`domains/accounts`)
 
-계좌는 `accounts` 한 테이블이라 종류별 경로를 두지 않습니다([ADR 0003](decisions/0003-db-redesign.md)). 팀 뼈대의 `/accounts/{type}/{id}`는 아래로 바뀝니다.
+계좌는 `accounts` 한 테이블이라 종류별 경로를 두지 않습니다([ADR 0003](decisions/0003-db-redesign.md)). 모두 🔒이고, **남의 계좌는 `404 ACCOUNT_NOT_FOUND`**입니다.
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
-| 📝 | GET | `/accounts` | 🔒 | 내 계좌 전체 + 총자산 (메인 화면: [screens.md](planning/screens.md)) |
-| 📝 | POST | `/accounts` | 🔒 | 계좌 개설 (`account_type`, `product_id`, 예·적금은 기간·금액) |
-| 📝 | GET | `/accounts/{account_id}` | 🔒 | 계좌 상세 (예·적금은 금리·만기 포함) |
-| 📝 | GET | `/accounts/{account_id}/transactions` | 🔒 | 거래내역 |
-| 📝 | PATCH | `/accounts/{account_id}` | 🔒 | 별칭, 이체 한도(입출금만) 변경 |
+| ✅ | GET | `/accounts` | 🔒 | 해지하지 않은 내 계좌(잔액 많은 순) + 총자산. 메인 화면은 앞의 3개 ([screens.md](planning/screens.md)) |
+| ✅ | POST | `/accounts` | 🔒 | 입출금·적금 개설 (종류는 상품이 정함). 가입 조건 검사, 적금은 적용 금리 확정 |
+| ✅ | GET | `/accounts/{account_id}` | 🔒 | 계좌 상세 (적금·예금은 금리·만기 포함) |
+| ✅ | GET | `/accounts/{account_id}/transactions?limit=&before=` | 🔒 | 거래내역, 최근부터. 다음 쪽은 받은 마지막 `tx_id`를 `before`로 |
+| ✅ | PATCH | `/accounts/{account_id}` | 🔒 | 별칭 변경 (`null`이면 지움) |
+| 📝 | | 예금 개설 | 🔒 | 맡길 돈을 입출금 계좌에서 옮겨야 해서 이체·승인 PR에서 |
+| 📝 | | 이체 한도 변경, 해지 | 🔒 | 한도를 올리는 것은 보안을 약하게 해서 승인 PR에서. 해지는 잔액 0일 때만 |
 
 <details>
-<summary>응답 예시 (초안)</summary>
+<summary>요청·응답 예시</summary>
+
+`POST /accounts` (적금)
+```json
+{ "product_id": 4, "nickname": "휴대폰 모으기", "term_months": 12, "monthly_payment": 100000, "payment_day": 25 }
+```
+→ `201`
+```json
+{ "data": {
+  "account_id": 3, "account_type": "SAVINGS", "account_num": "110-301-000001", "product_name": "스타크 자유적금",
+  "nickname": "휴대폰 모으기", "balance": 0, "status": "ACTIVE", "opened_at": "...",
+  "per_transfer_limit": null, "daily_transfer_limit": null,
+  "terms": { "applied_rate": "4.00", "rate_detail": [{"code": "MARKETING_AGREED", "rate": "0.20"}, {"code": "FIRST_PRODUCT", "rate": "0.30"}],
+             "maturity_date": "2027-11-05", "monthly_payment": 100000, "payment_day": 25 }
+}, "message": "계좌가 개설되었습니다." }
+```
+- 입출금 계좌는 이체 한도 기본값 1회 100만 원, 1일 500만 원으로 열립니다.
+- 적금의 적용 금리 = 기본금리 + min(충족한 우대 합계, 우대 상한). 마케팅 동의와 첫 예·적금 우대는 개설 때 확인하고, **급여이체 우대는 개설 때 알 수 없어서 넣지 않습니다**.
+- 만기일은 오늘(한국 날짜) + 기간. 그 달에 같은 날이 없으면 말일입니다.
+- 실패: `400 AGE_NOT_ELIGIBLE`, `400 TERM_OUT_OF_RANGE`, `400 AMOUNT_OUT_OF_RANGE`, `400 DEPOSIT_NEEDS_TRANSFER`(예금), `400 PRODUCT_NOT_OPENABLE`(대출), `404 PRODUCT_NOT_FOUND`(판매 중 아님), `409 ACCOUNT_NUM_CONFLICT`(같은 상품을 동시에 개설, 다시 시도)
 
 `GET /accounts` → `200`
 ```json
 { "data": {
-  "total_balance": 10800000,
+  "total_balance": 8100000,
   "accounts": [
-    { "account_id": 2, "account_type": "DEPOSIT", "account_num": "110-201-000001", "balance": 10000000, "nickname": null, "status": "ACTIVE", "opened_at": "..." },
-    { "account_id": 1, "account_type": "CHECKING", "account_num": "110-101-000001", "balance": 500000, "nickname": "생활비", "status": "ACTIVE", "opened_at": "..." }
+    { "account_id": 3, "account_type": "DEPOSIT", "account_num": "110-201-000001", "product_name": "히어로 정기예금", "nickname": null, "balance": 5000000, "status": "ACTIVE", "opened_at": "..." },
+    { "account_id": 1, "account_type": "CHECKING", "account_num": "110-101-000001", "product_name": "어벤져스 입출금통장", "nickname": "생활비", "balance": 2350000, "status": "ACTIVE", "opened_at": "..." }
   ]
 }, "message": null }
 ```
-계좌 한 줄의 모양은 `domains/accounts/schemas.py`의 `AccountSummaryResponse`입니다.
 </details>
 
 ## transfers: 돈 이동 (`domains/transfers`)
@@ -137,7 +157,7 @@
 | 📝 | POST | `/transfers` | 🔒 | 이체 요청 → 승인 대기 생성 (잔액·1회·1일 한도·예산 미리 계산) |
 | 📝 | POST | `/approvals/{action_id}/approve` | 🔒 | 승인 (`action_id` + PIN만 받음). Agent·MCP 도구에는 없음 |
 
-실패 예시(예정): `400 INSUFFICIENT_BALANCE`, `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED`, `403 ACCOUNT_FORBIDDEN`, `404 ACCOUNT_NOT_FOUND`
+실패 예시(예정): `400 INSUFFICIENT_BALANCE`, `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED`, `404 ACCOUNT_NOT_FOUND`(없거나 남의 계좌)
 
 ## cards: 카드 (`domains/cards`)
 

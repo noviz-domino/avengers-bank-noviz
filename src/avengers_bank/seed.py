@@ -1,4 +1,4 @@
-"""데모용 상품 데이터. 여러 번 실행해도 (type, product_code)가 같은 상품은 다시 넣지 않는다.
+"""데모용 상품과 데모 사용자. 여러 번 실행해도 이미 있는 상품·사용자는 다시 넣지 않는다.
 
 실행: uv run python -m avengers_bank.seed  (Docker는 시작할 때 자동 실행)
 상품 이름·금리는 데모용으로 지어낸 값이다.
@@ -16,8 +16,19 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from avengers_bank.core.clock import today_kst
 from avengers_bank.core.database import SessionLocal, engine
+from avengers_bank.core.security import hash_password
+import avengers_bank.domains.approvals.models  # noqa: F401  장부의 action_id FK가 가리키는 테이블
+from avengers_bank.domains.accounts.account_number import BANK_CODE, TYPE_CODES, make_account_num
+from avengers_bank.domains.accounts.repository import account_repository
+from avengers_bank.domains.accounts.models import Account, AccountTerms, AccountTransaction
+from avengers_bank.domains.products.eligibility import add_months
 from avengers_bank.domains.products.models import AccountProduct, ProductPreferentialRate
+from avengers_bank.domains.users.models import User
+
+# 데모 화면 확인용 로그인 정보 (실제 비밀이 아님). README "데모 계정"과 같다
+DEMO_LOGIN_ID, DEMO_PASSWORD = "demo", "demo-password-1234"
 
 SALARY = ("SALARY_TRANSFER", "이 은행 입출금 계좌로 급여를 받으면")
 MARKETING = ("MARKETING_AGREED", "마케팅 정보 수신에 동의하면")
@@ -79,10 +90,70 @@ async def seed_products(db: AsyncSession) -> int:
     return added
 
 
+async def seed_demo_user(db: AsyncSession) -> bool:
+    """메인 화면(총자산, 잔액 상위 3개 계좌)을 바로 볼 수 있는 데모 사용자. 상품 seed 뒤에 실행한다.
+
+    shortcut: 잔액과 장부를 실행 함수(ADR 0007)를 거치지 않고 직접 넣는다. 초기 데이터라서이고,
+    이체 기능이 생기면 seed도 그 함수를 쓰게 바꾼다.
+    """
+    async with db.begin():
+        if await db.scalar(select(User.user_id).where(User.login_id == DEMO_LOGIN_ID)) is not None:
+            return False
+        user = User(
+            login_id=DEMO_LOGIN_ID, hashed_password=hash_password(DEMO_PASSWORD), name="데모 사용자",
+            phone="010-0000-0000", birth_date=date(1995, 3, 15), marketing_agreed=True,
+        )
+        db.add(user)
+        await db.flush()
+        products = {
+            (p.type, p.product_code): p for p in await db.scalars(select(AccountProduct))
+        }
+        today = today_kst()
+
+        async def account(kind, code, nickname, txs, terms=None):
+            product = products[(kind, code)]
+            serial = await account_repository.last_serial(db, f"{BANK_CODE}-{TYPE_CODES[kind]}{code:02d}-") + 1
+            limits = dict(per_transfer_limit=1_000_000, daily_transfer_limit=5_000_000) if kind == "CHECKING" else {}
+            acc = Account(
+                user_id=user.user_id, product_id=product.product_id, account_type=kind, status="ACTIVE",
+                account_num=make_account_num(kind, code, serial), nickname=nickname,
+                balance=sum(a for _, a, _ in txs), **limits,
+            )
+            db.add(acc)
+            await db.flush()
+            balance = 0
+            for tx_type, amount, memo in txs:
+                balance += amount
+                db.add(AccountTransaction(
+                    account_id=acc.account_id, tx_type=tx_type, amount=amount, balance_after=balance, memo=memo,
+                ))
+            if terms:
+                db.add(AccountTerms(account_id=acc.account_id, **terms))
+
+        await account("CHECKING", 1, "생활비", [
+            ("DEPOSIT", 3_000_000, "급여"), ("CARD_PAYMENT", -38_000, "편의점"),
+            ("TRANSFER_OUT", -600_000, "월세"), ("CARD_PAYMENT", -12_000, "점심"),
+        ])
+        await account("CHECKING", 1, "비상금", [("DEPOSIT", 150_000, "용돈")])
+        await account("DEPOSIT", 1, None, [("DEPOSIT", 5_000_000, "예금 가입")], dict(
+            applied_rate=Decimal("3.20"), rate_detail=[{"code": "MARKETING_AGREED", "rate": "0.20"}],
+            maturity_date=add_months(today, 12),
+        ))
+        await account("SAVINGS", 1, "휴대폰 모으기", [("DEPOSIT", 300_000, "1회차"), ("DEPOSIT", 300_000, "2회차")], dict(
+            applied_rate=Decimal("4.00"),
+            rate_detail=[{"code": "MARKETING_AGREED", "rate": "0.20"}, {"code": "FIRST_PRODUCT", "rate": "0.30"}],
+            maturity_date=add_months(today, 12), monthly_payment=300_000, payment_day=min(today.day, 28),
+        ))
+    return True
+
+
 async def main() -> None:
     try:
         async with SessionLocal() as db:
             print(f"상품 {await seed_products(db)}개를 넣었습니다.")
+        async with SessionLocal() as db:
+            if await seed_demo_user(db):
+                print(f"데모 사용자를 만들었습니다: {DEMO_LOGIN_ID}")
     finally:
         await engine.dispose()
 
