@@ -39,7 +39,8 @@ def not_found() -> NotFoundException:
 
 async def run_unsuspend_card(db: AsyncSession, action: PendingAction) -> None:
     """승인된 정지 해제 (approvals EXECUTORS). 그사이 분실 신고됐으면 풀지 않는다"""
-    card = await db.get(Card, action.payload["card_id"])
+    found = await card_repository.find_by_id(db, action.payload["card_id"], lock=True)
+    card = found[0] if found else None
     if card is None or card.user_id != action.user_id:
         raise TransferRejected("CARD_NOT_FOUND", "카드를 찾을 수 없습니다.")
     if card.status != "SUSPENDED":
@@ -94,7 +95,7 @@ class CardService:
     async def suspend(self, db: AsyncSession, user_id: int, card_id: int, reason: str) -> CardResponse:
         """정지·분실 신고는 안전해지는 쪽이라 바로 (ADR 0004). 분실은 되돌릴 수 없다"""
         async with db.begin():
-            found = await card_repository.find_by_id(db, card_id)
+            found = await card_repository.find_by_id(db, card_id, lock=True)
             if found is None or found[0].user_id != user_id:
                 raise not_found()
             card = found[0]

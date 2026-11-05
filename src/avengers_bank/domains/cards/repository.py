@@ -28,11 +28,13 @@ class CardRepository:
         )
         return [(c, name) for c, name in rows]
 
-    async def find_by_id(self, db: AsyncSession, card_id: int) -> tuple[Card, str] | None:
-        row = (await db.execute(
-            select(Card, CardProduct.name).join(CardProduct, Card.product_id == CardProduct.product_id)
-            .where(Card.card_id == card_id)
-        )).first()
+    async def find_by_id(self, db: AsyncSession, card_id: int, lock: bool = False) -> tuple[Card, str] | None:
+        """lock=True: 상태를 바꾸기 전 카드 행만 잠근다 (동시 정지·분실·해제가 서로 덮어쓰지 않게)"""
+        query = (select(Card, CardProduct.name).join(CardProduct, Card.product_id == CardProduct.product_id)
+                 .where(Card.card_id == card_id))
+        if lock:
+            query = query.with_for_update(of=Card).execution_options(populate_existing=True)
+        row = (await db.execute(query)).first()
         return tuple(row) if row else None
 
 
