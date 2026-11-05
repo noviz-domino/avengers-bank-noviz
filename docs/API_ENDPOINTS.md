@@ -140,8 +140,9 @@
 ```json
 { "product_id": 2, "from_account_id": 1, "amount": 2000000, "term_months": 12, "nickname": "목돈", "idempotency_key": "web-7c2d…" }
 ```
-→ `202` 승인 대기 (`action_type: OPEN_DEPOSIT`, summary: "생활비(110-101-000001)에서 2,000,000원을 히어로 정기예금 12개월에 맡기기"). `POST /approvals/{action_id}/approve`(PIN) → 예금 계좌가 열리고 2,000,000원이 옮겨지며, 승인 대기 `payload.account_id`에 새 계좌 id가 들어갑니다.
-- 예금 금액은 상품의 `min_amount`~`max_amount`, 출금 계좌는 내 입출금 계좌. 승인 때 상품 판매·가입 조건·잔액을 **다시** 확인하고, 안 되면 계좌를 만들지 않고 `FAILED`
+→ `202` 승인 대기 (`action_type: OPEN_DEPOSIT`, summary: "생활비(110-101-000001)에서 2,000,000원을 히어로 정기예금 12개월에 맡기기"). `POST /approvals/{action_id}/approve`(PIN) → 예금 계좌가 열리고 2,000,000원이 옮겨지며, 응답(`ActionResponse`)의 `result.account_id`에 새 계좌 id가 들어갑니다.
+- 예금 금액은 상품의 `min_amount`~`max_amount`, 출금 계좌는 내 입출금 계좌. 승인 때 상품 판매·가입 조건·잔액을 **다시** 확인하고, 안 되면 계좌를 만들지 않고 `FAILED`(계좌번호 충돌 `ACCOUNT_NUM_CONFLICT`도 같음)
+- 승인 뒤 같은 멱등키로 다시 보내면 `200`으로 처음 요청(상태 `EXECUTED`)을 돌려줍니다
 - 예금 계좌에는 나중에 이체로 돈을 더 넣을 수 없습니다(`ACCOUNT_CANNOT_RECEIVE`)
 
 `GET /accounts` → `200`

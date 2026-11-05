@@ -109,8 +109,8 @@ async def run_open_deposit(db: AsyncSession, action: PendingAction) -> None:
     상품·가입 조건을 다시 확인 → 예금 계좌 생성 → 맡길 돈을 입출금 계좌에서 옮김."""
     p = action.payload
     user = await db.get(User, action.user_id)
-    # 계좌를 만들기 전에 출금 계좌를 잠그고 검사한다. 만든 뒤에 이체가 실패하면 빈 예금 계좌가 남기 때문
-    # (FAILED로 끝나도 같은 트랜잭션은 커밋된다). 잠근 동안은 잔액이 바뀌지 않아서 아래 이체는 통과한다
+    # 출금 계좌를 먼저 잠그고 검사한다: 계좌번호를 만들기 전에 분명한 이유(잔액 부족 등)로 실패하게.
+    # 빈 예금 계좌가 남지 않는 것 자체는 아래 savepoint가 보장한다
     src = await db.scalar(
         select(Account).where(Account.account_id == p["from_account_id"])
         .with_for_update().execution_options(populate_existing=True)
@@ -119,19 +119,24 @@ async def run_open_deposit(db: AsyncSession, action: PendingAction) -> None:
         raise TransferRejected("ACCOUNT_NOT_FOUND", "출금할 내 입출금 계좌를 찾을 수 없습니다.")
     if p["amount"] > src.balance:
         raise TransferRejected("INSUFFICIENT_BALANCE", "잔액이 부족합니다.")
+    # 계좌 생성 + 이동을 savepoint로 묶는다: 어느 쪽이 실패해도 이 부분만 되돌리고
+    # 바깥 트랜잭션(승인 대기를 FAILED로 바꾸는 것)은 살아 있다. 빈 예금 계좌가 남지 않는 것을 순서가 아니라 구조로 보장
     try:
-        product = await product_service.get_account_product(db, p["product_id"])  # 그사이 판매가 끝났을 수 있음
-        account, _ = await create_account(
-            db, user_id=user.user_id, birth_date=user.birth_date, marketing_agreed=user.marketing_agreed,
-            product=product, nickname=p.get("nickname"), term_months=p["term_months"], amount=p["amount"],
-        )
-    except ApiException as e:  # 실행 직전 재검사 실패 → 승인 대기를 FAILED로 (돈은 안 움직임)
+        async with db.begin_nested():
+            product = await product_service.get_account_product(db, p["product_id"])  # 그사이 판매가 끝났을 수 있음
+            account, _ = await create_account(
+                db, user_id=user.user_id, birth_date=user.birth_date, marketing_agreed=user.marketing_agreed,
+                product=product, nickname=p.get("nickname"), term_months=p["term_months"], amount=p["amount"],
+            )
+            await execute_transfer(
+                db, owner_user_id=action.user_id, from_account_id=p["from_account_id"],
+                to_account_id=account.account_id, amount=p["amount"], action_id=action.action_id,
+                memo="예금 가입", opening_deposit=True,
+            )
+    except ApiException as e:  # 실행 직전 재검사 실패(판매 종료, 가입 조건, 번호 충돌) → FAILED, 돈은 안 움직임
         raise TransferRejected(e.code, e.message) from None
-    await execute_transfer(
-        db, owner_user_id=action.user_id, from_account_id=p["from_account_id"], to_account_id=account.account_id,
-        amount=p["amount"], action_id=action.action_id, memo="예금 가입", opening_deposit=True,
-    )
-    action.payload = {**p, "account_id": account.account_id}  # 승인 화면에서 새 계좌로 갈 수 있게
+    # 요청 내용(payload)은 바꾸지 않는다: 멱등키 비교에 쓰인다. 결과는 따로 남긴다
+    action.result = {"account_id": account.account_id}
 
 
 class AccountService:
@@ -161,7 +166,7 @@ class AccountService:
         async with db.begin():
             existing = await approval_repository.find_by_key(db, user.user_id, data.idempotency_key)
             if existing is not None:
-                if existing.action_type != "OPEN_DEPOSIT" or existing.payload != deposit_payload(data):
+                if existing.action_type != "OPEN_DEPOSIT" or existing.payload != deposit_payload(data):  # 요청 내용만 비교
                     raise ConflictException(
                         message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
                     )

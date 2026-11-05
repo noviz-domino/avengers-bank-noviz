@@ -123,7 +123,8 @@ erDiagram
         uuid action_id PK
         int user_id FK
         string action_type "TRANSFER / CARD_PAYMENT / LOAN_EXECUTE / BUDGET_CONFIRM …"
-        json payload "실행할 내용"
+        json payload "실행할 내용, 만든 뒤 안 바꿈"
+        json result "NULL, 실행 결과 (예금이면 새 account_id)"
         text summary "승인 화면 문장, 서버가 payload로 생성"
         string requested_by "WEB / AGENT / MCP"
         string status "PENDING / APPROVED / REJECTED / EXPIRED / EXECUTED / FAILED"

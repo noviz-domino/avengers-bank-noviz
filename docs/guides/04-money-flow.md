@@ -45,7 +45,7 @@ sequenceDiagram
 ```python
 EXECUTORS = {"TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit}
 ```
-승인 API는 하나이고, `action_type`에 맞는 실행기를 같은 트랜잭션 안에서 부릅니다. 예금 개설은 "계좌 생성 + 맡길 돈 이동(`INTERNAL_OUT/IN`, 메모 `예금 가입`)"이 한 번에 됩니다. 앞으로 카드 정지 해제, 대출 실행도 실행기 한 줄씩 추가합니다. 실행기에서 업무 오류가 나면 `TransferRejected`로 바꿔 `FAILED`로 남기고, 그 밖의 오류는 트랜잭션 전체가 되돌아가 `PENDING`으로 남습니다.
+승인 API는 하나이고, `action_type`에 맞는 실행기를 같은 트랜잭션 안에서 부릅니다. 예금 개설은 "계좌 생성 + 맡길 돈 이동(`INTERNAL_OUT/IN`, 메모 `예금 가입`)"이 한 번에 됩니다. 앞으로 카드 정지 해제, 대출 실행도 실행기 한 줄씩 추가합니다. 실행기에서 업무 오류가 나면 `TransferRejected`로 바꿔 `FAILED`로 남기고, 그 밖의 오류는 트랜잭션 전체가 되돌아가 `PENDING`으로 남습니다. 실행 결과(예: 새 예금의 `account_id`)는 요청 내용 `payload`가 아니라 `result` 칸에 남깁니다. `payload`를 바꾸면 같은 멱등키로 다시 보낸 요청과 비교가 맞지 않게 되기 때문입니다(PR #13 리뷰).
 
 ## 핵심 규칙과 코드
 

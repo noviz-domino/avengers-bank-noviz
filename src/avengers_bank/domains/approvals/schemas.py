@@ -16,6 +16,7 @@ class ActionResponse(BaseModel):
     created_at: datetime
     executed_at: datetime | None
     failure_reason: str | None
+    result: dict | None  # 실행 결과. 예금 개설이면 {"account_id": 새 계좌}
 
     model_config = ConfigDict(from_attributes=True)
 

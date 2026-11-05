@@ -56,12 +56,17 @@ async def test_deposit_opens_only_after_pin(bank):
 
     response = await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
     assert response.status_code == 200 and response.json()["data"]["status"] == "EXECUTED"
+    new_account_id = response.json()["data"]["result"]["account_id"]  # 화면이 새 예금으로 갈 수 있음
+
+    again = await client.post("/accounts/deposits", json=body(src, pid, nickname="목돈"), headers=me)
+    assert again.status_code == 200 and again.json()["data"]["status"] == "EXECUTED"  # 승인 뒤 다시 보내도 같은 요청
 
     async with SessionLocal() as db:
         deposit = await db.scalar(select(Account).where(Account.account_type == "DEPOSIT"))
         terms = await db.get(AccountTerms, deposit.account_id)
         rows = list(await db.scalars(select(AccountTransaction).order_by(AccountTransaction.tx_id)))
     assert (deposit.balance, deposit.nickname, deposit.account_num) == (2_000_000, "목돈", "110-201-000001")
+    assert deposit.account_id == new_account_id
     assert terms.applied_rate == Decimal("3.20")  # 기본 3.00 + 마케팅 0.20 (급여이체는 개설 때 모름)
     assert terms.maturity_date.year == today_kst().year + 1 and terms.monthly_payment is None
     assert [(r.tx_type, r.amount, r.memo) for r in rows] == [("INTERNAL_OUT", -2_000_000, "예금 가입"), ("INTERNAL_IN", 2_000_000, "예금 가입")]
@@ -98,7 +103,29 @@ async def test_sale_ended_before_approval(bank):
         await db.commit()
     response = await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
     assert response.json()["error"]["code"] == "PRODUCT_NOT_FOUND"
+    assert (await client.get(f"/approvals/{action['action_id']}", headers=me)).json()["data"]["status"] == "FAILED"
     assert await deposit_count() == 0 and await balance(src["account_id"]) == 3_000_000
+
+
+async def test_account_num_conflict_becomes_failed(bank, monkeypatch):
+    """계좌번호가 겹쳐 INSERT가 실패해도(IntegrityError) savepoint만 되돌리고 FAILED는 저장된다"""
+    from avengers_bank.domains.accounts import repository as repo
+
+    client, me, src = bank
+    action = (await client.post("/accounts/deposits", json=body(src, await product_id("히어로 정기예금")), headers=me)).json()["data"]
+    async with SessionLocal() as db:  # 같은 번호의 계좌가 이미 있는 상황을 만든다
+        db.add(Account(user_id=1, product_id=await product_id("히어로 정기예금"), account_type="DEPOSIT",
+                       account_num="110-201-000001", balance=0, status="ACTIVE"))
+        await db.commit()
+
+    async def stale_serial(self, db, prefix):  # 동시에 열어서 최댓값을 늦게 본 상황
+        return 0
+    monkeypatch.setattr(repo.AccountRepository, "last_serial", stale_serial)
+
+    response = await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
+    assert response.json()["error"]["code"] == "ACCOUNT_NUM_CONFLICT"
+    assert (await client.get(f"/approvals/{action['action_id']}", headers=me)).json()["data"]["status"] == "FAILED"
+    assert await balance(src["account_id"]) == 3_000_000 and await deposit_count() == 1  # 미리 넣은 것만
 
 
 async def test_cannot_transfer_into_deposit_afterwards(bank):
