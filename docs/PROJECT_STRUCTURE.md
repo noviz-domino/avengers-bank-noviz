@@ -25,6 +25,7 @@ avengers-bank/
 │   ├── test_refresh_tokens.py  # 토큰 교체, 재사용 감지, 만료, 기기별 로그아웃
 │   ├── test_accounts.py        # 계좌 개설·가입 조건·적용 금리, 메인 화면 총자산, 남의 계좌 404, 거래내역
 │   ├── test_transfers.py       # 이체 승인 흐름, 두 번 승인, 멱등키, PIN 잠금, 승인 전 잔액 변화, 한도
+│   ├── test_deposits.py        # 예금 개설 승인, 실패 때 빈 계좌가 남지 않음, 특판 종료, 예금 추가 입금 불가
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/

@@ -37,7 +37,9 @@ async def today_transfer_out(db: AsyncSession, account_id: int) -> int:
     return -total
 
 
-def check_transfer(src: Account | None, dst: Account | None, amount: int, sent_today: int) -> bool:
+def check_transfer(
+    src: Account | None, dst: Account | None, amount: int, sent_today: int, opening_deposit: bool = False
+) -> bool:
     """이체해도 되는지 검사하고, 내 계좌끼리 이동이면 True. 안 되면 TransferRejected."""
     if src is None or src.status != "ACTIVE":
         raise TransferRejected("ACCOUNT_NOT_FOUND", "보내는 계좌를 찾을 수 없습니다.")
@@ -49,7 +51,8 @@ def check_transfer(src: Account | None, dst: Account | None, amount: int, sent_t
         raise TransferRejected("SAME_ACCOUNT", "같은 계좌로는 보낼 수 없습니다.")
     internal = src.user_id == dst.user_id
     # 남에게는 입출금 계좌로만. 내 적금에는 납입할 수 있다. 예금은 가입 때 한 번만 넣는다
-    if not (dst.account_type == "CHECKING" or (internal and dst.account_type == "SAVINGS")):
+    receivable = dst.account_type == "CHECKING" or (internal and dst.account_type == "SAVINGS")
+    if not (receivable or (opening_deposit and internal and dst.account_type == "DEPOSIT")):
         raise TransferRejected("ACCOUNT_CANNOT_RECEIVE", "이 계좌로는 보낼 수 없습니다.")
     if amount > src.balance:
         raise TransferRejected("INSUFFICIENT_BALANCE", "잔액이 부족합니다.")
@@ -64,7 +67,7 @@ def check_transfer(src: Account | None, dst: Account | None, amount: int, sent_t
 
 async def execute_transfer(
     db: AsyncSession, *, owner_user_id: int, from_account_id: int, to_account_id: int, amount: int,
-    action_id: uuid.UUID | None, memo: str | None,
+    action_id: uuid.UUID | None, memo: str | None, opening_deposit: bool = False,
 ) -> uuid.UUID:
     """호출한 쪽의 트랜잭션 안에서 실행한다. 잔액 변경 + 장부 두 줄 + (호출한 쪽의) 승인 상태 변경이 함께 커밋된다."""
     # 잠금 순서: 계좌 id 오름차순 (ERD 규칙 5). 예산 기능이 생기면 그 앞에 예산 주기 행을 잠근다
@@ -79,7 +82,7 @@ async def execute_transfer(
     src, dst = accounts.get(from_account_id), accounts.get(to_account_id)
     if src is not None and src.user_id != owner_user_id:  # 실행 직전 소유권 재검사 (승인·실행 규칙 3)
         src = None
-    internal = check_transfer(src, dst, amount, await today_transfer_out(db, from_account_id))
+    internal = check_transfer(src, dst, amount, await today_transfer_out(db, from_account_id), opening_deposit)
     # 가드 목록 (ADR 0007): 예산 가드는 예산 기능 PR에서 여기에 들어간다
 
     names = dict((await db.execute(

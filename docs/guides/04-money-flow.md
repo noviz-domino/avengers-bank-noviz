@@ -14,6 +14,7 @@
 | 거절 | `POST /approvals/{id}/reject` | `approvals/service.py` `reject` |
 | **검사 (요청·실행 공용)** | — | `accounts/money.py` `check_transfer` |
 | **실행 함수** | — | `accounts/money.py` `execute_transfer` |
+| 승인 대상별 실행기 | — | `approvals/service.py` `EXECUTORS`: `TRANSFER` → `run_transfer`, `OPEN_DEPOSIT` → `accounts/service.py` `run_open_deposit` |
 
 ## 전체 흐름
 
@@ -38,6 +39,13 @@ sequenceDiagram
     A->>DB: 상태=EXECUTED, 커밋
     A-->>U: 200
 ```
+
+## 승인 대상이 늘어나는 방법
+
+```python
+EXECUTORS = {"TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit}
+```
+승인 API는 하나이고, `action_type`에 맞는 실행기를 같은 트랜잭션 안에서 부릅니다. 예금 개설은 "계좌 생성 + 맡길 돈 이동(`INTERNAL_OUT/IN`, 메모 `예금 가입`)"이 한 번에 됩니다. 앞으로 카드 정지 해제, 대출 실행도 실행기 한 줄씩 추가합니다. 실행기에서 업무 오류가 나면 `TransferRejected`로 바꿔 `FAILED`로 남기고, 그 밖의 오류는 트랜잭션 전체가 되돌아가 `PENDING`으로 남습니다.
 
 ## 핵심 규칙과 코드
 
@@ -79,7 +87,7 @@ A→B와 B→A 이체가 동시에 오면, 각자 자기 출금 계좌부터 잠
 | 보낸 쪽 | `TRANSFER_OUT` | −50,000 | 950,000 | 피터 |
 | 받은 쪽 | `TRANSFER_IN` | +50,000 | 50,000 | 토니 |
 
-두 줄은 같은 `transfer_id`로 묶이고, `action_id`로 어느 승인이 만든 것인지 따라갈 수 있습니다. 금액 부호와 거래 종류가 맞지 않으면 DB CHECK가 막습니다. 내 계좌끼리(내 적금 납입)는 `INTERNAL_OUT/IN`이고 이체 한도를 적용하지 않습니다.
+두 줄은 같은 `transfer_id`로 묶이고, `action_id`로 어느 승인이 만든 것인지 따라갈 수 있습니다. 금액 부호와 거래 종류가 맞지 않으면 DB CHECK가 막습니다. 내 계좌끼리(내 적금 납입, 예금 가입)는 `INTERNAL_OUT/IN`이고 이체 한도를 적용하지 않습니다. 예금 계좌로 들어가는 건 **가입할 때 한 번만**(`opening_deposit=True`)이고, 그 뒤 이체로는 넣을 수 없습니다.
 
 **6. 한도**
 - 1회 한도, 1일 한도(오늘 **한국 날짜**에 남에게 보낸 `TRANSFER_OUT` 합계)

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.exceptions import BadRequestException, ConflictException, NotFoundException
 from avengers_bank.domains.accounts.money import TransferRejected, execute_transfer
+from avengers_bank.domains.accounts.service import run_open_deposit
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
 from avengers_bank.domains.users.service import user_service
@@ -20,8 +21,8 @@ async def run_transfer(db: AsyncSession, action: PendingAction) -> None:
     )
 
 
-# action_type → 실행 함수. 새 승인 대상(예금 개설, 카드 해제 등)은 여기에 추가한다
-EXECUTORS = {"TRANSFER": run_transfer}
+# action_type → 실행 함수. 새 승인 대상(카드 해제 등)은 여기에 추가한다
+EXECUTORS = {"TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit}
 
 
 def as_utc(value: datetime) -> datetime:

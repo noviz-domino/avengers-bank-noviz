@@ -10,7 +10,8 @@
 |---|---|---|
 | 판매 중인 상품 목록·상세 | `GET /products/accounts`, `/{id}` | `products/service.py`, `products/repository.py` `on_sale` |
 | 가입 조건·적용 금리 | (개설할 때) | `products/eligibility.py` |
-| 계좌 개설 | `POST /accounts` | `accounts/service.py` `open_account` |
+| 계좌 개설 (입출금·적금) | `POST /accounts` | `accounts/service.py` `open_account` → `create_account` |
+| 예금 개설 (승인 필요) | `POST /accounts/deposits` | `accounts/service.py` `request_deposit`, 승인 뒤 `run_open_deposit` |
 | 메인 화면 (총자산 + 잔액 많은 순) | `GET /accounts` | `accounts/service.py` `list_my_accounts` |
 | 상세·거래내역·별칭 | `GET /accounts/{id}`, `/transactions`, `PATCH` | `accounts/service.py` |
 | 계좌번호 | — | `accounts/account_number.py` |
@@ -38,11 +39,15 @@ accounts (모든 계좌)                 account_terms (예·적금만, 1:1)
 ```
 POST /accounts {product_id, term_months, monthly_payment}
   ① 판매 중인 상품인가 (is_active + 특판 기간, 한국 날짜)        → 404 PRODUCT_NOT_FOUND
-  ② 예금이면 거절 (맡길 돈 이체가 필요해서 승인 흐름으로)          → 400 DEPOSIT_NEEDS_TRANSFER
+  ② 예금이면 거절 → POST /accounts/deposits로 (맡길 돈이 움직여서 승인 필요)  → 400 DEPOSIT_NEEDS_TRANSFER
   ③ 가입 조건: 나이(만 나이), 기간, 금액                          → 400 AGE_NOT_ELIGIBLE …
   ④ 계좌번호: 같은 상품 안에서 가장 큰 번호 + 1                   → 동시에 겹치면 409
   ⑤ 적금이면 적용 금리 계산해서 account_terms에 스냅샷
 ```
+
+### 예금은 왜 따로인가
+
+입출금·적금은 열 때 돈이 움직이지 않아서 바로 엽니다. 예금은 **맡길 돈을 입출금 계좌에서 옮겨야** 해서, 이체와 똑같이 승인 대기 → PIN → 실행으로 엽니다([4. 돈이 움직이는 흐름](04-money-flow.md)). 계좌를 만드는 부분(`create_account`)은 두 경로가 같은 함수를 씁니다.
 
 ### 적용 금리
 
@@ -71,6 +76,9 @@ A. 상품 금리는 나중에 바뀌지만, 이미 가입한 계좌는 가입 �
 
 **Q. 특판 기간을 어떻게 판단하나요?**
 A. 판매 중 조건(`is_active` + 기간)을 한 함수에 두고 목록·상세·개설이 같이 씁니다. 날짜는 서버 시간대(컨테이너는 UTC)가 아니라 **한국 날짜**로 판단합니다. UTC로 보면 한국 시간 0~9시에는 하루가 어긋나서 끝난 특판에 가입할 수 있었습니다(PR #7 리뷰).
+
+**Q. 예금 승인 때 잔액이 부족하면 빈 예금 계좌가 남지 않나요?**
+A. 그걸 막으려고 순서를 정했습니다. 실행기는 **출금 계좌를 먼저 잠그고 잔액을 확인한 뒤에** 예금 계좌를 만듭니다. 계좌를 먼저 만들고 이체가 실패하면, 승인 대기는 `FAILED`로 커밋되면서 같은 트랜잭션의 빈 계좌도 함께 커밋되기 때문입니다. 잠근 동안은 잔액이 바뀌지 않아서 뒤의 이체는 통과합니다. `test_failed_approval_leaves_no_empty_account`가 확인하고, 순서를 바꾸면 이 테스트가 실패합니다.
 
 **Q. 계좌번호 일련번호를 어떻게 만드나요? 동시에 만들면요?**
 A. 같은 상품 접두어 안에서 가장 큰 번호 + 1입니다. 동시에 열어 번호가 겹치면 DB의 unique 제약이 막고 409로 다시 시도하게 합니다. 자주 겹치면 DB 시퀀스로 바꾸면 되고, 코드에 그 한계를 주석으로 남겼습니다(ADR 0008).

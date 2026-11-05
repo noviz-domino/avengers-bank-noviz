@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
@@ -11,9 +11,11 @@ from avengers_bank.domains.accounts.schemas import (
     AccountDetailResponse,
     AccountListResponse,
     AccountUpdate,
+    DepositCreate,
     TransactionResponse,
 )
 from avengers_bank.domains.accounts.service import account_service
+from avengers_bank.domains.approvals.schemas import ActionResponse
 from avengers_bank.domains.users.schemas import UserResponse
 
 # 계좌가 한 테이블이라 종류별 경로를 두지 않는다 (ADR 0003)
@@ -35,6 +37,18 @@ async def list_my_accounts(db: DB, me: Me):
 async def open_account(data: AccountCreate, db: DB, me: Me):
     account = await account_service.open_account(db, me, data)
     return SuccessResponse[AccountDetailResponse](data=account, message="계좌가 개설되었습니다.")
+
+
+@router.post(
+    "/deposits", response_model=SuccessResponse[ActionResponse],
+    status_code=status.HTTP_202_ACCEPTED, responses=error_responses(400, 404, 409),
+)
+async def request_deposit(data: DepositCreate, response: Response, db: DB, me: Me):
+    """예금 개설 신청 → 승인 대기. `POST /approvals/{action_id}/approve`(PIN)로 계좌가 열리고 돈이 옮겨진다."""
+    action, created = await account_service.request_deposit(db, me, data)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return SuccessResponse[ActionResponse](data=action, message="승인 화면에서 PIN을 입력하면 예금이 열립니다.")
 
 
 @router.get("/{account_id}", response_model=SuccessResponse[AccountDetailResponse], responses=error_responses(404))
