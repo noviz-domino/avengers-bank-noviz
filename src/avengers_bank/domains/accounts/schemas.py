@@ -8,7 +8,7 @@ class AccountCreate(BaseModel):
     """POST /accounts — 입출금·적금 개설. 종류는 상품(product_id)이 정한다"""
 
     product_id: int
-    nickname: str | None = Field(default=None, max_length=50)
+    nickname: str | None = Field(default=None, min_length=1, max_length=50)  # 빈 이름 대신 null
     # 적금만
     term_months: int | None = Field(default=None, ge=1, le=120)
     monthly_payment: int | None = Field(default=None, gt=0)
@@ -16,7 +16,7 @@ class AccountCreate(BaseModel):
 
 
 class AccountUpdate(BaseModel):
-    nickname: str | None = Field(max_length=50)  # null이면 별칭 지움
+    nickname: str | None = Field(min_length=1, max_length=50)  # null이면 별칭 지움 (화면은 상품명)
 
 
 class AccountSummaryResponse(BaseModel):

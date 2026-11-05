@@ -132,7 +132,7 @@
 }, "message": "계좌가 개설되었습니다." }
 ```
 - 입출금 계좌는 이체 한도 기본값 1회 100만 원, 1일 500만 원으로 열립니다.
-- 적금의 적용 금리 = 기본금리 + min(충족한 우대 합계, 우대 상한). 마케팅 동의와 첫 예·적금 우대는 개설 때 확인하고, **급여이체 우대는 개설 때 알 수 없어서 넣지 않습니다**.
+- 적금의 적용 금리 = 기본금리 + min(충족한 우대 합계, 우대 상한). 마케팅 동의와 첫 예·적금 우대는 개설 때 확인하고, **급여이체 우대는 개설 때 알 수 없어서 넣지 않습니다**. 상한에 걸리면 `rate_detail` 끝에 `{"code": "PREFERENTIAL_CAP", "rate": "-0.20"}`처럼 깎인 만큼이 붙어서, 기본금리 + `rate_detail` 합계 = 적용 금리입니다([ADR 0008](decisions/0008-account-opening-policy.md)).
 - 만기일은 오늘(한국 날짜) + 기간. 그 달에 같은 날이 없으면 말일입니다.
 - 실패: `400 AGE_NOT_ELIGIBLE`, `400 TERM_OUT_OF_RANGE`, `400 AMOUNT_OUT_OF_RANGE`, `400 DEPOSIT_NEEDS_TRANSFER`(예금), `400 PRODUCT_NOT_OPENABLE`(대출), `404 PRODUCT_NOT_FOUND`(판매 중 아님), `409 ACCOUNT_NUM_CONFLICT`(같은 상품을 동시에 개설, 다시 시도)
 

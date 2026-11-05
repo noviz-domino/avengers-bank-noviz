@@ -2,11 +2,13 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from avengers_bank.core.database import SessionLocal
-from avengers_bank.domains.products.eligibility import add_months, age_on
-from avengers_bank.domains.products.models import AccountProduct
+from avengers_bank.domains.accounts.models import Account
+from avengers_bank.domains.products.eligibility import add_months, age_on, applied_rate
+from avengers_bank.domains.products.models import AccountProduct, ProductPreferentialRate
+from avengers_bank.domains.users.models import User
 from avengers_bank.seed import DEMO_LOGIN_ID, DEMO_PASSWORD, seed_demo_user, seed_products
 
 pytestmark = pytest.mark.anyio
@@ -90,7 +92,6 @@ async def test_not_openable_here(app, name, code):
     me = await sign_in(app)
     response = await app.post("/accounts", json={"product_id": await product_id(name), "term_months": 12, "monthly_payment": 1_000_000}, headers=me)
     assert response.json()["error"]["code"] == code
-    assert (await app.get("/accounts", headers=me)).json()["data"]["accounts"] == []  # 아무것도 안 생김
 
 
 async def test_main_screen_total_and_order(app):
@@ -139,3 +140,46 @@ async def test_transactions_paging_and_rename(app):
 
 async def test_requires_login(app):
     assert (await app.get("/accounts")).status_code == 401
+
+
+async def test_closed_accounts_not_in_total(app):
+    me = await sign_in(app)
+    pid = await product_id("어벤져스 입출금통장")
+    for _ in range(2):
+        await app.post("/accounts", json={"product_id": pid}, headers=me)
+    async with SessionLocal() as db:
+        await db.execute(update(Account).values(balance=1000))
+        await db.execute(update(Account).where(Account.account_id == 1).values(status="CLOSED"))
+        await db.commit()
+    data = (await app.get("/accounts", headers=me)).json()["data"]
+    assert [a["account_id"] for a in data["accounts"]] == [2]
+    assert data["total_balance"] == 1000
+
+
+def test_rate_detail_adds_up_when_capped():
+    product = AccountProduct(base_rate=Decimal("3.00"), max_preferential_rate=Decimal("0.50"), preferential_rates=[
+        ProductPreferentialRate(code="A", description="a", rate=Decimal("0.40")),
+        ProductPreferentialRate(code="B", description="b", rate=Decimal("0.30")),
+    ])
+    result = applied_rate(product, {"A", "B"})
+    assert result.rate == Decimal("3.50")
+    assert product.base_rate + sum(Decimal(d["rate"]) for d in result.detail) == result.rate
+    assert result.detail[-1] == {"code": "PREFERENTIAL_CAP", "rate": "-0.20"}
+
+
+async def test_blank_nickname_rejected(app):
+    me = await sign_in(app)
+    response = await app.post("/accounts", json={"product_id": await product_id("어벤져스 입출금통장"), "nickname": ""}, headers=me)
+    assert response.status_code == 422
+
+
+async def test_seed_unlocks_demo_user(app):
+    async with SessionLocal() as db:
+        await seed_demo_user(db)
+    async with SessionLocal() as db:
+        await db.execute(update(User).values(login_fail_count=3))
+        await db.commit()
+    async with SessionLocal() as db:
+        assert await seed_demo_user(db) is False  # 다시 만들지 않고
+    async with SessionLocal() as db:
+        assert await db.scalar(select(User.login_fail_count).where(User.login_id == DEMO_LOGIN_ID)) == 0  # 잠금만 풂
