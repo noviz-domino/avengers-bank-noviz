@@ -1,6 +1,7 @@
+import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, SmallInteger, String, false, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, SmallInteger, String, Uuid, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from avengers_bank.core.database import Base
@@ -30,6 +31,28 @@ class User(Base):
         SmallInteger, default=0, server_default="0", nullable=False
     )
     pin_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RefreshToken(Base):
+    """로그인 유지용 토큰. 원문은 저장하지 않고 SHA-256 해시만 둔다 (ADR 0005)
+
+    쓸 때마다 새 토큰으로 바꾸고(rotation), 같은 로그인에서 이어진 토큰은 family_id로 묶는다.
+    이미 바꾼 토큰이 다시 오면 도난으로 보고 그 family 전체를 폐기한다.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    token_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), index=True, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    family_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True, nullable=False)
+    device_name: Mapped[str | None] = mapped_column(String(100))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    replaced_by: Mapped[int | None] = mapped_column(ForeignKey("refresh_tokens.token_id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

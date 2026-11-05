@@ -17,6 +17,11 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     login_id: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=1, max_length=128, repr=False)
+    device_name: str | None = Field(default=None, max_length=100)  # 기기 이름. 로그인 기기 목록 기능을 만들면 보여줌
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1, max_length=200, repr=False)
 
 
 class UserResponse(BaseModel):
@@ -34,4 +39,5 @@ class UserResponse(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: Literal["bearer"] = "bearer"

@@ -35,7 +35,9 @@
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
 | ✅ | POST | `/users/signup` | | 회원가입 (생년월일 필수, 마케팅 동의 선택) |
-| ✅ | POST | `/users/login` | | 로그인, JWT 발급. 5회 실패하면 15분 잠금 |
+| ✅ | POST | `/users/login` | | 로그인, access token(15분) + refresh token(14일) 발급. 5회 실패하면 15분 잠금 |
+| ✅ | POST | `/users/token/refresh` | | refresh token을 새 것으로 바꾸고 access token 재발급. 이미 바꾼 토큰이 다시 오면 그 기기 전체 폐기 |
+| ✅ | POST | `/users/logout` | | 이 기기의 refresh token 폐기 (없는 토큰이어도 성공) |
 | ✅ | GET | `/users/me` | 🔒 | 내 정보 조회 |
 | 📝 | PATCH | `/users/me` | 🔒 | 이름, 닉네임, 전화번호 수정 |
 
@@ -53,13 +55,19 @@
 
 `POST /users/login`
 ```json
-{ "login_id": "ironman", "password": "password1234" }
+{ "login_id": "ironman", "password": "password1234", "device_name": "아이폰" }
 ```
 → `200`
 ```json
-{ "data": { "access_token": "eyJhbGciOi...", "token_type": "bearer" }, "message": null }
+{ "data": { "access_token": "eyJhbGciOi...", "refresh_token": "q3Zx...", "token_type": "bearer" }, "message": null }
 ```
 실패: `401 INVALID_CREDENTIALS`(1~4번째), `423 LOGIN_LOCKED`(5번째부터 15분 동안, 비밀번호가 맞아도)
+
+`POST /users/token/refresh`, `POST /users/logout`
+```json
+{ "refresh_token": "q3Zx..." }
+```
+→ refresh는 로그인과 같은 모양(새 refresh token). 실패: `401 INVALID_REFRESH_TOKEN`(만료·없음), `401 REFRESH_TOKEN_REUSED`(이미 바꾼 토큰, 그 기기의 토큰 모두 폐기)
 </details>
 
 ## products: 상품 (`domains/products`)

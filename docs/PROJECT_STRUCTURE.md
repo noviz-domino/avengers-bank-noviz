@@ -22,6 +22,7 @@ avengers-bank/
 │   ├── conftest.py
 │   ├── test_users.py           # 회원가입, 로그인, 로그인 잠금
 │   ├── test_products.py        # 상품 목록·상세, 특판 기간, seed
+│   ├── test_refresh_tokens.py  # 토큰 교체, 재사용 감지, 만료, 기기별 로그아웃
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/
@@ -78,7 +79,7 @@ users ◀── approvals ◀── transfers   (이체는 승인 대기를 만�
 
 | ERD 테이블 | 모델 클래스 | 파일 |
 |---|---|---|
-| `users` | `User` | `domains/users/models.py` |
+| `users`, `refresh_tokens` | `User`, `RefreshToken` | `domains/users/models.py` |
 | `account_products`, `product_preferential_rates` | `AccountProduct`, `ProductPreferentialRate` | `domains/products/models.py` |
 | `accounts`, `account_terms`, `account_transactions` | `Account`, `AccountTerms`, `AccountTransaction` | `domains/accounts/models.py` |
 | `pending_actions` | `PendingAction` | `domains/approvals/models.py` |

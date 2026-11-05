@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -48,3 +50,12 @@ def decode_access_token(token: str) -> int:
         raise UnauthorizedException(
             message="유효하지 않거나 만료된 토큰입니다.", code="INVALID_TOKEN"
         ) from None
+
+
+def new_refresh_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_refresh_token(token: str) -> str:
+    # 무작위 32바이트라 비밀번호처럼 느린 해시(Argon2)가 필요 없다. DB가 새도 원문은 알 수 없다
+    return hashlib.sha256(token.encode()).hexdigest()

@@ -153,6 +153,8 @@ README의 "실패 상황 동작 확인"에 쓸 후보입니다. 구현하면서 
 |---|---|---|
 | ① | 이미 있는 아이디로 가입 | `409 LOGIN_ID_ALREADY_EXISTS` ✅ 구현됨 |
 | ① | 아이디·비밀번호 불일치 | `401 INVALID_CREDENTIALS` ✅ 구현됨 |
+| ① | 만료되거나 없는 refresh token | `401 INVALID_REFRESH_TOKEN` ✅ 구현됨 |
+| ① | 이미 교체한 refresh token이 다시 옴(도난 의심) | `401 REFRESH_TOKEN_REUSED`, 그 기기의 토큰 모두 폐기 ✅ 구현됨 |
 | ① | 5회 연속 실패 후 로그인 | `423 LOGIN_LOCKED` (15분 동안 비밀번호가 맞아도 거절) ✅ 구현됨 |
 | ② | 판매가 끝났거나 없는 상품 | `404 PRODUCT_NOT_FOUND` ✅ 구현됨 (특판 기간이 지나면 목록·상세·가입 모두 막힘) |
 | ② | 가입 조건 불충족 | 미정 |

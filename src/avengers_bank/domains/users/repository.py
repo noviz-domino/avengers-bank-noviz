@@ -1,9 +1,10 @@
+import uuid
 from datetime import datetime
 
 from sqlalchemy import case, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from avengers_bank.domains.users.models import User
+from avengers_bank.domains.users.models import RefreshToken, User
 
 
 class UserRepository:
@@ -40,3 +41,36 @@ class UserRepository:
 
 
 user_repository = UserRepository()
+
+
+class RefreshTokenRepository:
+    async def save(self, db: AsyncSession, token: RefreshToken) -> RefreshToken:
+        db.add(token)
+        await db.flush()
+        return token
+
+    async def revoke_if_active(self, db: AsyncSession, token_hash: str, now: datetime) -> RefreshToken | None:
+        """쓸 수 있는 토큰이면 폐기하고 돌려준다. 한 문장이라 같은 토큰으로 동시에 와도 한 번만 성공한다."""
+        return await db.scalar(
+            update(RefreshToken)
+            .where(
+                RefreshToken.token_hash == token_hash,
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > now,
+            )
+            .values(revoked_at=now)
+            .returning(RefreshToken)
+        )
+
+    async def find_by_hash(self, db: AsyncSession, token_hash: str) -> RefreshToken | None:
+        return await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
+
+    async def revoke_family(self, db: AsyncSession, family_id: uuid.UUID, now: datetime) -> None:
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.family_id == family_id, RefreshToken.revoked_at.is_(None))
+            .values(revoked_at=now)
+        )
+
+
+refresh_token_repository = RefreshTokenRepository()
