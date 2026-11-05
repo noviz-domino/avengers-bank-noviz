@@ -1,12 +1,61 @@
-from fastapi import APIRouter
+from typing import Annotated
 
-from avengers_bank.core.responses import error_responses
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/accounts", tags=["accounts"], responses=error_responses(422))
+from avengers_bank.core.database import get_db
+from avengers_bank.core.dependencies import get_current_user
+from avengers_bank.core.responses import SuccessResponse, error_responses
+from avengers_bank.domains.accounts.schemas import (
+    AccountCreate,
+    AccountDetailResponse,
+    AccountListResponse,
+    AccountUpdate,
+    TransactionResponse,
+)
+from avengers_bank.domains.accounts.service import account_service
+from avengers_bank.domains.users.schemas import UserResponse
 
 # 계좌가 한 테이블이라 종류별 경로를 두지 않는다 (ADR 0003)
-# TODO: GET   /accounts                          내 계좌 전체 + 총자산
-# TODO: POST  /accounts                          계좌 개설 (account_type으로 구분)
-# TODO: GET   /accounts/{account_id}             계좌 상세 (예·적금은 조건 포함)
-# TODO: GET   /accounts/{account_id}/transactions  거래내역
-# TODO: PATCH /accounts/{account_id}             별칭, 이체 한도(입출금만) 변경
+router = APIRouter(prefix="/accounts", tags=["accounts"], responses=error_responses(401, 422))
+
+DB = Annotated[AsyncSession, Depends(get_db)]
+Me = Annotated[UserResponse, Depends(get_current_user)]
+
+
+@router.get("", response_model=SuccessResponse[AccountListResponse])
+async def list_my_accounts(db: DB, me: Me):
+    return SuccessResponse[AccountListResponse](data=await account_service.list_my_accounts(db, me.user_id))
+
+
+@router.post(
+    "", response_model=SuccessResponse[AccountDetailResponse],
+    status_code=status.HTTP_201_CREATED, responses=error_responses(400, 404, 409),
+)
+async def open_account(data: AccountCreate, db: DB, me: Me):
+    account = await account_service.open_account(db, me, data)
+    return SuccessResponse[AccountDetailResponse](data=account, message="계좌가 개설되었습니다.")
+
+
+@router.get("/{account_id}", response_model=SuccessResponse[AccountDetailResponse], responses=error_responses(404))
+async def get_my_account(account_id: int, db: DB, me: Me):
+    return SuccessResponse[AccountDetailResponse](data=await account_service.get_my_account(db, me.user_id, account_id))
+
+
+@router.get(
+    "/{account_id}/transactions",
+    response_model=SuccessResponse[list[TransactionResponse]], responses=error_responses(404),
+)
+async def list_transactions(
+    account_id: int, db: DB, me: Me,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    before: Annotated[int | None, Query(description="이전 쪽의 마지막 tx_id")] = None,
+):
+    txs = await account_service.list_transactions(db, me.user_id, account_id, limit, before)
+    return SuccessResponse[list[TransactionResponse]](data=txs)
+
+
+@router.patch("/{account_id}", response_model=SuccessResponse[AccountDetailResponse], responses=error_responses(404))
+async def rename_account(account_id: int, data: AccountUpdate, db: DB, me: Me):
+    account = await account_service.rename(db, me.user_id, account_id, data.nickname)
+    return SuccessResponse[AccountDetailResponse](data=account)

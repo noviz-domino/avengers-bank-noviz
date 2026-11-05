@@ -157,11 +157,11 @@ README의 "실패 상황 동작 확인"에 쓸 후보입니다. 구현하면서 
 | ① | 이미 교체한 refresh token이 다시 옴(도난 의심) | `401 REFRESH_TOKEN_REUSED`, 그 기기의 토큰 모두 폐기 ✅ 구현됨 |
 | ① | 5회 연속 실패 후 로그인 | `423 LOGIN_LOCKED` (15분 동안 비밀번호가 맞아도 거절) ✅ 구현됨 |
 | ② | 판매가 끝났거나 없는 상품 | `404 PRODUCT_NOT_FOUND` ✅ 구현됨 (특판 기간이 지나면 목록·상세·가입 모두 막힘) |
-| ② | 가입 조건 불충족 | 미정 |
+| ② | 가입 조건 불충족 (나이·기간·금액) | `400 AGE_NOT_ELIGIBLE`, `400 TERM_OUT_OF_RANGE`, `400 AMOUNT_OUT_OF_RANGE` ✅ 구현됨 |
 | ② | 출금 계좌 잔액 부족 | `400 INSUFFICIENT_BALANCE` (예정) |
 | ③ | 없는 계좌로 이체 | `404 ACCOUNT_NOT_FOUND` (예정) |
 | ③ | 1회·1일 한도 초과 | `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED` (예정) |
-| ③ | 남의 계좌에서 출금 | `403 ACCOUNT_FORBIDDEN` (예정) |
+| ③ | 남의 계좌 조회·출금 | `404 ACCOUNT_NOT_FOUND` (있다는 것도 알려 주지 않음) ✅ 조회 구현됨, 출금은 이체 PR |
 | ④ | 정지·분실 카드 결제 | 미정 |
 | ④ | 카드 한도 초과, 연결 계좌 잔액 부족 | 미정 |
 | ⑤ | 대출 심사 거절 | 미정 |
