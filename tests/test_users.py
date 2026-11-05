@@ -39,8 +39,10 @@ async def test_signup_login_me(client):
     assert response.json()["data"]["login_id"] == SIGNUP["login_id"]
 
 
-async def test_signup_requires_birth_date(client):
+async def test_signup_requires_past_birth_date(client):
     response = await client.post("/users/signup", json={k: v for k, v in SIGNUP.items() if k != "birth_date"})
+    assert response.status_code == 422
+    response = await client.post("/users/signup", json={**SIGNUP, "birth_date": "2999-01-01"})
     assert response.status_code == 422
 
 

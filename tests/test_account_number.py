@@ -1,4 +1,5 @@
 import importlib.util
+import inspect
 from datetime import date
 from pathlib import Path
 
@@ -57,6 +58,14 @@ def test_migration_checks_match_models():
     assert in_migrations == model_checks()
 
 
+def test_migration_creates_every_check():
+    # CHECKS에 적어 놓고 upgrade()에서 빠뜨려도 위 테스트·alembic check·SQLite 테스트는 모두 통과한다
+    migration = load_migration("c3d9e1a47b20")
+    source = inspect.getsource(migration.upgrade)
+    missing = [n for n in migration.CHECKS if f"check('{n}')" not in source and f"'{n}', " not in source]
+    assert not missing, missing
+
+
 async def seed(db) -> None:
     db.add_all([
         User(login_id="ironman", hashed_password="x", name="토니", phone="010", birth_date=date(1990, 1, 1)),
@@ -77,6 +86,8 @@ def checking(num: str, **kw) -> Account:
     {"account_num": "110-201-000002"},                            # 예금 번호를 입출금 계좌에
     {"account_num": "110-101-000002", "balance": -1},             # 잔액 음수
     {"account_num": "110-101-000002", "per_transfer_limit": None},  # 입출금인데 한도 없음
+    {"account_num": "110-101-000002", "per_transfer_limit": 0},     # 한도 0
+    {"account_num": "110-101-000002", "daily_transfer_limit": 1},   # 1일 한도 < 1회 한도
     {"account_num": "110-101-000002", "status": "DELETED"},
 ])
 async def test_account_checks_reject(client, bad):
@@ -120,6 +131,8 @@ async def test_transaction_checks_reject(client):
         for bad in [
             {"tx_type": "GIFT", "amount": 1, "balance_after": 1},
             {"tx_type": "DEPOSIT", "amount": 0, "balance_after": 1},
+            {"tx_type": "WITHDRAW", "amount": 1000, "balance_after": 2000},  # 나가는 거래인데 +
+            {"tx_type": "DEPOSIT", "amount": -1000, "balance_after": 0},     # 들어오는 거래인데 -
             {"tx_type": "WITHDRAW", "amount": -2000, "balance_after": -1000},
         ]:
             db.add(AccountTransaction(account_id=1, **bad))

@@ -31,7 +31,8 @@ CHECKS = {
     ),
     "ck_accounts_balance": "balance >= 0",
     "ck_accounts_transfer_limits": (
-        "(account_type = 'CHECKING' AND per_transfer_limit IS NOT NULL AND daily_transfer_limit IS NOT NULL)"
+        "(account_type = 'CHECKING' AND per_transfer_limit IS NOT NULL AND daily_transfer_limit IS NOT NULL"
+        " AND per_transfer_limit > 0 AND daily_transfer_limit >= per_transfer_limit)"
         " OR (account_type <> 'CHECKING' AND per_transfer_limit IS NULL AND daily_transfer_limit IS NULL)"
     ),
     "ck_accounts_status": "status IN ('ACTIVE', 'FROZEN', 'CLOSED')",
@@ -39,12 +40,13 @@ CHECKS = {
     "ck_pending_actions_status": "status IN ('PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'EXECUTED', 'FAILED')",
     "ck_pending_actions_requested_by": "requested_by IN ('WEB', 'AGENT', 'MCP')",
     "ck_pending_actions_approval_method": "approval_method IS NULL OR approval_method IN ('PIN', 'PASSKEY')",
-    "ck_account_transactions_tx_type": (
-        "tx_type IN ('DEPOSIT', 'WITHDRAW', 'TRANSFER_IN', 'TRANSFER_OUT', 'INTERNAL_IN', 'INTERNAL_OUT',"
-        " 'CARD_PAYMENT', 'CARD_BILL', 'GOAL_SAVING_IN', 'GOAL_SAVING_OUT', 'INTEREST',"
-        " 'LOAN_DISBURSE', 'LOAN_REPAY', 'REFUND')"
+    # 거래 종류 목록 + 금액 부호 (들어오면 +, 나가면 -)
+    "ck_account_transactions_amount_sign": (
+        "(tx_type IN ('DEPOSIT', 'TRANSFER_IN', 'INTERNAL_IN', 'GOAL_SAVING_IN', 'INTEREST', 'LOAN_DISBURSE', 'REFUND')"
+        " AND amount > 0)"
+        " OR (tx_type IN ('WITHDRAW', 'TRANSFER_OUT', 'INTERNAL_OUT', 'CARD_PAYMENT', 'CARD_BILL', 'GOAL_SAVING_OUT', 'LOAN_REPAY')"
+        " AND amount < 0)"
     ),
-    "ck_account_transactions_amount": "amount <> 0",
     "ck_account_transactions_balance_after": "balance_after >= 0",
 }
 
@@ -114,6 +116,7 @@ def upgrade() -> None:
         check('ck_accounts_transfer_limits'),
         check('ck_accounts_status'),
     )
+    op.create_index('ix_accounts_user_id', 'accounts', ['user_id'])
     op.create_table('account_terms',
         sa.Column('account_id', sa.Integer(), nullable=False),
         sa.Column('applied_rate', sa.Numeric(precision=5, scale=2), nullable=False),
@@ -163,8 +166,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['account_id'], ['accounts.account_id']),
         sa.ForeignKeyConstraint(['action_id'], ['pending_actions.action_id']),
         sa.PrimaryKeyConstraint('tx_id'),
-        check('ck_account_transactions_tx_type'),
-        check('ck_account_transactions_amount'),
+        check('ck_account_transactions_amount_sign'),
         check('ck_account_transactions_balance_after'),
     )
     op.create_index('ix_account_transactions_account_id_created_at', 'account_transactions', ['account_id', 'created_at'])
@@ -175,6 +177,7 @@ def downgrade() -> None:
     op.drop_table('account_transactions')
     op.drop_table('pending_actions')
     op.drop_table('account_terms')
+    op.drop_index('ix_accounts_user_id', table_name='accounts')
     op.drop_table('accounts')
 
     op.drop_constraint('ck_account_products_type', 'account_products', type_='check')

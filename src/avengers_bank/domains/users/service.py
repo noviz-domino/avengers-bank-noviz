@@ -59,9 +59,10 @@ class UserService:
         return user
 
     async def login(self, db: AsyncSession, data: UserLogin) -> str:
-        # 실패 횟수는 실패해도 저장해야 해서, 예외는 트랜잭션이 커밋된 뒤에 던진다
+        # 비밀번호 확인(Argon2, 느림)은 행을 잠그지 않고 하고, 실패 횟수는 UPDATE 한 문장으로 올린다.
+        # 동시에 여러 번 틀려도 횟수가 덮어써지지 않고, 연결을 오래 붙잡지 않는다.
         async with db.begin():
-            user = await user_repository.find_by_login_id(db, data.login_id, for_update=True)
+            user = await user_repository.find_by_login_id(db, data.login_id)
             if user is None:
                 raise UnauthorizedException(
                     message="아이디 또는 비밀번호가 올바르지 않습니다.", code="INVALID_CREDENTIALS"
@@ -69,26 +70,24 @@ class UserService:
             now = datetime.now(UTC)
             if is_locked(user.login_locked_until, now):
                 raise login_locked()
+            user_id, hashed_password = user.user_id, user.hashed_password
 
-            ok = await run_in_threadpool(verify_password, data.password, user.hashed_password)
+        ok = await run_in_threadpool(verify_password, data.password, hashed_password)
+
+        async with db.begin():
             if ok:
-                user.login_fail_count = 0
-                user.login_locked_until = None
-            else:
-                user.login_fail_count += 1
-                if user.login_fail_count >= LOGIN_MAX_FAILS:
-                    user.login_fail_count = 0
-                    user.login_locked_until = now + LOGIN_LOCK_DURATION
-            # 잠금 시간이 지난 옛 값이 남아 있을 수 있어서 시각으로 판단
-            user_id, locked_now = user.user_id, is_locked(user.login_locked_until, now)
-
-        if not ok:
-            if locked_now:
-                raise login_locked()
-            raise UnauthorizedException(
-                message="아이디 또는 비밀번호가 올바르지 않습니다.", code="INVALID_CREDENTIALS"
+                await user_repository.reset_login_failures(db, user_id)
+                return create_access_token(user_id)
+            locked_until = await user_repository.add_login_failure(
+                db, user_id, LOGIN_MAX_FAILS, now + LOGIN_LOCK_DURATION
             )
-        return create_access_token(user_id)
+
+        # 예외는 실패 횟수가 커밋된 뒤에 던진다
+        if is_locked(locked_until, now):
+            raise login_locked()
+        raise UnauthorizedException(
+            message="아이디 또는 비밀번호가 올바르지 않습니다.", code="INVALID_CREDENTIALS"
+        )
 
     async def get_current_user(self, db: AsyncSession, token: str) -> User:
         user_id = decode_access_token(token)
