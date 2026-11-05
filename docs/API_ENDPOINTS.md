@@ -66,9 +66,31 @@
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
-| 📝 | GET | `/products/accounts?type=` | | 계좌 상품 목록 (`type` = CHECKING·DEPOSIT·SAVINGS, 생략하면 전체) |
-| 📝 | GET | `/products/accounts/{product_id}` | | 계좌 상품 상세 |
+| ✅ | GET | `/products/accounts?type=` | | **판매 중인** 계좌·대출 상품 목록 (`type` = CHECKING·DEPOSIT·SAVINGS·LOAN, 생략하면 전체) |
+| ✅ | GET | `/products/accounts/{product_id}` | | 상품 상세: 설명, 가입 조건, 우대금리 조건. 판매 중이 아니면 `404 PRODUCT_NOT_FOUND` |
 | 📝 | GET | `/products/cards?type=` | | 카드 상품 목록 (카드 기능 PR에서 `card_products`와 함께) |
+
+<details>
+<summary>응답 예시</summary>
+
+`GET /products/accounts/4` → `200`
+```json
+{ "data": {
+  "product_id": 4, "type": "SAVINGS", "name": "스타크 자유적금",
+  "base_rate": "3.50", "max_preferential_rate": "1.00",
+  "min_term_months": 12, "max_term_months": 24, "min_amount": 10000, "max_amount": 1000000,
+  "min_age": null, "sale_start": null, "sale_end": null,
+  "description": "매달 정한 금액을 넣어 목돈을 만드는 적금입니다. …",
+  "conditions": "월 1만 원부터 100만 원까지, 12~24개월.",
+  "preferential_rates": [
+    { "code": "SALARY_TRANSFER", "description": "이 은행 입출금 계좌로 급여를 받으면", "rate": "0.50" },
+    { "code": "MARKETING_AGREED", "description": "마케팅 정보 수신에 동의하면", "rate": "0.20" },
+    { "code": "FIRST_PRODUCT", "description": "이 은행에서 처음 가입하는 예·적금이면", "rate": "0.30" }
+  ]
+}, "message": null }
+```
+금리는 소수점이 정확해야 해서 문자열로 보냅니다. "판매 중"은 한국 날짜로 판단합니다(서버 시간대가 UTC여도 자정에 바뀜). 적금·예금의 `min_amount`·`max_amount`는 적금은 월 납입금, 예금은 맡기는 금액입니다.
+</details>
 
 ## accounts: 계좌 (`domains/accounts`)
 

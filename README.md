@@ -26,7 +26,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-시작할 때 `alembic upgrade head`가 자동으로 실행됩니다.
+시작할 때 `alembic upgrade head`와 데모 상품 seed가 자동으로 실행됩니다.
 
 - API 문서: http://127.0.0.1:8000/docs
 - DB 접속(내 PC에서): `localhost:5433`, 사용자·비밀번호 `postgres`, DB `avengers_bank`
@@ -55,8 +55,11 @@ cp .env.example .env
 
 ```bash
 uv run alembic upgrade head
+uv run python -m avengers_bank.seed
 uv run fastapi dev
 ```
+
+`avengers_bank.seed`는 데모 상품(입출금 1, 예금 2, 적금 2, 대출 1)을 넣습니다. 여러 번 실행해도 같은 상품을 다시 넣지 않습니다.
 
 API 문서: http://127.0.0.1:8000/docs
 
@@ -84,5 +87,6 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 | 도메인 | 상태 |
 |---|---|
 | users | ✅ 회원가입(생년월일·마케팅 동의), 로그인(5회 실패 15분 잠금), 내 정보 조회 |
-| products, accounts, approvals | 📝 테이블만 완성 ([ERD](docs/ERD.md) 핵심 6개). API는 TODO 주석 |
+| products | ✅ 판매 중인 상품 목록·상세(우대금리 조건 포함), 데모 상품 seed |
+| accounts, approvals | 📝 테이블만 완성 ([ERD](docs/ERD.md) 핵심 6개). API는 TODO 주석 |
 | transfers, cards | 📝 TODO 주석. 카드 테이블은 카드 기능 PR에서 새로 만듦 |

@@ -21,10 +21,12 @@ avengers-bank/
 ├── tests/                  # pytest (SQLite로 실행, DB 서버 불필요)
 │   ├── conftest.py
 │   ├── test_users.py           # 회원가입, 로그인, 로그인 잠금
+│   ├── test_products.py        # 상품 목록·상세, 특판 기간, seed
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/
     ├── main.py             # 앱 생성, CORS, 예외 핸들러, 라우터 등록
+    ├── seed.py             # 데모 상품 데이터 (python -m avengers_bank.seed)
     ├── core/               # 모든 도메인이 같이 쓰는 공용 코드
     │   ├── config.py       # .env 읽기
     │   ├── database.py     # DB 연결, Base, get_db
@@ -35,7 +37,7 @@ avengers-bank/
     │   └── responses.py    # SuccessResponse, ErrorResponse 형식
     └── domains/
         ├── users/          # 회원가입, 로그인, 내 정보          ✅ 구현됨
-        ├── products/       # 계좌·대출 상품 조회                📝 모델만
+        ├── products/       # 계좌·대출 상품 조회, 우대금리       ✅ 목록·상세
         ├── accounts/       # 계좌·예적금 조건·장부              📝 모델 + 계좌번호 규칙(account_number.py)
         ├── approvals/      # 승인 대기 작업(pending_actions)     📝 모델만. API는 이체 PR에서
         ├── transfers/      # 이체 (테이블 없음, 장부는 accounts) 📝
@@ -77,7 +79,7 @@ users ◀── approvals ◀── transfers   (이체는 승인 대기를 만�
 | ERD 테이블 | 모델 클래스 | 파일 |
 |---|---|---|
 | `users` | `User` | `domains/users/models.py` |
-| `account_products` | `AccountProduct` | `domains/products/models.py` |
+| `account_products`, `product_preferential_rates` | `AccountProduct`, `ProductPreferentialRate` | `domains/products/models.py` |
 | `accounts`, `account_terms`, `account_transactions` | `Account`, `AccountTerms`, `AccountTransaction` | `domains/accounts/models.py` |
 | `pending_actions` | `PendingAction` | `domains/approvals/models.py` |
 

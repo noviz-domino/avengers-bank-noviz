@@ -12,7 +12,7 @@ from avengers_bank.core.config import get_settings
 from avengers_bank.core.database import Base
 from avengers_bank.domains.accounts.models import Account, AccountTerms, AccountTransaction  # noqa: F401
 from avengers_bank.domains.approvals.models import PendingAction  # noqa: F401
-from avengers_bank.domains.products.models import AccountProduct  # noqa: F401
+from avengers_bank.domains.products.models import AccountProduct, ProductPreferentialRate  # noqa: F401
 from avengers_bank.domains.users.models import User  # noqa: F401
 
 config = context.config

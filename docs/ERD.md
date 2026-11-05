@@ -6,7 +6,7 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions). 마이그레이션: `c3d9e1a47b20`
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리)
 
 ## 핵심 테이블 (구현됨)
 
@@ -14,6 +14,7 @@
 erDiagram
     users ||--o{ accounts : "보유"
     account_products ||--o{ accounts : "상품"
+    account_products ||--o{ product_preferential_rates : "우대 조건"
     accounts ||--o| account_terms : "예·적금만"
     accounts ||--o{ account_transactions : "장부"
     users ||--o{ pending_actions : "승인 대기"
@@ -51,6 +52,13 @@ erDiagram
         date sale_start "NULL, 특판"
         date sale_end "NULL, 특판"
         bool is_active
+    }
+    product_preferential_rates {
+        int rate_id PK
+        int product_id FK
+        string code "SALARY_TRANSFER 등, 상품 안에서 unique"
+        string description "조건 설명"
+        numeric rate "가산 금리(%p), 0보다 큼"
     }
     accounts {
         int account_id PK
@@ -106,7 +114,8 @@ erDiagram
     }
 ```
 
-- `account_products`: `(type, product_code)` unique, `product_code` 1~99 (ADR 0001). 대출 상품도 `type = LOAN`으로 여기에 둡니다.
+- `account_products`: `(type, product_code)` unique, `product_code` 1~99 (ADR 0001). 대출 상품도 `type = LOAN`으로 여기에 둡니다. **판매 중** = `is_active`이고 특판 기간(`sale_start`~`sale_end`)이 있으면 오늘(**한국 날짜**, `core/clock.py`)이 그 안에 있음. `max_preferential_rate`는 **우대 상한**이라 우대 조건 합계와 다를 수 있습니다(데모 seed는 합계를 넣음). 가입 때 적용 금리 = 기본금리 + min(충족한 우대 합계, 상한).
+- `product_preferential_rates`: 상품의 우대 조건. 처음에는 예산 그룹의 예정 테이블이었지만, 우대금리는 상품 기능이라 상품 PR에서 만들었습니다. 계좌에는 가입 때 적용된 우대만 `account_terms.rate_detail`에 스냅샷으로 남습니다.
 - `account_terms.rate_detail` 예: `[{"code": "SALARY_TRANSFER", "rate": 0.5}, {"code": "MARKETING_AGREED", "rate": 0.2}]`. 가입할 때 한 번 정해지고 바뀌지 않습니다.
 - PK는 `int`입니다(현재 코드와 같음). SQLite 테스트에서 `BIGINT PRIMARY KEY`는 자동 증가하지 않기 때문입니다. 금액 칸(`balance`, `amount`, 한도 등)만 `bigint`입니다.
 - `account_transactions`에 `(account_id, created_at)` 인덱스를 둡니다. 거래내역 조회와 1일 한도 계산이 이 순서로 찾습니다.
@@ -163,7 +172,6 @@ erDiagram
 | 카드 | `card_transactions` | card_id, merchant_name, category, amount, is_overseas, status(APPROVED/CANCELED), billing_status, account_tx_id |
 | 대출 | `loans` | user_id, product_id, loan_num(110-4PP-…), account_id, principal, remaining_principal, applied_rate, term_months, status. `account_products`에 `income_multiplier`(한도 = 연소득 × 배수) 추가 |
 | 대출 | `loan_schedules` | loan_id, seq, due_date, principal_amount, interest_amount, status, paid_tx_id |
-| 예산 | `product_preferential_rates` | product_id, code, description, rate |
 | 예산 | `categories` | name, is_essential, is_daily, default_always_pass (신청 때 보여 줄 추천값. 실제 설정은 사용자별로 `budget_profiles`에, ADR 0007) |
 | 예산 | `budget_profiles`, `fixed_expenses`, `savings_goals`, `budget_cycles`, `budget_decisions` | [budget.md](planning/budget.md) 참고. `budget_cycles`가 결제 검사 때 잠그는 행 |
 | Agent | `recipients` | user_id, bank_name, account_num, holder_name, nickname, last_sent_at |
