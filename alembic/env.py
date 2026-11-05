@@ -10,21 +10,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from avengers_bank.core.config import get_settings
 from avengers_bank.core.database import Base
-from avengers_bank.domains.accounts.models import (  # noqa: F401
-    CheckingAccount,
-    CheckingAccountHistory,
-    DepositAccount,
-    DepositAccountHistory,
-    SavingsAccount,
-    SavingsAccountHistory,
-)
-from avengers_bank.domains.cards.models import (  # noqa: F401
-    CreditCard,
-    CreditCardHistory,
-    DebitCard,
-    DebitCardHistory,
-)
-from avengers_bank.domains.products.models import AccountProduct, CardProduct  # noqa: F401
+from avengers_bank.domains.accounts.models import Account, AccountTerms, AccountTransaction  # noqa: F401
+from avengers_bank.domains.approvals.models import PendingAction  # noqa: F401
+from avengers_bank.domains.products.models import AccountProduct  # noqa: F401
 from avengers_bank.domains.users.models import User  # noqa: F401
 
 config = context.config

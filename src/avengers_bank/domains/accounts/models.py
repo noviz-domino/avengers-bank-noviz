@@ -1,143 +1,115 @@
+"""계좌·예적금 조건·장부 (docs/ERD.md, 결정 이유: docs/decisions/0003)"""
+
+import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
+    Index,
+    Numeric,
     SmallInteger,
     String,
+    Uuid,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from avengers_bank.core.database import Base
-from avengers_bank.domains.accounts.account_number import check_constraint_sql
+from avengers_bank.core.database import Base, in_sql
+from avengers_bank.domains.accounts.account_number import account_num_check_sql
+
+ACCOUNT_TYPES = ("CHECKING", "DEPOSIT", "SAVINGS")
+ACCOUNT_STATUSES = ("ACTIVE", "FROZEN", "CLOSED")
+# 장부의 거래 종류. 예산에서 어떻게 세는지는 docs/ERD.md "거래 종류"
+TX_TYPES = (
+    "DEPOSIT", "WITHDRAW", "TRANSFER_IN", "TRANSFER_OUT", "INTERNAL_IN", "INTERNAL_OUT",
+    "CARD_PAYMENT", "CARD_BILL", "GOAL_SAVING_IN", "GOAL_SAVING_OUT", "INTEREST",
+    "LOAN_DISBURSE", "LOAN_REPAY", "REFUND",
+)
 
 
-class CheckingAccount(Base):
-    """입출금 계좌"""
+class Account(Base):
+    """입출금·예금·적금 계좌. 종류는 account_type으로 구분한다."""
 
-    __tablename__ = "checking_accounts"
+    __tablename__ = "accounts"
     __table_args__ = (
-        CheckConstraint(check_constraint_sql("checking"), name="ck_checking_accounts_account_num"),
+        CheckConstraint(in_sql("account_type", ACCOUNT_TYPES), name="ck_accounts_account_type"),
+        CheckConstraint(account_num_check_sql(), name="ck_accounts_account_num"),
+        CheckConstraint("balance >= 0", name="ck_accounts_balance"),
+        # 이체 한도는 입출금 계좌에만 있다
+        CheckConstraint(
+            "(account_type = 'CHECKING' AND per_transfer_limit IS NOT NULL AND daily_transfer_limit IS NOT NULL)"
+            " OR (account_type <> 'CHECKING' AND per_transfer_limit IS NULL AND daily_transfer_limit IS NULL)",
+            name="ck_accounts_transfer_limits",
+        ),
+        CheckConstraint(in_sql("status", ACCOUNT_STATUSES), name="ck_accounts_status"),
     )
 
-    checking_account_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
     product_id: Mapped[int] = mapped_column(
         ForeignKey("account_products.product_id"), nullable=False
     )
+    account_type: Mapped[str] = mapped_column(String(20), nullable=False)
     account_num: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
-    balance: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
-    per_transfer_limit: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    daily_transfer_limit: Mapped[int] = mapped_column(BigInteger, nullable=False)
     nickname: Mapped[str | None] = mapped_column(String(50))
-    created_at: Mapped[datetime] = mapped_column(
+    balance: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    per_transfer_limit: Mapped[int | None] = mapped_column(BigInteger)
+    daily_transfer_limit: Mapped[int | None] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE", nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class DepositAccount(Base):
-    """예금 계좌"""
+class AccountTerms(Base):
+    """예금·적금에만 있는 조건. accounts와 1:1"""
 
-    __tablename__ = "deposit_accounts"
+    __tablename__ = "account_terms"
     __table_args__ = (
-        CheckConstraint(check_constraint_sql("deposit"), name="ck_deposit_accounts_account_num"),
+        CheckConstraint(
+            "payment_day IS NULL OR payment_day BETWEEN 1 AND 31", name="ck_account_terms_payment_day"
+        ),
     )
 
-    deposit_account_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
-    product_id: Mapped[int] = mapped_column(
-        ForeignKey("account_products.product_id"), nullable=False
-    )
-    account_num: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
-    balance: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.account_id"), primary_key=True)
+    applied_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)  # 가입 때 확정된 연 금리(%)
+    # 적용된 우대 내역 스냅샷 예: [{"code": "SALARY_TRANSFER", "rate": 0.5}]
+    rate_detail: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     maturity_date: Mapped[date] = mapped_column(Date, nullable=False)
-    nickname: Mapped[str | None] = mapped_column(String(50))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    monthly_payment: Mapped[int | None] = mapped_column(BigInteger)  # 적금만
+    payment_day: Mapped[int | None] = mapped_column(SmallInteger)  # 적금 납입일 1~31
 
 
-class SavingsAccount(Base):
-    """적금 계좌"""
+class AccountTransaction(Base):
+    """모든 계좌의 장부. 들어오면 +, 나가면 -"""
 
-    __tablename__ = "savings_accounts"
+    __tablename__ = "account_transactions"
     __table_args__ = (
-        CheckConstraint(check_constraint_sql("savings"), name="ck_savings_accounts_account_num"),
+        CheckConstraint(in_sql("tx_type", TX_TYPES), name="ck_account_transactions_tx_type"),
+        CheckConstraint("amount <> 0", name="ck_account_transactions_amount"),
+        CheckConstraint("balance_after >= 0", name="ck_account_transactions_balance_after"),
+        # 거래내역 조회와 1일 이체 한도 계산이 이 순서로 찾는다
+        Index("ix_account_transactions_account_id_created_at", "account_id", "created_at"),
     )
 
-    savings_account_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), nullable=False)
-    product_id: Mapped[int] = mapped_column(
-        ForeignKey("account_products.product_id"), nullable=False
-    )
-    account_num: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
-    balance: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
-    monthly_payment: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    monthly_deposit_date: Mapped[int] = mapped_column(SmallInteger, nullable=False)  # 매월 납입일(1~31)
-    maturity_date: Mapped[date] = mapped_column(Date, nullable=False)
-    nickname: Mapped[str | None] = mapped_column(String(50))
+    tx_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.account_id"), nullable=False)
+    action_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("pending_actions.action_id"))
+    transfer_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)  # 이체 두 줄을 묶음
+    tx_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    balance_after: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    counterparty_name: Mapped[str | None] = mapped_column(String(50))
+    counterparty_account: Mapped[str | None] = mapped_column(String(30))
+    memo: Mapped[str | None] = mapped_column(String(100))
+    category: Mapped[str | None] = mapped_column(String(30))  # 예산 기능에서 categories FK로 바꿈
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-
-
-class CheckingAccountHistory(Base):
-    """입출금 계좌 거래내역 (ERD: Chenking_Account_History)"""
-
-    __tablename__ = "checking_account_histories"
-
-    checking_account_history_id: Mapped[int] = mapped_column(
-        primary_key=True, autoincrement=True
-    )
-    checking_account_id: Mapped[int] = mapped_column(
-        ForeignKey("checking_accounts.checking_account_id"), nullable=False
-    )
-    date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    change_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    type: Mapped[str] = mapped_column(String(20), nullable=False)  # 입금/출금/이체/카드결제 등
-    from_account: Mapped[str | None] = mapped_column(String(20))
-    sending_account: Mapped[str | None] = mapped_column(String(20))
-
-
-class DepositAccountHistory(Base):
-    """예금 계좌 거래내역"""
-
-    __tablename__ = "deposit_account_histories"
-
-    deposit_account_history_id: Mapped[int] = mapped_column(
-        primary_key=True, autoincrement=True
-    )
-    deposit_account_id: Mapped[int] = mapped_column(
-        ForeignKey("deposit_accounts.deposit_account_id"), nullable=False
-    )
-    date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    deposit_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    type: Mapped[str] = mapped_column(String(20), nullable=False)
-    from_account: Mapped[str | None] = mapped_column(String(20))
-
-
-class SavingsAccountHistory(Base):
-    """적금 계좌 거래내역"""
-
-    __tablename__ = "savings_account_histories"
-
-    savings_account_history_id: Mapped[int] = mapped_column(
-        primary_key=True, autoincrement=True
-    )
-    savings_account_id: Mapped[int] = mapped_column(
-        ForeignKey("savings_accounts.savings_account_id"), nullable=False
-    )
-    date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    deposit_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    type: Mapped[str] = mapped_column(String(20), nullable=False)
-    from_account: Mapped[str | None] = mapped_column(String(20))

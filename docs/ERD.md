@@ -6,9 +6,9 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다.
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions). 마이그레이션: `c3d9e1a47b20`
 
-## 핵심 테이블 (첫 구현)
+## 핵심 테이블 (구현됨)
 
 ```mermaid
 erDiagram

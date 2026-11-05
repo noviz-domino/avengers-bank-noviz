@@ -47,3 +47,10 @@ class ConflictException(ApiException):
         self, message: str = "요청이 현재 상태와 충돌합니다.", *, code: str = "CONFLICT"
     ):
         super().__init__(status_code=409, code=code, message=message)
+
+
+class LockedException(ApiException):
+    """로그인 5회 실패처럼 잠금 시간이 지나야 다시 시도할 수 있는 경우."""
+
+    def __init__(self, message: str = "잠긴 상태라 처리할 수 없습니다.", *, code: str = "LOCKED"):
+        super().__init__(status_code=423, code=code, message=message)
