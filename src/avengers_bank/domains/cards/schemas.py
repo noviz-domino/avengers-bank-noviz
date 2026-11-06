@@ -84,4 +84,5 @@ class CardBillRunResponse(BaseModel):
     run_date: date
     paid_cards: int  # 대금을 출금한 카드 수
     overdue_cards: int  # 잔액 부족 등으로 못 낸 카드 수 (BILLED로 남음)
+    failed_cards: int  # 예상 못 한 오류로 건너뛴 카드 수 (그 카드만 되돌림, 로그 확인)
     total_paid: int

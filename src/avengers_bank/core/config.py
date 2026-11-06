@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     system_api_key: SecretStr | None = Field(default=None, min_length=32)
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore",
+        env_ignore_empty=True,  # .env.example처럼 `KEY=`로 비워 두면 "없음" (PR #17 리뷰)
     )
 
 

@@ -251,6 +251,7 @@
 
 
 - 기본 한도: 체크 1일 100만, 신용 1일 100만·신용 한도(안 갚은 금액) 300만. 카드 응답의 `monthly_limit`은 `credit_limit`으로 바뀜
+- 발급·정지 실패: `400 ACCOUNT_NOT_FOUND`(결제 계좌가 내 입출금 계좌가 아님), `404 CARD_PRODUCT_NOT_FOUND`, `409 CARD_LOST`, `409 CARD_NOT_SUSPENDED`, `409 CARD_NUM_CONFLICT`(동시 발급, 다시 시도)
 - 결제 실패: `409 CARD_NOT_ACTIVE`(정지·분실), `400 CARD_DAILY_LIMIT_EXCEEDED`, `400 CREDIT_LIMIT_EXCEEDED`, `400 INSUFFICIENT_BALANCE`, `400 ACCOUNT_NOT_FOUND`(결제 계좌를 쓸 수 없음), `409 IDEMPOTENCY_KEY_REUSED`
 - 결제 실패(신용): `409 CARD_OVERDUE` (대금을 못 낸 사용분이 있음, [ADR 0011](decisions/0011-card-bills.md))
 - 취소: 안 낸 것(`UNBILLED`·`BILLED`)은 기록만, 낸 것(체크카드, `PAID`)은 결제 계좌로 환불. 실패: `404 CARD_TX_NOT_FOUND`, `409 CARD_TX_ALREADY_CANCELED`
@@ -261,12 +262,12 @@
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
-| ✅ | POST | `/system/card-bills/run?run_date=` | 🔑 | 신용카드 대금 출금. 날짜를 비우면 오늘(한국). 결제일이면 전날까지 쓴 것을 묶어 전액 출금(`CARD_BILL`), 못 내면 연체로 남기고 다음 실행 때 다시. 같은 날짜로 다시 불러도 한 번만 |
+| ✅ | POST | `/system/card-bills/run?run_date=` | 🔑 | 신용카드 대금 출금. 날짜를 비우면 오늘(한국), 오늘 이후는 거절. 결제일이면 전날까지 쓴 것을 묶어 전액 출금(`CARD_BILL`), 못 내면 연체로 남기고 다음 실행 때 다시. 같은 날짜로 다시 불러도 한 번만 |
 
 ```json
-{ "success": true, "data": { "run_date": "2030-01-14", "paid_cards": 3, "overdue_cards": 1, "total_paid": 450000 } }
+{ "success": true, "data": { "run_date": "2030-01-14", "paid_cards": 3, "overdue_cards": 1, "failed_cards": 0, "total_paid": 450000 } }
 ```
-- 실패: `400 ACCOUNT_NOT_FOUND`(결제 계좌가 내 입출금 계좌가 아님), `404 CARD_PRODUCT_NOT_FOUND`, `409 CARD_LOST`, `409 CARD_NOT_SUSPENDED`, `409 CARD_NUM_CONFLICT`(동시 발급, 다시 시도)
+- 실패: `400 RUN_DATE_IN_FUTURE`(오늘 이후 날짜), `403 SYSTEM_API_DISABLED`, `403 SYSTEM_KEY_INVALID`. 카드 하나가 예상 못 한 오류로 실패하면 그 카드만 되돌리고 `failed_cards`에 셈
 
 ---
 

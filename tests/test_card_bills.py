@@ -1,8 +1,10 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select, update
 
+from avengers_bank.core.config import Settings
 from avengers_bank.core.database import SessionLocal
 from avengers_bank.domains.accounts.models import Account
 from avengers_bank.domains.cards.models import CardTransaction
@@ -13,6 +15,12 @@ pytestmark = pytest.mark.anyio
 
 KEY = {"X-System-Key": "test-system-key-test-system-key-0000"}
 PAY_DAY = "2030-01-14"  # 신용카드 기본 결제일 14일. 테스트에서 오늘 결제한 것은 모두 이 날 전에 쓴 것
+
+
+@pytest.fixture(autouse=True)
+def today_is_2030(monkeypatch):
+    # 오늘 이후 날짜는 거절하므로, 테스트의 "오늘"을 2030년 말로 둔다
+    monkeypatch.setattr("avengers_bank.domains.cards.router.today_kst", lambda: date(2030, 12, 31))
 
 
 async def run(client, day=PAY_DAY, headers=KEY):
@@ -99,3 +107,35 @@ async def test_needs_system_key(bank):
     for headers in [{}, {"X-System-Key": "wrong"}, me]:
         res = await run(client, headers=headers)
         assert res.status_code == 403 and res.json()["error"]["code"] == "SYSTEM_KEY_INVALID"
+
+
+async def test_rejects_future_date(bank):
+    client, *_ = bank
+    res = await run(client, day="2031-01-14")
+    assert res.status_code == 400 and res.json()["error"]["code"] == "RUN_DATE_IN_FUTURE"
+
+
+async def test_disabled_without_key(bank, monkeypatch):
+    client, *_ = bank
+    monkeypatch.setattr("avengers_bank.core.dependencies.get_settings", lambda: SimpleNamespace(system_api_key=None))
+    res = await run(client)
+    assert res.status_code == 403 and res.json()["error"]["code"] == "SYSTEM_API_DISABLED"
+
+
+def test_empty_key_in_env_means_off(monkeypatch):
+    monkeypatch.setenv("SYSTEM_API_KEY", "")  # .env.example 그대로 `SYSTEM_API_KEY=`
+    assert Settings(_env_file=None).system_api_key is None
+
+
+async def test_one_failing_card_does_not_stop_others(bank, monkeypatch):
+    client, me, checking, _, credit = bank
+    tx = (await pay(client, me, credit, amount=10_000)).json()["data"]
+    from avengers_bank.domains.cards import service
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("예상 못 한 오류")
+
+    monkeypatch.setattr(service, "execute_card_ledger", boom)
+    res = (await run(client)).json()["data"]
+    assert (res["paid_cards"], res["failed_cards"]) == (0, 1)
+    assert await billing(tx["card_tx_id"]) == "UNBILLED"  # 그 카드는 통째로 되돌아감

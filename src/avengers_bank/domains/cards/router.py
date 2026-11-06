@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
+from avengers_bank.core.exceptions import BadRequestException
 from avengers_bank.core.clock import today_kst
 from avengers_bank.core.dependencies import get_current_user, require_system_key
 from avengers_bank.core.responses import SuccessResponse, error_responses
@@ -110,5 +111,8 @@ async def card_limits(card_id: int, db: DB, me: Me):
 @system_router.post("/card-bills/run", response_model=SuccessResponse[CardBillRunResponse])
 async def run_card_bills(db: DB, run_date: date | None = None):
     """신용카드 대금 출금. 매일 한 번 부른다(cron 등). 날짜를 비우면 오늘(한국). 같은 날짜로 다시 불러도 한 번만 출금"""
-    result = await card_service.run_bills(db, run_date or today_kst())
+    today = today_kst()
+    if run_date is not None and run_date > today:  # 아직 오지 않은 결제일을 앞당겨 청구하지 않게
+        raise BadRequestException(message="오늘 이후 날짜로는 실행할 수 없습니다.", code="RUN_DATE_IN_FUTURE")
+    result = await card_service.run_bills(db, run_date or today)
     return SuccessResponse[CardBillRunResponse](data=result, message="카드 대금 출금을 실행했습니다.")
