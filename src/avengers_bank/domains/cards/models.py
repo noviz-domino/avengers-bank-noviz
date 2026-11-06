@@ -122,3 +122,9 @@ class CardTransaction(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def refund_pending(self) -> bool:
+        """취소됐는데 돈을 못 돌려줌: 결제 계좌가 해지돼 상담원이 다른 계좌로 보낼 때까지 (ADR 0012)"""
+        paid_out = self.account_tx_id is not None or self.billing_status == "PAID"
+        return self.status == "CANCELED" and paid_out and self.refund_tx_id is None

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from avengers_bank.domains.accounts.money import TransferRejected, execute_trans
 from avengers_bank.domains.accounts.repository import account_repository
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
+from avengers_bank.domains.cards.models import Card, CardTransaction
 from avengers_bank.domains.accounts.schemas import (
     AccountCreate,
     AccountDetailResponse,
@@ -258,8 +259,37 @@ class AccountService:
             terms=AccountTermsResponse.model_validate(terms) if terms else None,
         )
 
+    async def close(self, db: AsyncSession, user_id: int, account_id: int) -> AccountDetailResponse:
+        """잔액 0인 입출금 계좌를 바로 해지 (ADR 0012). 잠금 순서(ERD 규칙 5)대로 연결 카드 → 계좌를 잠그고,
+        카드 검사는 계좌를 잠근 뒤에 한다 (그사이 이 계좌로 발급된 카드까지 보려고)"""
+        async with db.begin():
+            await db.execute(select(Card.card_id).where(Card.linked_account_id == account_id)
+                             .order_by(Card.card_id).with_for_update())
+            account = await db.scalar(select(Account).where(Account.account_id == account_id)
+                                      .with_for_update().execution_options(populate_existing=True))
+            if account is None or account.user_id != user_id:
+                raise not_found()
+            if account.account_type != "CHECKING":
+                raise BadRequestException(message="예·적금 해지(만기·중도)는 아직 지원하지 않습니다.", code="ACCOUNT_CANNOT_CLOSE")
+            if account.status != "ACTIVE":
+                raise ConflictException(message="이미 해지했거나 쓸 수 없는 계좌입니다.", code="ACCOUNT_NOT_ACTIVE")
+            if account.balance != 0:
+                raise ConflictException(message=f"남은 돈 {account.balance:,}원을 먼저 옮겨 주세요.", code="BALANCE_REMAINING")
+            if await db.scalar(select(func.count()).where(
+                    Card.linked_account_id == account_id, Card.status.in_(("ACTIVE", "SUSPENDED")))):
+                raise ConflictException(
+                    message="이 계좌를 결제 계좌로 쓰는 카드가 있습니다. 카드를 먼저 정리해 주세요.", code="LINKED_CARD_EXISTS"
+                )
+            linked = select(Card.card_id).where(Card.linked_account_id == account_id)
+            if await db.scalar(select(func.count()).where(  # 분실 카드라도 안 갚은 신용 사용분(연체 포함)이 있으면
+                    CardTransaction.card_id.in_(linked), CardTransaction.status == "APPROVED",
+                    CardTransaction.billing_status.in_(("UNBILLED", "BILLED")))):
+                raise ConflictException(message="연결된 카드에 아직 안 낸 대금이 있습니다.", code="CARD_UNPAID")
+            account.status, account.closed_at = "CLOSED", datetime.now(UTC)
+            await db.flush()
+            return self._detail(*await account_repository.find_by_id(db, account_id))
+
     # TODO: 이체 한도 변경(올리는 것은 승인 필요)
-    # TODO: close_account — 잔액 0일 때만 (ADR 0006)
 
 
 account_service = AccountService()

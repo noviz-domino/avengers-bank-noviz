@@ -112,7 +112,8 @@
 | ✅ | GET | `/accounts/{account_id}/transactions?limit=&before=` | 🔒 | 거래내역, 최근부터. 다음 쪽은 받은 마지막 `tx_id`를 `before`로 |
 | ✅ | PATCH | `/accounts/{account_id}` | 🔒 | 별칭 변경 (`null`이면 지움) |
 | ✅ | POST | `/accounts/deposits` | 🔒 | **예금 개설 신청** → `202` 승인 대기. PIN 승인 때 계좌 생성 + 맡길 돈 이동이 한 트랜잭션 |
-| 📝 | | 이체 한도 변경, 해지 | 🔒 | 한도를 올리는 것은 보안을 약하게 해서 승인 PR에서. 해지는 잔액 0일 때만 |
+| ✅ | POST | `/accounts/{account_id}/close` | 🔒 | **입출금 계좌 해지**, 잔액 0일 때만 바로. 쓸 수 있는 연결 카드·안 낸 카드 대금이 있으면 막음 ([ADR 0012](decisions/0012-account-close.md)). 실패: `400 ACCOUNT_CANNOT_CLOSE`(예·적금), `409 ACCOUNT_NOT_ACTIVE`, `409 BALANCE_REMAINING`, `409 LINKED_CARD_EXISTS`, `409 CARD_UNPAID` |
+| 📝 | | 이체 한도 변경 | 🔒 | 한도를 올리는 것은 보안을 약하게 해서 승인 PR에서 |
 
 <details>
 <summary>요청·응답 예시</summary>
@@ -254,7 +255,7 @@
 - 발급·정지 실패: `400 ACCOUNT_NOT_FOUND`(결제 계좌가 내 입출금 계좌가 아님), `404 CARD_PRODUCT_NOT_FOUND`, `409 CARD_LOST`, `409 CARD_NOT_SUSPENDED`, `409 CARD_NUM_CONFLICT`(동시 발급, 다시 시도)
 - 결제 실패: `409 CARD_NOT_ACTIVE`(정지·분실), `400 CARD_DAILY_LIMIT_EXCEEDED`, `400 CREDIT_LIMIT_EXCEEDED`, `400 INSUFFICIENT_BALANCE`, `400 ACCOUNT_NOT_FOUND`(결제 계좌를 쓸 수 없음), `409 IDEMPOTENCY_KEY_REUSED`
 - 결제 실패(신용): `409 CARD_OVERDUE` (대금을 못 낸 사용분이 있음, [ADR 0011](decisions/0011-card-bills.md))
-- 취소: 안 낸 것(`UNBILLED`·`BILLED`)은 기록만, 낸 것(체크카드, `PAID`)은 결제 계좌로 환불. 실패: `404 CARD_TX_NOT_FOUND`, `409 CARD_TX_ALREADY_CANCELED`
+- 취소: 안 낸 것(`UNBILLED`·`BILLED`)은 기록만, 낸 것(체크카드, `PAID`)은 결제 계좌로 환불. 결제 계좌가 해지됐으면 **환불 대기**(`refund_pending: true`)로 두고 상담원이 다른 계좌로 보냄([ADR 0012](decisions/0012-account-close.md)). 실패: `404 CARD_TX_NOT_FOUND`, `409 CARD_TX_ALREADY_CANCELED`
 
 ## system: 시스템 작업 (`domains/cards`의 `system_router`)
 
@@ -262,6 +263,8 @@
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
+| ✅ | GET | `/system/card-refunds` | 🔑 | 상담원용: 환불 대기 목록 (결제 계좌를 쓸 수 없어 못 돌려준 결제 취소). 카드 주인 `user_id`, 원래 결제 계좌 `linked_account_id` 포함 |
+| ✅ | POST | `/system/card-refunds/{card_tx_id}` | 🔑 | 상담원용: 고객 확인 후 `to_account_id`(카드 주인의 입출금 계좌)로 환불. 실패: `400 ACCOUNT_NOT_FOUND`, `404 CARD_TX_NOT_FOUND`, `409 REFUND_NOT_PENDING` |
 | ✅ | POST | `/system/card-bills/run?run_date=` | 🔑 | 신용카드 대금 출금. 날짜를 비우면 오늘(한국), 오늘 이후는 거절. 결제일이면 전날까지 쓴 것을 묶어 전액 출금(`CARD_BILL`), 못 내면 연체로 남기고 다음 실행 때 다시. 같은 날짜로 다시 불러도 한 번만 |
 
 ```json

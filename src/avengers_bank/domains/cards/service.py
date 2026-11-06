@@ -3,6 +3,7 @@
 import logging
 from datetime import UTC, date, datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,7 @@ from avengers_bank.domains.accounts.money import TransferRejected, execute_card_
 from avengers_bank.domains.accounts.repository import kst_midnight_utc
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
+from avengers_bank.domains.audit.repository import audit_repository
 from avengers_bank.domains.cards.card_number import make_card_num, mask, prefix
 from avengers_bank.domains.cards.models import Card, CardProduct, CardTransaction
 from avengers_bank.domains.cards.repository import card_repository
@@ -23,6 +25,8 @@ from avengers_bank.domains.cards.schemas import (
     CardLimitsResponse,
     CardPayment,
     CardResponse,
+    CardTransactionResponse,
+    PendingRefundResponse,
 )
 
 # 기본 한도. 올리는 것은 보안을 약하게 해서 승인 기능과 함께 만든다 (ADR 0009)
@@ -77,7 +81,9 @@ class CardService:
             product = await db.get(CardProduct, data.product_id)
             if product is None or not product.is_active:
                 raise NotFoundException(message="판매 중인 카드 상품이 아닙니다.", code="CARD_PRODUCT_NOT_FOUND")
-            account = await db.get(Account, data.linked_account_id)
+            # 잠근다: 해지(ADR 0012)가 계좌를 잠근 뒤 카드를 보므로, 해지 중인 계좌로 발급되지 않는다
+            account = await db.scalar(select(Account).where(Account.account_id == data.linked_account_id)
+                                      .with_for_update().execution_options(populate_existing=True))
             if (account is None or account.user_id != user_id or account.status != "ACTIVE"
                     or account.account_type != "CHECKING"):  # 카드 주인 = 결제 계좌 주인 (ERD 규칙 10)
                 raise BadRequestException(message="결제 계좌는 내 입출금 계좌여야 합니다.", code="ACCOUNT_NOT_FOUND")
@@ -221,7 +227,9 @@ class CardService:
                 raise tx_not_found()
             if tx.status == "CANCELED":
                 raise ConflictException(message="이미 취소된 결제입니다.", code="CARD_TX_ALREADY_CANCELED")
-            if tx.account_tx_id is not None or tx.billing_status == "PAID":
+            linked = await db.get(Account, card.linked_account_id, populate_existing=True)
+            # 돈이 나간 결제는 결제 계좌로 환불. 계좌가 해지됐으면 환불 대기로 두고 상담원이 다른 계좌로 (ADR 0012)
+            if (tx.account_tx_id is not None or tx.billing_status == "PAID") and linked.status == "ACTIVE":
                 try:
                     refund = await execute_card_ledger(  # 쓴 업종 그대로: 예산에서 그 업종 지출이 줄어든다
                         db, owner_user_id=user_id, account_id=card.linked_account_id, tx_type="REFUND",
@@ -231,6 +239,42 @@ class CardService:
                     raise rejected(e) from None
                 tx.refund_tx_id = refund.tx_id
             tx.status, tx.canceled_at = "CANCELED", datetime.now(UTC)
+            await db.flush()
+            await db.refresh(tx)
+            return tx
+
+    async def list_pending_refunds(self, db: AsyncSession) -> list[PendingRefundResponse]:
+        return [
+            PendingRefundResponse(**CardTransactionResponse.model_validate(tx).model_dump(),
+                                  user_id=card.user_id, linked_account_id=card.linked_account_id)
+            for tx, card in await card_repository.find_pending_refunds(db)
+        ]
+
+    async def refund_to(self, db: AsyncSession, card_tx_id: int, to_account_id: int) -> CardTransaction:
+        """상담원 처리: 환불 대기 건을 카드 주인의 다른 입출금 계좌로 (ADR 0012). 잠금 순서 카드 → 계좌"""
+        async with db.begin():
+            tx = await db.get(CardTransaction, card_tx_id)
+            if tx is None:
+                raise tx_not_found()
+            card = (await card_repository.find_by_id(db, tx.card_id, lock=True))[0]
+            await db.refresh(tx)  # 카드를 잠근 뒤의 최신 상태로 (같은 건을 두 번 환불하지 않게)
+            if not tx.refund_pending:
+                raise ConflictException(message="환불 대기 중인 건이 아닙니다.", code="REFUND_NOT_PENDING")
+            target = await db.get(Account, to_account_id)
+            if target is None or target.account_type != "CHECKING":
+                raise BadRequestException(message="카드 주인의 입출금 계좌가 아닙니다.", code="ACCOUNT_NOT_FOUND")
+            try:  # 주인·ACTIVE는 실행 함수가 잠근 뒤 다시 본다
+                refund = await execute_card_ledger(
+                    db, owner_user_id=card.user_id, account_id=to_account_id, tx_type="REFUND",
+                    amount=tx.amount, merchant_name=tx.merchant_name, category=tx.category,
+                )
+            except TransferRejected as e:
+                raise rejected(e) from None
+            tx.refund_tx_id = refund.tx_id
+            await audit_repository.record(  # 누가 어느 계좌로 보냈는지 (상담원 역할이 생기면 actor를 그 직원으로)
+                db, user_id=card.user_id, actor="SYSTEM", action="CARD_REFUND_TO", target=str(card_tx_id),
+                detail={"to_account_id": to_account_id, "amount": tx.amount, "refund_tx_id": refund.tx_id},
+            )
             await db.flush()
             await db.refresh(tx)
             return tx

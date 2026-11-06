@@ -86,5 +86,14 @@ class CardRepository:
             CardTransaction.billing_status == "BILLED",
         ).execution_options(populate_existing=True)))
 
+    async def find_pending_refunds(self, db: AsyncSession) -> list[tuple[CardTransaction, Card]]:
+        """환불 대기: 돈이 나간 결제(체크, 낸 신용)를 취소했는데 환불 줄이 없음 (ADR 0012).
+        조건은 CardTransaction.refund_pending과 같아야 한다 (test_pending_list_matches_property)"""
+        return [tuple(r) for r in await db.execute(select(CardTransaction, Card).join(
+            Card, Card.card_id == CardTransaction.card_id).where(
+            CardTransaction.status == "CANCELED", CardTransaction.refund_tx_id.is_(None),
+            or_(CardTransaction.account_tx_id.is_not(None), CardTransaction.billing_status == "PAID"),
+        ).order_by(CardTransaction.card_tx_id))]
+
 
 card_repository = CardRepository()

@@ -119,8 +119,8 @@ async def execute_card_ledger(
         select(Account).where(Account.account_id == account_id)
         .with_for_update().execution_options(populate_existing=True)
     )
-    # 환불은 계좌 상태와 상관없이 돌려준다. 결제만 ACTIVE 계좌에서
-    if account is None or account.user_id != owner_user_id or (amount < 0 and account.status != "ACTIVE"):
+    # 환불도 ACTIVE 계좌로만. 결제 계좌가 해지됐으면 취소는 환불 대기가 되고 상담원이 다른 계좌로 보낸다 (ADR 0012)
+    if account is None or account.user_id != owner_user_id or account.status != "ACTIVE":
         raise TransferRejected("ACCOUNT_NOT_FOUND", "결제 계좌를 쓸 수 없습니다.")
     if account.balance + amount < 0:
         raise TransferRejected("INSUFFICIENT_BALANCE", "잔액이 부족합니다.")
