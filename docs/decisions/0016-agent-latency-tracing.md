@@ -1,6 +1,6 @@
 # 0016. Agent 실행 추적과 응답 시간: Langfuse 클라우드, 감독관은 턴마다 한 번 계획, 생각 수준 low
 
-- 상태: 채택
+- 상태: 채택 (→ [0018](0018-chat-stream-router.md): 이렇게 바꾼 감독관은 라우터라서 이름을 바로잡음)
 - 날짜: 2026-11-06
 - 관련 PR: (이 문서를 추가하는 PR)
 - 관련: [ADR 0006](0006-agent-orchestration.md) "다시 검토할 조건", [ADR 0015](0015-agent-chat.md) Agent 구현

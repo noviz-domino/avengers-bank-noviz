@@ -1,6 +1,6 @@
 """Agent 실행 추적 (ADR 0006·0016: Langfuse 무료 클라우드). 키가 없으면 꺼진다. 테스트는 항상 끈다.
 
-Langfuse로 나가는 것: 대화 내용, 감독관·담당 Agent의 LLM 입출력, 도구 결과(데모 데이터). 사용자는 `user-{id}`로만.
+Langfuse로 나가는 것: 대화 내용, 라우터·담당 Agent의 LLM 입출력, 도구 결과(데모 데이터). 사용자는 `user-{id}`로만.
 """
 
 import asyncio
