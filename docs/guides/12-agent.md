@@ -33,12 +33,23 @@ flowchart TD
 
 ## 핵심 코드
 
+`service.py`의 `_turn`과 `_run`은 `first_turn(message)`로 입력 상태를 만든다.
+
 ```python
-mcp_api.agent_token.set(token)       # 이 요청에서만 보이는 값
-mcp_api.requester.set("AGENT")
-async with create_connected_server_and_client_session(mcp) as session:   # 앱 안의 MCP 서버에 메모리로
+def first_turn(message: str) -> dict:
+    return {"messages": [HumanMessage(message)], "plan": [], "routed": []}
+```
+
+`POST /chat`은 `_turn`에서 `graph.ainvoke(first_turn(message), config)`로 최종 상태를 받는다. `POST /chat/stream`은 `_run`에서 실행 이벤트를 큐에 넣고 체크포인터에서 최종 상태를 읽는다.
+
+```python
+translate = EventTranslator()
+async with create_connected_server_and_client_session(mcp) as session:
     graph = build(llm, await load_mcp_tools(session), checkpoint.saver)
-    state = await graph.ainvoke({"messages": [HumanMessage(message)], "hops": 0, "routed": []}, config)
+    async for ev in graph.astream_events(first_turn(message), config, version="v2"):
+        for out in translate(ev):
+            put(out)
+    state = (await graph.aget_state(config)).values
 ```
 
 라우터는 턴 처음에 한 번, 정해진 이름만으로 계획을 냅니다(ADR 0016).
@@ -90,7 +101,11 @@ class Plan(BaseModel):
 8.4초  done    전체 답, session_id
 ```
 
-`agent/stream.py`의 `EventTranslator`가 LangGraph `astream_events` 이벤트를 위 네 가지로 바꿉니다. 라우터의 계획(JSON)이나 담당의 "어떤 도구를 쓸지" 결정은 사용자에게 보낼 글이 아니라서 빼고, 담당이 쓰는 답의 글자만 `token`으로 보냅니다. 끝나는 시간은 `/chat`과 같지만, 사용자는 0초부터 무엇을 하는지 봅니다.
+`agent/stream.py`의 `EventTranslator`는 LangGraph 실행 이벤트를 `status`와 `token`으로 바꿉니다. `service.py`의 `_run`은 완료 시 `done`, 실패 시 `error`를 보냅니다. 화면은 `token`을 미리보기로 쓰고 `done.reply`로 최종 답을 표시합니다. 끝나는 시간은 `/chat`과 같지만, 사용자는 0초부터 무엇을 하는지 봅니다.
+
+**면접 질문. 스트리밍 도중 클라이언트 연결이 끊기면 턴도 멈추나요?**
+
+`open_stream`은 `asyncio.create_task`로 턴을 별도 작업에서 실행하고, 응답 스트림은 `read(queue)`로 이벤트만 읽습니다. 연결이 끊기면 전송이 멈추고, 턴 작업은 계속 실행돼 대화를 저장합니다. 같은 대화방의 잠금은 턴 작업이 끝날 때 풀립니다.
 
 ## 측정과 실행 추적
 

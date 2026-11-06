@@ -290,14 +290,17 @@ event: status
 data: {"stage": "tool", "agent": "card", "tool": "get_card_limit", "label": "카드 한도를 조회하고 있어요"}
 
 event: token
-data: {"agent": "card", "text": "일일 한도는 1,000,000원이며"}
+data: {"agent": "card", "text": "일일 한도는 1,000,000원입니다."}
 
 event: token
 data: {"agent": "account", "text": "\n\n보유하신 계좌의 잔액 안내입니다."}
 
 event: done
-data: {"session_id": "…", "reply": "…(token을 이어 붙인 것)", "routed": ["card", "account"]}
+data: {"session_id": "…", "reply": "일일 한도는 1,000,000원입니다.\n\n보유하신 계좌의 잔액 안내입니다.", "routed": ["card", "account"]}
 ```
+
+- 도구 호출 전의 “확인해 볼게요” 같은 서문은 `token`으로 나갈 수 있고 `done.reply`에서는 빠진다. 화면은 `token`을 미리보기로 표시하고, `done`을 받으면 표시한 텍스트를 `done.reply`로 바꿔 끼운다.
+- 인사처럼 라우터가 혼자 답하면 `token` 없이 `done.reply`로만 답이 온다.
 
 ## mcp: AI 도구 (`domains/mcp_server`)
 
