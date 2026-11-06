@@ -1,0 +1,38 @@
+{"q": "이체 한도가 얼마예요?", "expected": ["transfer-guide#2"]}
+{"q": "하루에 다른 사람한테 최대 얼마까지 보낼 수 있어?", "expected": ["transfer-guide#2"]}
+{"q": "내 적금으로 옮기는 돈도 이체 한도에 들어가나요?", "expected": ["transfer-guide#2"]}
+{"q": "이체하면 바로 돈이 나가나요?", "expected": ["transfer-guide#1"]}
+{"q": "이체 승인은 언제까지 해야 해?", "expected": ["transfer-guide#1"]}
+{"q": "AI한테 이체 승인해 달라고 하면 되나요?", "expected": ["transfer-guide#1", "ai-service-guide#2"]}
+{"q": "PIN을 여러 번 틀리면 어떻게 되나요?", "expected": ["transfer-guide#5"]}
+{"q": "비밀번호 5번 틀리면 로그인 못 해?", "expected": ["transfer-guide#5"]}
+{"q": "정기예금에 다른 사람이 돈을 보낼 수 있나요?", "expected": ["transfer-guide#3"]}
+{"q": "같은 이체 요청을 실수로 두 번 보내면?", "expected": ["transfer-guide#4"]}
+{"q": "카드 하루 한도는 얼마인가요?", "expected": ["card-terms#3"]}
+{"q": "신용카드 한도 다 쓰면 언제 다시 쓸 수 있어?", "expected": ["card-terms#3"]}
+{"q": "결제를 취소하면 한도가 돌아오나요?", "expected": ["card-terms#3", "card-terms#5"]}
+{"q": "신용카드로 결제하면 통장에서 바로 빠져나가?", "expected": ["card-terms#4"]}
+{"q": "카드 결제를 일부만 취소할 수 있나요?", "expected": ["card-terms#5"]}
+{"q": "카드를 잃어버렸어요. 어떻게 하죠?", "expected": ["card-terms#6"]}
+{"q": "정지한 카드를 다시 쓰려면?", "expected": ["card-terms#6"]}
+{"q": "분실 신고한 카드를 다시 쓸 수 있어?", "expected": ["card-terms#6"]}
+{"q": "카드 대금은 언제 빠져나가요?", "expected": ["card-terms#7"]}
+{"q": "결제일 당일에 쓴 금액은 이번 달에 청구되나요?", "expected": ["card-terms#7"]}
+{"q": "카드값 못 내면 어떻게 돼?", "expected": ["card-terms#8"]}
+{"q": "연체 이자가 있나요?", "expected": ["card-terms#8"]}
+{"q": "카드번호 전체를 앱에서 볼 수 있나요?", "expected": ["card-terms#2"]}
+{"q": "카드 결제 계좌로 적금 계좌를 쓸 수 있나요?", "expected": ["card-terms#1"]}
+{"q": "계좌를 해지하려면 어떻게 해야 해?", "expected": ["deposit-terms#5"]}
+{"q": "카드가 연결된 통장도 해지할 수 있나요?", "expected": ["deposit-terms#5"]}
+{"q": "해지한 계좌로 카드 환불이 오면 돈은 어디로 가?", "expected": ["deposit-terms#6"]}
+{"q": "정기예금 가입하려면 PIN이 필요한가요?", "expected": ["deposit-terms#3"]}
+{"q": "예금 금리는 가입 후에 바뀌나요?", "expected": ["deposit-terms#4"]}
+{"q": "급여이체 우대금리는 언제 적용돼?", "expected": ["deposit-terms#4"]}
+{"q": "적금 납입일을 31일로 할 수 있나요?", "expected": ["deposit-terms#3"]}
+{"q": "계좌번호 가운데 숫자는 무슨 뜻이에요?", "expected": ["deposit-terms#2"]}
+{"q": "스타크 자유적금 우대금리 조건 알려줘", "expected": ["product:savings:1"]}
+{"q": "사회 초년생을 위한 적금 있어?", "expected": ["product:savings:2"]}
+{"q": "특판 예금 금리가 얼마예요?", "expected": ["product:deposit:2"]}
+{"q": "연회비 없는 카드 있나요?", "expected": ["product:debit:1"]}
+{"q": "스타크 신용카드 혜택이 뭐야?", "expected": ["product:credit:1"]}
+{"q": "AI 상담이 PIN을 물어보면 알려줘도 돼?", "expected": ["ai-service-guide#2"]}

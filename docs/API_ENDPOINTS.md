@@ -257,7 +257,21 @@
 - 결제 실패(신용): `409 CARD_OVERDUE` (대금을 못 낸 사용분이 있음, [ADR 0011](decisions/0011-card-bills.md))
 - 취소: 안 낸 것(`UNBILLED`·`BILLED`)은 기록만, 낸 것(체크카드, `PAID`)은 결제 계좌로 환불. 결제 계좌가 해지됐으면 **환불 대기**(`refund_pending: true`)로 두고 상담원이 다른 계좌로 보냄([ADR 0012](decisions/0012-account-close.md)). 실패: `404 CARD_TX_NOT_FOUND`, `409 CARD_TX_ALREADY_CANCELED`
 
-## system: 시스템 작업 (`domains/cards`의 `system_router`)
+## rag: 상품·약관 질문 (`domains/rag`)
+
+상품 DB와 데모 약관을 근거로 답합니다. Gemini 키(`GEMINI_API_KEY`)가 없으면 `503 AI_DISABLED`, Gemini가 실패하면(한도 초과 등) `503 AI_UNAVAILABLE`. 결정 이유: [ADR 0013](decisions/0013-agent-rag-plan.md), 코드 설명: [가이드 10](guides/10-rag.md)
+
+| 상태 | 메서드 | 경로 | 인증 | 설명 |
+|---|---|---|---|---|
+| ✅ | GET | `/rag/search?q=&k=5` | 🔒 | 근거 검색 (벡터 + Kiwi BM25, RRF). `chunk_id`, `title`, `content`, `score` |
+| ✅ | POST | `/rag/ask` | 🔒 | `question`(500자까지) → `action`(`answer`·`clarify`·`abstain`), `answer`, `citations`(검색된 근거 안에서만) |
+
+```json
+{ "success": true, "data": { "action": "answer", "answer": "결제일에 잔액이 모자라면 출금하지 않고 연체로 남고, 그동안 그 신용카드로 결제할 수 없습니다.",
+  "citations": [ { "chunk_id": "card-terms#8", "title": "어벤져스은행 카드 이용약관 > 제8조(연체)" } ] } }
+```
+
+## system: 시스템 작업 (`domains/cards`, `domains/rag`의 `system_router`)
 
 사용자 토큰이 아니라 **서버 키**(`X-System-Key` 헤더 = `.env`의 `SYSTEM_API_KEY`)로만 부릅니다. 키를 설정하지 않으면 `403 SYSTEM_API_DISABLED`, 틀리면 `403 SYSTEM_KEY_INVALID`. 결정 이유: [ADR 0011](decisions/0011-card-bills.md)
 
@@ -265,6 +279,7 @@
 |---|---|---|---|---|
 | ✅ | GET | `/system/card-refunds` | 🔑 | 상담원용: 환불 대기 목록 (결제 계좌를 쓸 수 없어 못 돌려준 결제 취소). 카드 주인 `user_id`, 원래 결제 계좌 `linked_account_id` 포함 |
 | ✅ | POST | `/system/card-refunds/{card_tx_id}` | 🔑 | 상담원용: 고객 확인 후 `to_account_id`(카드 주인의 입출금 계좌)로 환불. 실패: `400 ACCOUNT_NOT_FOUND`, `404 CARD_TX_NOT_FOUND`, `409 REFUND_NOT_PENDING` |
+| ✅ | POST | `/system/rag/reindex` | 🔑 | RAG 색인 갱신: 데모 약관과 판매 중인 상품을 다시 자르고, 본문 해시나 임베딩 모델이 바뀐 청크만 임베딩. 상품을 바꾸면 부른다. `total`, `embedded`, `deleted` |
 | ✅ | POST | `/system/card-bills/run?run_date=` | 🔑 | 신용카드 대금 출금. 날짜를 비우면 오늘(한국), 오늘 이후는 거절. 결제일이면 전날까지 쓴 것을 묶어 전액 출금(`CARD_BILL`), 못 내면 연체로 남기고 다음 실행 때 다시. 같은 날짜로 다시 불러도 한 번만 |
 
 ```json

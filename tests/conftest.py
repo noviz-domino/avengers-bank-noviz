@@ -13,8 +13,13 @@ import avengers_bank.domains.approvals.models  # noqa: F401
 import avengers_bank.domains.audit.models  # noqa: F401
 import avengers_bank.domains.cards.models  # noqa: F401
 import avengers_bank.domains.products.models  # noqa: F401
+import avengers_bank.domains.rag.models  # noqa: F401
 from avengers_bank.core.database import Base, engine
+from avengers_bank.domains.rag import ai as rag_ai
 from avengers_bank.main import app
+
+# 테스트는 Gemini를 절대 부르지 않는다: .env에 진짜 키가 있어도 무시 (ADR 0013). RAG 테스트는 가짜 AI를 끼운다
+rag_ai.gemini = lambda: None
 
 
 @pytest.fixture
