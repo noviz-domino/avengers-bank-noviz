@@ -1,6 +1,6 @@
 """계좌번호 형식: 110-TPP-NNNNNN (결정 이유: docs/decisions/0001, 0003)
 
-- 110: 은행 코드 (AvengersBank 고정)
+- 110: 은행 코드 (캡아메리카뱅크 고정)
 - T: 계좌 종류 (1 입출금, 2 예금, 3 적금, 4 대출 예약)
 - PP: 상품 코드 (account_products.product_code, 종류 안에서 01~99)
 - NNNNNN: 일련번호 (000001~999999)

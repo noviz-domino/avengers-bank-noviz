@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 
 
 mcp_app = mcp.streamable_http_app()  # session_manager는 이걸 만들 때 생긴다 (lifespan보다 먼저)
-app = FastAPI(title="AvengersBank", lifespan=lifespan, responses=error_responses(500))
+app = FastAPI(title="캡아메리카뱅크 (CapAmericaBank)", lifespan=lifespan, responses=error_responses(500))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
@@ -59,7 +59,7 @@ app.include_router(chat_router)
 
 @app.get("/", response_model=SuccessResponse[dict[str, str]])
 async def get_root():
-    return SuccessResponse[dict[str, str]](data={"Hello": "AvengersBank"})
+    return SuccessResponse[dict[str, str]](data={"Hello": "CapAmericaBank"})
 # MCP(ADR 0014): Authorization 헤더의 사용자 토큰으로 위 REST API를 부르는 도구들.
 # mount 대신 경로 하나로 붙인다: mount는 /mcp를 /mcp/로 307 리다이렉트해서 따라가지 않는 클라이언트가 실패한다
 app.add_route("/mcp", mcp_app)

@@ -1,4 +1,6 @@
-# AvengersBank
+# 캡아메리카뱅크 (CapAmericaBank)
+
+> 코드 패키지·레포 이름은 처음 이름(`avengers_bank`, `avengers-bank-noviz`)을 그대로 씁니다([ADR 0017](docs/decisions/0017-rename-bank.md)).
 
 은행 앱 클론 백엔드입니다. 계좌·카드·이체 같은 은행 기능 위에 **자연어 AI 상담(LangGraph Agent)**과 **상품·약관 RAG**를 얹었고, AI가 무엇을 하든 **돈은 사람이 PIN으로 승인해야만 움직이도록** 서버가 강제합니다.
 
@@ -7,7 +9,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 - **돈 처리**: 잔액·장부를 바꾸는 곳은 실행 함수 하나, 행 잠금, 요청 번호(같은 요청이 두 번 와도 한 번만), 승인 대기 + 거래 PIN
 - **AI 상담**: 감독관이 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구로 REST만 부름 → AI는 사용자보다 큰 권한이 없음
 - **RAG**: 상품 DB + 앱 규칙을 쓴 데모 약관, 벡터 + 단어 하이브리드 검색, 근거 인용(정답 세트 Hit@5 1.000)
-- **문서**: 설계 결정 16개(ADR), 기능별 코드 가이드 12개, 테스트 144개
+- **문서**: 설계 결정 17개(ADR), 기능별 코드 가이드 12개, 테스트 144개
 
 ## 목차
 
@@ -227,6 +229,6 @@ docker compose exec app alembic upgrade head
 | [docs/ERD.md](docs/ERD.md) | ER 다이어그램, 코드에서 지킬 규칙 |
 | [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md) | API 목록, 요청·응답 형식, 오류 코드 |
 | [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | 폴더 구조, 계층 설명 |
-| [docs/decisions/](docs/decisions/README.md) | 설계 결정 기록(ADR) 16개: 무엇을 왜 바꿨는지, 팀 뼈대와의 차이 |
+| [docs/decisions/](docs/decisions/README.md) | 설계 결정 기록(ADR) 17개: 무엇을 왜 바꿨는지, 팀 뼈대와의 차이 |
 | [docs/guides/](docs/guides/README.md) | 코드 가이드 12개: 기능별 흐름, 설계 이유, 면접 예상 질문 |
 | [docs/retrospective.md](docs/retrospective.md) | 회고 |

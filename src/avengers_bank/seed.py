@@ -39,7 +39,7 @@ MARKETING = ("MARKETING_AGREED", "마케팅 정보 수신에 동의하면")
 FIRST = ("FIRST_PRODUCT", "이 은행에서 처음 가입하는 예·적금이면")
 
 PRODUCTS = [
-    dict(type="CHECKING", product_code=1, name="어벤져스 입출금통장", base_rate=Decimal("0.10"),
+    dict(type="CHECKING", product_code=1, name="캡아메리카 입출금통장", base_rate=Decimal("0.10"),
          description="수수료 없이 쓰는 기본 입출금 통장입니다. 이체·카드 결제 계좌로 씁니다.",
          conditions="누구나 가입할 수 있습니다.", rates=[]),
     dict(type="DEPOSIT", product_code=1, name="히어로 정기예금", base_rate=Decimal("3.00"),
@@ -57,12 +57,12 @@ PRODUCTS = [
          description="매달 정한 금액을 넣어 목돈을 만드는 적금입니다. 예산 관리의 목표 저축 계좌로 씁니다.",
          conditions="월 1만 원부터 100만 원까지, 12~24개월.",
          rates=[(*SALARY, Decimal("0.50")), (*MARKETING, Decimal("0.20")), (*FIRST, Decimal("0.30"))]),
-    dict(type="SAVINGS", product_code=2, name="주니어 어벤져스 적금", base_rate=Decimal("4.00"),
+    dict(type="SAVINGS", product_code=2, name="주니어 캡아메리카 적금", base_rate=Decimal("4.00"),
          min_term_months=12, max_term_months=12, min_amount=10_000, max_amount=300_000, min_age=19,
          description="사회 초년생을 위한 1년 적금입니다.",
          conditions="만 19세 이상. 월 1만 원부터 30만 원까지, 12개월.",
          rates=[(*MARKETING, Decimal("0.30"))]),
-    dict(type="LOAN", product_code=1, name="어벤져스 신용대출", base_rate=Decimal("5.50"),
+    dict(type="LOAN", product_code=1, name="캡아메리카 신용대출", base_rate=Decimal("5.50"),
          min_term_months=12, max_term_months=60, min_amount=1_000_000, max_amount=50_000_000, min_age=19,
          description="연소득을 기준으로 한도를 정하는 신용대출입니다. 원리금균등 상환.",
          conditions="만 19세 이상, 소득이 있는 분. 100만 원부터 5천만 원까지, 12~60개월.", rates=[]),
@@ -70,7 +70,7 @@ PRODUCTS = [
 
 
 CARD_PRODUCTS = [
-    dict(type="DEBIT", product_code=1, name="어벤져스 체크카드", annual_fee=0,
+    dict(type="DEBIT", product_code=1, name="캡아메리카 체크카드", annual_fee=0,
          benefits="연회비 없음. 결제하면 연결된 입출금 계좌에서 바로 빠져나갑니다. 편의점·카페 5% 할인."),
     dict(type="CREDIT", product_code=1, name="스타크 신용카드", annual_fee=15_000,
          benefits="연회비 1만 5천 원. 쓴 금액은 대금 출금일에 한 번에 빠져나갑니다. 해외 결제 수수료 없음."),
@@ -81,11 +81,13 @@ async def seed_card_products(db: AsyncSession) -> int:
     added = 0
     async with db.begin():
         for spec in CARD_PRODUCTS:
-            exists = await db.scalar(select(CardProduct.product_id).where(
+            existing = await db.scalar(select(CardProduct).where(
                 CardProduct.type == spec["type"], CardProduct.product_code == spec["product_code"]))
-            if exists is None:
+            if existing is None:
                 db.add(CardProduct(**spec))
                 added += 1
+            else:
+                existing.name = spec["name"]  # 이름은 코드가 기준 (은행 이름 변경 등, ADR 0017)
     return added
 
 
@@ -95,12 +97,13 @@ async def seed_products(db: AsyncSession) -> int:
         for spec in PRODUCTS:
             spec = dict(spec)
             rates = spec.pop("rates")
-            exists = await db.scalar(
-                select(AccountProduct.product_id).where(
+            existing = await db.scalar(
+                select(AccountProduct).where(
                     AccountProduct.type == spec["type"], AccountProduct.product_code == spec["product_code"]
                 )
             )
-            if exists is not None:
+            if existing is not None:
+                existing.name = spec["name"]  # 이름은 코드가 기준 (은행 이름 변경 등, ADR 0017)
                 continue
             product = AccountProduct(
                 **spec,

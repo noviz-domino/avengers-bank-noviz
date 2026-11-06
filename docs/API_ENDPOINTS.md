@@ -152,7 +152,7 @@
   "total_balance": 8100000,
   "accounts": [
     { "account_id": 3, "account_type": "DEPOSIT", "account_num": "110-201-000001", "product_name": "히어로 정기예금", "nickname": null, "balance": 5000000, "status": "ACTIVE", "opened_at": "..." },
-    { "account_id": 1, "account_type": "CHECKING", "account_num": "110-101-000001", "product_name": "어벤져스 입출금통장", "nickname": "생활비", "balance": 2350000, "status": "ACTIVE", "opened_at": "..." }
+    { "account_id": 1, "account_type": "CHECKING", "account_num": "110-101-000001", "product_name": "캡아메리카 입출금통장", "nickname": "생활비", "balance": 2350000, "status": "ACTIVE", "opened_at": "..." }
   ]
 }, "message": null }
 ```
@@ -301,7 +301,7 @@ MCP(Model Context Protocol) 서버. 도구 16개가 아래 REST API를 사용자
 
 ```json
 { "success": true, "data": { "action": "answer", "answer": "결제일에 잔액이 모자라면 출금하지 않고 연체로 남고, 그동안 그 신용카드로 결제할 수 없습니다.",
-  "citations": [ { "chunk_id": "card-terms#8", "title": "어벤져스은행 카드 이용약관 > 제8조(연체)" } ] } }
+  "citations": [ { "chunk_id": "card-terms#8", "title": "캡아메리카뱅크 카드 이용약관 > 제8조(연체)" } ] } }
 ```
 
 ## system: 시스템 작업 (`domains/cards`, `domains/rag`의 `system_router`)

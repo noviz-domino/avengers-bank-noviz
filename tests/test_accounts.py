@@ -44,7 +44,7 @@ def test_add_months_and_age():
 
 async def test_open_checking_gets_number_and_limits(app):
     me = await sign_in(app)
-    pid = await product_id("어벤져스 입출금통장")
+    pid = await product_id("캡아메리카 입출금통장")
     first = (await app.post("/accounts", json={"product_id": pid, "nickname": "생활비"}, headers=me)).json()["data"]
     second = (await app.post("/accounts", json={"product_id": pid}, headers=me)).json()["data"]
 
@@ -82,12 +82,12 @@ async def test_savings_conditions(app, body, code):
 
 async def test_age_condition(app):
     me = await sign_in(app, birth="2012-01-01")
-    body = {"product_id": await product_id("주니어 어벤져스 적금"), "term_months": 12, "monthly_payment": 10_000}
+    body = {"product_id": await product_id("주니어 캡아메리카 적금"), "term_months": 12, "monthly_payment": 10_000}
     response = await app.post("/accounts", json=body, headers=me)
     assert response.json()["error"]["code"] == "AGE_NOT_ELIGIBLE"
 
 
-@pytest.mark.parametrize("name, code", [("히어로 정기예금", "DEPOSIT_NEEDS_TRANSFER"), ("어벤져스 신용대출", "PRODUCT_NOT_OPENABLE")])
+@pytest.mark.parametrize("name, code", [("히어로 정기예금", "DEPOSIT_NEEDS_TRANSFER"), ("캡아메리카 신용대출", "PRODUCT_NOT_OPENABLE")])
 async def test_not_openable_here(app, name, code):
     me = await sign_in(app)
     response = await app.post("/accounts", json={"product_id": await product_id(name), "term_months": 12, "monthly_payment": 1_000_000}, headers=me)
@@ -110,7 +110,7 @@ async def test_main_screen_total_and_order(app):
 async def test_other_users_account_is_not_found(app):
     owner = await sign_in(app)
     other = await sign_in(app, login_id="thor")
-    account = (await app.post("/accounts", json={"product_id": await product_id("어벤져스 입출금통장")}, headers=owner)).json()["data"]
+    account = (await app.post("/accounts", json={"product_id": await product_id("캡아메리카 입출금통장")}, headers=owner)).json()["data"]
 
     for path in [f"/accounts/{account['account_id']}", f"/accounts/{account['account_id']}/transactions", "/accounts/999"]:
         response = await app.get(path, headers=other)
@@ -144,7 +144,7 @@ async def test_requires_login(app):
 
 async def test_closed_accounts_not_in_total(app):
     me = await sign_in(app)
-    pid = await product_id("어벤져스 입출금통장")
+    pid = await product_id("캡아메리카 입출금통장")
     for _ in range(2):
         await app.post("/accounts", json={"product_id": pid}, headers=me)
     async with SessionLocal() as db:
@@ -169,7 +169,7 @@ def test_rate_detail_adds_up_when_capped():
 
 async def test_blank_nickname_rejected(app):
     me = await sign_in(app)
-    response = await app.post("/accounts", json={"product_id": await product_id("어벤져스 입출금통장"), "nickname": ""}, headers=me)
+    response = await app.post("/accounts", json={"product_id": await product_id("캡아메리카 입출금통장"), "nickname": ""}, headers=me)
     assert response.status_code == 422
 
 

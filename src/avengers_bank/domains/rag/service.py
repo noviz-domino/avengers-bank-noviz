@@ -22,7 +22,7 @@ Mode = Literal["hybrid", "vector", "bm25"]
 # shortcut: 서버 한 프로세스 안에서만 막는다. 서버를 여러 대 띄우면 DB advisory lock으로 바꾼다
 REINDEX_LOCK = asyncio.Lock()
 
-PROMPT = """너는 어벤져스은행의 상품·약관 안내 담당이다. 아래 <근거>만 보고 <질문>에 답한다.
+PROMPT = """너는 캡아메리카뱅크의 상품·약관 안내 담당이다. 아래 <근거>만 보고 <질문>에 답한다.
 
 규칙
 - 근거에 있는 내용만 쓴다. 근거에 없는 숫자·조건은 쓰지 않는다.

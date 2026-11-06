@@ -1,7 +1,7 @@
 [project]
 name = "avengers-bank"
 version = "0.1.0"
-description = "AvengersBank 비동기 FastAPI 백엔드"
+description = "캡아메리카뱅크(CapAmericaBank) 비동기 FastAPI 백엔드"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
