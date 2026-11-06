@@ -1,7 +1,7 @@
 """감독관 + 도메인 Agent (ADR 0006·0015).
 
-감독관은 맡을 Agent만 고른다(구조화된 출력, 정해진 이름만). 도메인 Agent는 자기 도구만 가진 ReAct Agent다.
-한 턴에 Agent를 여러 번 부를 수 있고(복합 요청), MAX_HOPS에서 멈춘다.
+감독관은 턴 처음에 한 번, 처리할 담당을 순서대로 고른다(구조화된 출력, 정해진 이름만, ADR 0016).
+도메인 Agent는 자기 도구만 가진 Agent이고, 계획 순서대로 차례로 일한다(복합 요청, 최대 MAX_HOPS).
 예산 컨텍스트·코멘트 노드와 대출·예산 Agent는 그 기능을 만들 때 붙인다 (ADR 0013).
 """
 
@@ -49,25 +49,25 @@ PROMPTS = {
                "근거가 없으면 모른다고 한다. 투자를 권유하지 않는다.",
 }
 
-SUPERVISOR = """너는 어벤져스은행 AI 상담의 감독관이다. 대화를 보고 다음에 일할 담당을 하나 고른다.
+SUPERVISOR = """너는 어벤져스은행 AI 상담의 감독관이다. 사용자의 마지막 말을 처리할 담당을 처리할 순서대로 고른다.
 - account: 계좌·잔액·거래내역·이체·계좌 개설과 해지. "어디서 얼마 썼어", "이번 달 지출"처럼 쓴 돈을 묻는 질문도 account(체크카드 결제도 계좌 거래내역에 있다)
 - card: 카드 조회·발급·한도·정지·분실, 특정 카드의 사용내역을 콕 집어 물을 때
-- product: 상품 소개·금리·가입 조건, 약관·규칙 질문
-- FINISH: 사용자의 요청이 모두 처리됐거나, 담당이 되물었거나, 은행 업무가 아닌 말(인사 등)
-여러 업무가 섞이면 하나씩 차례로 고른다. 이미 담당이 답한 업무는 다시 고르지 않는다.
-FINISH인데 이번 턴에 아직 아무 담당도 답하지 않았으면 reply에 사용자에게 할 짧은 답을 쓴다."""
+- product: 상품 소개·금리·가입 조건, 약관·규칙 질문. 카드 상품의 혜택·연회비처럼 "어떤 상품인지"를 묻는 질문도 product(내 카드 자체를 묻는 것은 card)
+여러 업무가 섞이면 사용자가 말한 순서대로 담는다. 앞 대화에 이어지는 말(되물음에 대한 답, "응", "그걸로")은 그 업무의 담당을 고른다.
+은행 업무가 아닌 말(인사, 감사 등)이면 agents를 비우고 reply에 짧게 답한다."""
 
 
-class Route(BaseModel):
-    """감독관의 출력. 정해진 이름만 고를 수 있다 (ADR 0006: 엉뚱한 Agent로 보내지 않게)"""
+class Plan(BaseModel):
+    """감독관의 출력: 이번 턴에 일할 담당과 순서. 정해진 이름만 고를 수 있다 (ADR 0006: 엉뚱한 Agent로 보내지 않게).
+    턴 처음에 한 번만 정한다: 담당이 끝날 때마다 감독관을 다시 부르지 않아 LLM 호출이 준다 (ADR 0016)"""
 
-    next: Literal["account", "card", "product", "FINISH"]
-    reply: str | None = Field(default=None, description="FINISH이고 이번 턴에 담당이 답하지 않았을 때 사용자에게 할 말")
+    agents: list[AgentName] = Field(default_factory=list, description="처리할 담당, 처리 순서대로. 은행 업무가 아니면 빈 목록")
+    reply: str | None = Field(default=None, description="agents가 비었을 때 사용자에게 할 짧은 답")
 
 
 class ChatState(MessagesState):
-    hops: int  # 이번 턴에 도메인 Agent를 부른 횟수
-    routed: list[str]  # 이번 턴에 고른 담당 (응답·평가용)
+    plan: list[str]  # 이번 턴에 아직 일하지 않은 담당
+    routed: list[str]  # 이번 턴에 일한 담당 (응답·평가용)
 
 
 def common_prompt() -> str:
@@ -84,16 +84,6 @@ def recent(messages: list) -> list:
     return tail[start:]
 
 
-def answered_this_turn(messages) -> bool:
-    """마지막 사람 메시지 뒤에 AI 답이 있나"""
-    for m in reversed(messages):
-        if isinstance(m, HumanMessage):
-            return False
-        if isinstance(m, AIMessage) and m.content and not m.tool_calls:
-            return True
-    return False
-
-
 def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpointSaver):
     by_name = {t.name: t for t in tools}
     agents = {
@@ -104,34 +94,30 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
     }
 
     async def supervisor(state: ChatState) -> Command:
-        if state["hops"] >= MAX_HOPS:
-            return Command(goto=END)
-        # Gemini는 모델 차례(AI 메시지)로 끝나는 요청을 거절한다. 담당이 답한 뒤에는 대화가 AI로 끝나므로
-        # 감독관에게 할 일을 사람 말로 붙인다. 이 안내는 저장하지 않는다 (실제 Gemini 점검에서 발견)
-        ask = HumanMessage("(상담 안내) 위 대화를 보고 다음 담당을 고르세요. 모두 처리됐으면 FINISH.")
-        route = await llm.with_structured_output(Route).ainvoke([SystemMessage(SUPERVISOR), *recent(state["messages"]), ask])
-        if route.next == "FINISH":
-            if answered_this_turn(state["messages"]):
-                return Command(goto=END)
-            return Command(goto=END, update={"messages": [AIMessage(route.reply or "무엇을 도와드릴까요?")]})
-        if route.next in state["routed"]:  # 같은 담당을 한 턴에 두 번 부르지 않는다 (담당이 되물었는데 또 부르는 핑퐁)
-            return Command(goto=END)
-        return Command(goto=route.next, update={"routed": [*state["routed"], route.next]})
+        # 턴 처음에 한 번만: 대화는 사람 말로 끝난다 (Gemini는 AI 메시지로 끝나는 요청을 거절한다)
+        plan = await llm.with_structured_output(Plan).ainvoke([SystemMessage(SUPERVISOR), *recent(state["messages"])])
+        agents_in_order = list(dict.fromkeys(plan.agents))[:MAX_HOPS]  # 같은 담당 두 번, 핑퐁 없이
+        if not agents_in_order:
+            return Command(goto=END, update={"messages": [AIMessage(plan.reply or "무엇을 도와드릴까요?")]})
+        return Command(goto=agents_in_order[0], update={"plan": agents_in_order[1:], "routed": agents_in_order[:1]})
 
     def domain(name: str):
         async def run(state: ChatState) -> Command:
-            # 복합 요청에서 두 번째 담당은 대화가 앞 담당의 답(AI)으로 끝난 채 불린다. 모델 차례로 끝난 대화에는
-            # 빈 답을 내는 모델이 있어서, 이번에 할 일을 사람 말로 붙인다. 이 안내는 저장하지 않는다
+            # 복합 요청에서 두 번째 담당은 대화가 앞 담당의 답(AI)으로 끝난 채 불린다. Gemini는 AI 메시지로 끝나는
+            # 요청을 거절해서, 이번에 할 일을 사람 말로 붙인다. 이 안내는 저장하지 않는다
             ask = HumanMessage(f"(상담 안내) 위 대화에서 아직 처리하지 않은 {LABELS[name]} 업무를 처리하세요.")
             sent = [*recent(state["messages"]), ask]
             out = await agents[name].ainvoke({"messages": sent})
             new = out["messages"][len(sent):]  # 이 Agent가 더한 도구 호출·결과·답
-            return Command(goto="supervisor", update={"messages": new, "hops": state["hops"] + 1})
+            if not state["plan"]:
+                return Command(goto=END, update={"messages": new})
+            following, *rest = state["plan"]
+            return Command(goto=following, update={"messages": new, "plan": rest, "routed": [*state["routed"], following]})
         return run
 
     graph = StateGraph(ChatState)
     graph.add_node("supervisor", supervisor, destinations=(*TOOLS, END))
     for name in TOOLS:
-        graph.add_node(name, domain(name), destinations=("supervisor",))
+        graph.add_node(name, domain(name), destinations=(*TOOLS, END))
     graph.add_edge(START, "supervisor")
     return graph.compile(checkpointer=checkpointer)

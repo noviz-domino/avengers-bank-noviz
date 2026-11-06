@@ -85,6 +85,14 @@ API 문서: http://127.0.0.1:8000/docs
 | "자유적금 우대금리 조건이 뭐야?" | 상품 담당 → `ask_bank_docs`(근거 인용) |
 | "카드 정지하고 남은 잔액 알려줘" | 카드 담당 → 계좌 담당 (복합 요청) |
 
+### 실행 추적과 측정 (선택)
+
+[cloud.langfuse.com](https://cloud.langfuse.com) 무료 프로젝트 키를 `.env`의 `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`에 넣으면 채팅마다 감독관·담당·도구·Gemini 호출이 단계별로 남습니다. 라우팅 정확도와 응답 시간은 아래로 잽니다(질문 14개, Gemini 40~50번 호출).
+
+```bash
+docker compose exec app python -m avengers_bank.domains.agent.evaluate
+```
+
 ## Claude Desktop에서 쓰기 (MCP, 선택)
 
 서버(`docker compose up`)를 띄운 뒤, 한 번 로그인해 refresh token을 파일(`~/.avengers-bank/mcp-token.json`)에 저장합니다. 비밀번호는 저장하지 않습니다.

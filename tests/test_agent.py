@@ -8,7 +8,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
-from avengers_bank.domains.agent.graph import HISTORY, MAX_HOPS, Route, recent
+from avengers_bank.domains.agent.graph import HISTORY, MAX_HOPS, Plan, recent
 from avengers_bank.domains.agent.service import final_reply
 from avengers_bank.domains.agent.llm import get_llm
 from avengers_bank.domains.rag import router as rag_router
@@ -89,7 +89,7 @@ def chat(client, me, message, session_id=None):
 
 async def test_account_question_goes_through_mcp_tools(bank):
     client, tony, peter, src, dst, fake = bank
-    fake.routes = [Route(next="account"), Route(next="FINISH")]
+    fake.routes = [Plan(agents=["account"])]
     fake.replies = [call("get_my_accounts"), AIMessage("총자산은 1,000,000원입니다.")]
     data = (await chat(client, tony, "내 계좌 얼마 있어?")).json()["data"]
     assert data["reply"] == "총자산은 1,000,000원입니다." and data["routed"] == ["account"]
@@ -99,7 +99,7 @@ async def test_account_question_goes_through_mcp_tools(bank):
 
 async def test_transfer_only_creates_pending_marked_agent(bank):
     client, tony, peter, src, dst, fake = bank
-    fake.routes = [Route(next="account"), Route(next="FINISH")]
+    fake.routes = [Plan(agents=["account"])]
     fake.replies = [call("request_transfer", from_account_id=src["account_id"], to_account_num=dst["account_num"],
                          amount=50_000), AIMessage("승인 화면에서 PIN을 입력해 주세요.")]
     await chat(client, tony, "피터한테 5만 원 보내줘")
@@ -110,7 +110,7 @@ async def test_transfer_only_creates_pending_marked_agent(bank):
 
 async def test_context_is_kept_and_private(bank):
     client, tony, peter, src, dst, fake = bank
-    fake.routes = [Route(next="FINISH", reply="안녕하세요! 무엇을 도와드릴까요?"), Route(next="FINISH", reply="네")]
+    fake.routes = [Plan(reply="안녕하세요! 무엇을 도와드릴까요?"), Plan(reply="네")]
     first = (await chat(client, tony, "안녕")).json()["data"]
     assert first["reply"] == "안녕하세요! 무엇을 도와드릴까요?" and first["routed"] == []
     await chat(client, tony, "고마워", first["session_id"])
@@ -121,22 +121,22 @@ async def test_context_is_kept_and_private(bank):
     assert [t["role"] for t in history] == ["user", "assistant", "user", "assistant"]
     assert (await client.get(f"/chat/{first['session_id']}", headers=peter)).json()["data"] == []  # 남의 대화방
 
-    fake.routes = [Route(next="FINISH", reply="처음 뵙겠습니다")]
+    fake.routes = [Plan(reply="처음 뵙겠습니다")]
     await chat(client, peter, "안녕?", first["session_id"])  # 토니의 session_id를 써도 피터의 새 대화
     assert [m.content for m in fake.supervisor_inputs[-1] if isinstance(m, HumanMessage) and not m.content.startswith("(상담 안내)")] == ["안녕?"]
 
 
 async def test_same_agent_once_per_turn_and_hop_limit(bank):
     client, tony, peter, src, dst, fake = bank
-    fake.routes = [Route(next="account"), Route(next="account")]  # 담당이 되물었는데 감독관이 또 고르는 핑퐁
+    fake.routes = [Plan(agents=["account", "account"])]  # 같은 담당을 두 번 담아도
     fake.replies = [AIMessage("어느 계좌로 보낼까요?")]
     data = (await chat(client, tony, "토니한테 보내줘")).json()["data"]
     assert data["routed"] == ["account"] and data["reply"] == "어느 계좌로 보낼까요?"
 
-    fake.routes = [Route(next="account"), Route(next="card"), Route(next="product")]
+    fake.routes = [Plan(agents=["account", "card", "product"])]
     fake.replies = [AIMessage(f"답 {i}") for i in range(MAX_HOPS)]
     data = (await chat(client, tony, "다 알려줘")).json()["data"]
-    assert data["routed"] == ["account", "card", "product"]  # 세 번에서 멈춤 (네 번째 감독관 호출 없음)
+    assert data["routed"] == ["account", "card", "product"] and len(fake.supervisor_inputs) == 2  # 두 턴, 턴마다 감독관 1번 (담당이 끝날 때마다 다시 묻지 않음)
     assert data["reply"] == "답 0\n\n답 1\n\n답 2"
 
 
@@ -155,7 +155,7 @@ async def test_same_session_one_turn_at_a_time(bank):
     client, tony, peter, src, dst, fake = bank
     session_id = str(uuid.uuid4())
     fake.delay = 0.2
-    fake.routes = [Route(next="FINISH", reply="네")]
+    fake.routes = [Plan(reply="네")]
     first, second = await asyncio.gather(chat(client, tony, "안녕", session_id), chat(client, tony, "안녕", session_id))
     assert sorted([first.status_code, second.status_code]) == [200, 409]  # 두 번 눌러도 한 턴만
     assert 409 in (first.status_code, second.status_code)
@@ -165,7 +165,7 @@ async def test_same_session_one_turn_at_a_time(bank):
 
 async def test_compound_request_second_agent_gets_its_task(bank):
     client, tony, peter, src, dst, fake = bank
-    fake.routes = [Route(next="card"), Route(next="account"), Route(next="FINISH")]
+    fake.routes = [Plan(agents=["card", "account"])]
     fake.replies = [AIMessage("카드를 정지했어요."), AIMessage("잔액은 1,000,000원이에요.")]
     data = (await chat(client, tony, "카드 정지하고 잔액 알려줘")).json()["data"]
     assert data["routed"] == ["card", "account"]
@@ -181,3 +181,15 @@ def test_recent_starts_at_human_and_reply_is_this_turn():
         {"name": "x", "args": {}, "id": f"c{i}"}]), ToolMessage("r", tool_call_id=f"c{i}"))] + [HumanMessage("q1")]
     assert isinstance(recent(messages)[0], HumanMessage)  # 도구 결과로 시작해서 짝이 어긋나지 않게
     assert final_reply([HumanMessage("a"), AIMessage("예전 답"), HumanMessage("b")]).startswith("죄송합니다")
+
+
+def test_measurement_helpers():
+    from avengers_bank.domains.agent.evaluate import load_routing, percentile, summarize
+
+    assert percentile([1, 2, 3, 4, 10], 50) == 3 and percentile([1, 2, 3, 4, 10], 95) == 10
+    rows = [{"routed": ["card"], "expected": [["card"]], "error": None, "calls": 3, "seconds": 2.0},
+            {"routed": None, "expected": [["account"]], "error": "TimeoutError", "calls": 1, "seconds": 90.0}]
+    assert summarize(rows) == {"questions": 2, "errors": 1, "routing_accuracy": 0.5, "llm_calls_avg": 3.0,
+                               "p50": 2.0, "p95": 2.0}
+    names = {"account", "card", "product"}
+    assert all(set(route) <= names for item in load_routing() for alt in item["expected"] for route in [alt])
