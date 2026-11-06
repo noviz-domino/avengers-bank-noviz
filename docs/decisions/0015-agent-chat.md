@@ -1,6 +1,6 @@
 # 0015. AI 상담 Agent: 감독관 + 계좌·카드·상품 Agent, 도구는 메모리 연결 MCP
 
-- 상태: 채택, 일부 변경 (→ [0016](0016-agent-latency-tracing.md): 감독관은 턴 처음에 한 번 계획, 생각 수준 low, Langfuse)
+- 상태: 채택, 일부 변경 (→ [0018](0018-chat-stream-router.md): 감독관을 라우터로 부름, 스트리밍. → [0016](0016-agent-latency-tracing.md): 감독관은 턴 처음에 한 번 계획, 생각 수준 low, Langfuse)
 - 날짜: 2026-11-06
 - 관련 PR: (이 문서를 추가하는 PR)
 - 관련: [ADR 0006](0006-agent-orchestration.md) 감독관 구조, [ADR 0013](0013-agent-rag-plan.md) 모델·PR 순서, [ADR 0014](0014-mcp-server.md) MCP 서버

@@ -259,11 +259,12 @@
 
 ## chat: AI 상담 (`domains/agent`)
 
-자연어로 은행 업무를 합니다. 감독관이 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구(아래 절)로 REST를 부릅니다. 결정 이유: [ADR 0015](decisions/0015-agent-chat.md), 코드 설명: [가이드 12](guides/12-agent.md)
+자연어로 은행 업무를 합니다. 라우터가 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구(아래 절)로 REST를 부릅니다. 결정 이유: [ADR 0015](decisions/0015-agent-chat.md), 코드 설명: [가이드 12](guides/12-agent.md)
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
 | ✅ | POST | `/chat` | 🔒 | `message`(1000자까지), `session_id`(UUID, 없으면 새 대화) → `session_id`, `reply`, `routed`(일한 담당). 이체 등은 승인 대기까지, PIN은 승인 화면에서 |
+| ✅ | POST | `/chat/stream` | 🔒 | 같은 요청을 **SSE**로: `status`(진행 상태) → `token`(답 글자, `agent`로 담당 구분) → `done`(전체 답) / `error`. 처리 중인 대화방이면 스트림 대신 `409` ([ADR 0018](decisions/0018-chat-stream-router.md)) |
 | ✅ | GET | `/chat/{session_id}` | 🔒 | 내 대화 기록(사람 말과 AI 답). 남의 대화방이면 빈 목록 |
 
 - 실패: `503 AI_DISABLED`(Gemini 키 없음), `503 AI_UNAVAILABLE`(LLM 실패·90초 초과), `409 CHAT_BUSY`(같은 대화방의 앞 메시지를 처리 중), `429 AI_RATE_LIMITED`(RAG와 같은 한도 1분 10, 채팅 한 번은 3으로 셈)
@@ -272,6 +273,34 @@
 ```json
 { "success": true, "data": { "session_id": "6f1c…", "reply": "피터님 계좌로 50,000원 이체를 요청했어요. 은행 앱 승인 화면에서 PIN을 입력해 주세요.", "routed": ["account"] } }
 ```
+
+스트리밍 예 (`POST /chat/stream`, "카드 한도랑 내 잔액 알려줘"):
+
+```text
+event: status
+data: {"stage": "routing", "label": "담당을 고르고 있어요"}
+
+event: status
+data: {"stage": "routed", "agents": ["card", "account"], "label": "카드 → 계좌 순서로 확인할게요"}
+
+event: status
+data: {"stage": "agent", "agent": "card", "label": "카드 담당이 확인하고 있어요"}
+
+event: status
+data: {"stage": "tool", "agent": "card", "tool": "get_card_limit", "label": "카드 한도를 조회하고 있어요"}
+
+event: token
+data: {"agent": "card", "text": "일일 한도는 1,000,000원입니다."}
+
+event: token
+data: {"agent": "account", "text": "\n\n보유하신 계좌의 잔액 안내입니다."}
+
+event: done
+data: {"session_id": "…", "reply": "일일 한도는 1,000,000원입니다.\n\n보유하신 계좌의 잔액 안내입니다.", "routed": ["card", "account"]}
+```
+
+- 도구 호출 전의 “확인해 볼게요” 같은 서문은 `token`으로 나갈 수 있고 `done.reply`에서는 빠진다. 화면은 `token`을 미리보기로 표시하고, `done`을 받으면 표시한 텍스트를 `done.reply`로 바꿔 끼운다.
+- 인사처럼 라우터가 혼자 답하면 `token` 없이 `done.reply`로만 답이 온다.
 
 ## mcp: AI 도구 (`domains/mcp_server`)
 

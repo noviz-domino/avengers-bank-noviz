@@ -25,7 +25,7 @@ avengers-bank/
 │   ├── test_refresh_tokens.py  # 토큰 교체, 재사용 감지, 만료, 기기별 로그아웃
 │   ├── test_accounts.py        # 계좌 개설·가입 조건·적용 금리, 메인 화면 총자산, 남의 계좌 404, 거래내역
 │   ├── test_account_close.py   # 계좌 해지 규칙(잔액·연결 카드·안 낸 대금), 해지 뒤 환불 대기와 상담원 환불
-│   ├── test_agent.py           # 감독관·담당(가짜 LLM, 도구는 진짜 MCP→REST), 승인 대기 AGENT, 맥락·대화방 분리, 핑퐁 제한, 503
+│   ├── test_agent.py           # 라우터·담당(가짜 LLM, 도구는 진짜 MCP→REST), 승인 대기 AGENT, 맥락·대화방 분리, 핑퐁 제한, 503
 │   ├── test_mcp.py             # 도구 목록(승인·결제·system 없음), 승인 대기만, 남의 것은 오류, HTTP /mcp Bearer 전달, 토큰 파일 교체
 │   ├── test_rag.py             # 청킹·RRF·평가 지표, 바뀐 것만 임베딩, 정답 세트 청크 존재, 인용 검사 (가짜 AI, Gemini 안 부름)
 │   ├── test_transfers.py       # 이체 승인 흐름, 두 번 승인, 멱등키, PIN 잠금, 승인 전 잔액 변화, 한도
@@ -55,7 +55,7 @@ avengers-bank/
         ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
         ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성
         ├── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소·대금 출금(/system)
-        ├── agent/          # AI 상담: 감독관 + 계좌·카드·상품 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl) ✅
+        ├── agent/          # AI 상담: 라우터 + 계좌·카드·상품 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl) ✅
         ├── mcp_server/     # MCP 도구 16개(REST를 사용자 토큰으로), HTTP /mcp + 로컬 stdio(login, 토큰 파일) ✅
         └── rag/            # 상품·약관 RAG: 데모 약관(docs/*.md), 청킹, Gemini 연결(ai.py), 하이브리드 검색, 평가(golden.jsonl) ✅
 ```

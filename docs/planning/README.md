@@ -54,7 +54,7 @@
 | 카드 | ✅ 명세, 흐름 ④ | ✅ `card_products`, `cards`, `card_transactions` | ✅ 발급, 목록·상세(가린 번호), 정지·분실(바로), 정지 해제(PIN), 결제·취소·사용내역·한도, 신용 대금 출금(연체 시 결제 막기) |
 | 대출 | ✅ 명세 16개 중 9개, 흐름 ⑤ | 📐 `loans`, `loan_schedules` | 가볍게 구현 ([scope.md](scope.md)) |
 | 수취인·알림 | ✅ 명세 | 📐 `recipients`, `notifications` | 자동이체는 예산의 저축 이체만 |
-| 자연어 입력 | ⚠️ 흐름 ⑥만 있음, 기능 명세 없음 | 📐 `chat_messages`, `pending_actions` | ADR 0004. ✅ MCP 서버(도구 16개, HTTP + 로컬, ADR 0014), ✅ AI 상담 `POST /chat`(감독관 + 계좌·카드·상품 Agent, 맥락 유지·되묻기, ADR 0015). 예산·대출 Agent는 그 기능과 함께 |
+| 자연어 입력 | ⚠️ 흐름 ⑥만 있음, 기능 명세 없음 | 📐 `chat_messages`, `pending_actions` | ADR 0004. ✅ MCP 서버(도구 16개, HTTP + 로컬, ADR 0014), ✅ AI 상담 `POST /chat`(라우터 + 계좌·카드·상품 Agent, 맥락 유지·되묻기, ADR 0015). 예산·대출 Agent는 그 기능과 함께 |
 | RAG | ⚠️ 흐름 ⑥만 있음 | ✅ `rag_chunks` (pgvector) | ✅ 상품 DB + 데모 약관, 하이브리드 검색(RRF), 근거 인용 답변, 정답 세트 38문항 (ADR 0013). Agent 연결은 MCP·Agent PR |
 | **예산 관리** (추가 기능) | ✅ budget.md, 흐름 ⑦⑧ | 📐 예산 테이블 6개 (우대금리 표는 상품으로 옮겨 구현) | |
 

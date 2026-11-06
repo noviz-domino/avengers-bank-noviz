@@ -7,9 +7,9 @@
 FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph · MCP · Gemini · Langfuse
 
 - **돈 처리**: 잔액·장부를 바꾸는 곳은 실행 함수 하나, 행 잠금, 요청 번호(같은 요청이 두 번 와도 한 번만), 승인 대기 + 거래 PIN
-- **AI 상담**: 감독관이 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구로 REST만 부름 → AI는 사용자보다 큰 권한이 없음
+- **AI 상담**: 라우터가 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구로 REST만 부름 → AI는 사용자보다 큰 권한이 없음
 - **RAG**: 상품 DB + 앱 규칙을 쓴 데모 약관, 벡터 + 단어 하이브리드 검색, 근거 인용(정답 세트 Hit@5 1.000)
-- **문서**: 설계 결정 17개(ADR), 기능별 코드 가이드 12개, 테스트 144개
+- **문서**: 설계 결정 18개(ADR), 기능별 코드 가이드 12개, 테스트 147개
 
 ## 목차
 
@@ -32,7 +32,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 |---|---|
 | 은행 기본 기능 | 입출금·적금 개설(상품별 **가입 조건·적용 금리**), 정기예금(PIN 승인), 계좌 목록·총자산·거래내역 검색, 이체(승인 대기 → PIN), 계좌 해지, 카드 발급·정지·분실·결제·취소·한도·신용 대금 출금 |
 | 회원가입·인증 | 회원가입, 로그인(5회 실패 잠금), refresh token 교체·도난 감지, 로그아웃(기기별), 거래 PIN. 남의 데이터는 404 |
-| 자연어 입력 | `POST /chat`: 감독관 + 계좌·카드·상품 Agent, **대화 맥락 유지**(PostgreSQL), **정보가 부족하면 되묻기**, 이체·정지 해제는 승인 대기까지 |
+| 자연어 입력 | `POST /chat`: 라우터 + 계좌·카드·상품 Agent, **대화 맥락 유지**(PostgreSQL), **정보가 부족하면 되묻기**, 이체·정지 해제는 승인 대기까지 |
 | RAG | `POST /rag/ask`, 상품 Agent의 `ask_bank_docs`: 상품 DB + 데모 약관, 조항 단위 청킹, 하이브리드 검색, 근거 인용, 근거 없으면 "자료 없음" |
 
 화면은 아직 없습니다. API 문서(`/docs`)로 확인합니다.
@@ -47,7 +47,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → PIN 승인 → 실행(잔액·한도 재검사), 거절, 요청 번호, 감사 기록 |
 | cards | ✅ 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN), 결제·취소·사용내역·한도, 신용 대금 출금·연체 |
-| chat | ✅ AI 상담: 감독관(턴마다 한 번 계획) + 담당 3개, 대화 기억, Langfuse 추적 |
+| chat | ✅ AI 상담: 라우터(턴마다 한 번 계획) + 담당 3개, 대화 기억, Langfuse 추적 |
 | mcp | ✅ AI 도구 16개. HTTP `/mcp`(Bearer), 로컬 stdio(Claude Desktop) |
 | rag | ✅ 검색·답변, 색인 갱신(바뀐 청크만 임베딩), 정답 세트 평가 |
 
@@ -99,7 +99,7 @@ DB까지 지우려면 `docker compose down -v`. 로컬(uv) 실행과 마이그�
 
 ### 자연어 요청 예시 (실제 Gemini 응답, 2026-11-06)
 
-`POST /chat`에 `{"message": "..."}`, 이어서 말하려면 응답의 `session_id`를 같이 보냅니다.
+`POST /chat`에 `{"message": "..."}`, 이어서 말하려면 응답의 `session_id`를 같이 보냅니다. `POST /chat/stream`은 같은 요청을 SSE로 흘려보내서, 0초부터 진행 상태("계좌를 조회하고 있어요")가 보이고 답은 만들어지는 대로 보입니다([ADR 0018](docs/decisions/0018-chat-stream-router.md)).
 
 | 사용자 | AI (담당) | 결과 |
 |---|---|---|
@@ -155,6 +155,7 @@ AI가 만든 승인 대기는 `requested_by = AGENT`로 남아서, 승인 화면
 | RAG 검색 (정답 세트 38문항) | hybrid Hit@1 0.947 · Hit@5 1.000 · MRR 0.966 / vector만 Hit@1 1.000 | [ADR 0013](docs/decisions/0013-agent-rag-plan.md) |
 | AI 상담 라우팅 (질문 14개) | 13~14 / 14 | [ADR 0016](docs/decisions/0016-agent-latency-tracing.md) |
 | AI 상담 응답 시간 | p50 **15.0 → 8.2초**, p95 28.5 → 16.8초 (질문당 LLM 호출 4.1 → 3.1번) | 목표 p95 8초는 아직 넘음 |
+| 스트리밍 체감 | 첫 진행 표시 0~0.3초, 첫 글자 7~14초 (끝나는 시간은 같음) | [ADR 0018](docs/decisions/0018-chat-stream-router.md) |
 
 모델: `gemini-3.8-flash`(생각 수준 low), 임베딩 `gemini-embedding-2`(768차원). 측정 명령:
 
@@ -169,7 +170,7 @@ docker compose exec app python -m avengers_bank.domains.agent.evaluate   # AI �
 uv run pytest
 ```
 
-테스트 144개는 SQLite로 돌고 **Gemini·Langfuse를 부르지 않습니다**(가짜 AI, `.env`에 키가 있어도). AI 테스트는 가짜 LLM이 "무엇을 고를지"만 정하고, 도구 호출은 진짜로 MCP → REST → DB를 지납니다.
+테스트 147개는 SQLite로 돌고 **Gemini·Langfuse를 부르지 않습니다**(가짜 AI, `.env`에 키가 있어도). AI 테스트는 가짜 LLM이 "무엇을 고를지"만 정하고, 도구 호출은 진짜로 MCP → REST → DB를 지납니다.
 
 PR과 `main` push마다 GitHub Actions([ci.yml](.github/workflows/ci.yml))가 두 가지를 검사합니다.
 
@@ -229,6 +230,6 @@ docker compose exec app alembic upgrade head
 | [docs/ERD.md](docs/ERD.md) | ER 다이어그램, 코드에서 지킬 규칙 |
 | [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md) | API 목록, 요청·응답 형식, 오류 코드 |
 | [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | 폴더 구조, 계층 설명 |
-| [docs/decisions/](docs/decisions/README.md) | 설계 결정 기록(ADR) 17개: 무엇을 왜 바꿨는지, 팀 뼈대와의 차이 |
+| [docs/decisions/](docs/decisions/README.md) | 설계 결정 기록(ADR) 18개: 무엇을 왜 바꿨는지, 팀 뼈대와의 차이 |
 | [docs/guides/](docs/guides/README.md) | 코드 가이드 12개: 기능별 흐름, 설계 이유, 면접 예상 질문 |
 | [docs/retrospective.md](docs/retrospective.md) | 회고 |

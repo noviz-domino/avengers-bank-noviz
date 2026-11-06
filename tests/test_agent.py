@@ -1,10 +1,11 @@
 import asyncio
+import json
 import uuid
 
 import pytest
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
+from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
@@ -26,14 +27,14 @@ def like_gemini(messages):
 
 
 class FakeChat(BaseChatModel):
-    """Gemini 대신: 감독관의 선택(routes)과 담당 Agent의 응답(replies)을 차례로 내놓는다. 도구는 진짜로 불린다"""
+    """Gemini 대신: 라우터의 선택(routes)과 담당 Agent의 응답(replies)을 차례로 내놓는다. 도구는 진짜로 불린다"""
 
     routes: list = Field(default_factory=list)
     replies: list = Field(default_factory=list)
     agent_inputs: list = Field(default_factory=list)  # 담당 Agent가 받은 메시지들
-    supervisor_inputs: list = Field(default_factory=list)
+    router_inputs: list = Field(default_factory=list)
     fail: bool = False
-    delay: float = 0.0  # 감독관이 생각하는 시간 (동시 요청 테스트)
+    delay: float = 0.0  # 라우터가 생각하는 시간 (동시 요청 테스트)
 
     @property
     def _llm_type(self) -> str:
@@ -44,6 +45,26 @@ class FakeChat(BaseChatModel):
         self.agent_inputs.append(messages)
         return ChatResult(generations=[ChatGeneration(message=self.replies.pop(0))])
 
+    def _stream(self, messages, stop=None, run_manager=None, **kwargs):
+        """스트리밍(astream_events)일 때는 실제 Gemini처럼 글자를 몇 조각으로 나눠 흘린다. 도구 호출은 마지막 조각에"""
+        like_gemini(messages)
+        self.agent_inputs.append(messages)
+        reply = self.replies.pop(0)
+        content = reply.content
+        for i in range(0, len(content), 4):
+            yield self._chunk(AIMessageChunk(content[i:i + 4]), run_manager)
+        if reply.tool_calls:
+            yield self._chunk(AIMessageChunk("", tool_call_chunks=[
+                {"name": c["name"], "args": json.dumps(c["args"]), "id": c["id"], "index": n}
+                for n, c in enumerate(reply.tool_calls)]), run_manager)
+
+    @staticmethod
+    def _chunk(message, run_manager):
+        chunk = ChatGenerationChunk(message=message)
+        if run_manager:
+            run_manager.on_llm_new_token(message.content, chunk=chunk)
+        return chunk
+
     def bind_tools(self, tools, **kwargs):
         return self
 
@@ -52,7 +73,7 @@ class FakeChat(BaseChatModel):
             like_gemini(messages)
             if self.fail:
                 raise RuntimeError("Gemini 장애")
-            self.supervisor_inputs.append(messages)
+            self.router_inputs.append(messages)
             return self.routes.pop(0)
 
         async def aroute(messages):
@@ -114,7 +135,7 @@ async def test_context_is_kept_and_private(bank):
     first = (await chat(client, tony, "안녕")).json()["data"]
     assert first["reply"] == "안녕하세요! 무엇을 도와드릴까요?" and first["routed"] == []
     await chat(client, tony, "고마워", first["session_id"])
-    humans = [m.content for m in fake.supervisor_inputs[1] if isinstance(m, HumanMessage) and not m.content.startswith("(상담 안내)")]
+    humans = [m.content for m in fake.router_inputs[1] if isinstance(m, HumanMessage) and not m.content.startswith("(상담 안내)")]
     assert humans == ["안녕", "고마워"]  # 같은 대화방이면 앞 대화를 기억한다
 
     history = (await client.get(f"/chat/{first['session_id']}", headers=tony)).json()["data"]
@@ -123,7 +144,7 @@ async def test_context_is_kept_and_private(bank):
 
     fake.routes = [Plan(reply="처음 뵙겠습니다")]
     await chat(client, peter, "안녕?", first["session_id"])  # 토니의 session_id를 써도 피터의 새 대화
-    assert [m.content for m in fake.supervisor_inputs[-1] if isinstance(m, HumanMessage) and not m.content.startswith("(상담 안내)")] == ["안녕?"]
+    assert [m.content for m in fake.router_inputs[-1] if isinstance(m, HumanMessage) and not m.content.startswith("(상담 안내)")] == ["안녕?"]
 
 
 async def test_same_agent_once_per_turn_and_hop_limit(bank):
@@ -136,7 +157,7 @@ async def test_same_agent_once_per_turn_and_hop_limit(bank):
     fake.routes = [Plan(agents=["account", "card", "product"])]
     fake.replies = [AIMessage(f"답 {i}") for i in range(MAX_HOPS)]
     data = (await chat(client, tony, "다 알려줘")).json()["data"]
-    assert data["routed"] == ["account", "card", "product"] and len(fake.supervisor_inputs) == 2  # 두 턴, 턴마다 감독관 1번 (담당이 끝날 때마다 다시 묻지 않음)
+    assert data["routed"] == ["account", "card", "product"] and len(fake.router_inputs) == 2  # 두 턴, 턴마다 라우터 1번 (담당이 끝날 때마다 다시 묻지 않음)
     assert data["reply"] == "답 0\n\n답 1\n\n답 2"
 
 
@@ -221,3 +242,102 @@ def test_thinking_setting_and_trace_metadata(monkeypatch):
     monkeypatch.setenv("GEMINI_THINKING", "")  # 비우면 기본값
     assert Settings(_env_file=None).gemini_thinking == "low"
     assert metadata(7, "s") == {"langfuse_user_id": "user-7", "langfuse_session_id": "s", "langfuse_tags": ["chat"]}
+
+
+def events_of(response) -> list[tuple[str, dict]]:
+    """SSE 본문을 (이벤트 이름, 데이터)로"""
+    import json
+
+    out = []
+    for block in response.text.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines())
+        out.append((lines["event"], json.loads(lines["data"])))
+    return out
+
+
+def stream(client, me, message, session_id=None):
+    body = {"message": message} | ({"session_id": session_id} if session_id else {})
+    return client.post("/chat/stream", json=body, headers=me)
+
+
+async def test_stream_sends_progress_then_answer(bank):
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(agents=["account"])]
+    fake.replies = [call("get_my_accounts"), AIMessage("총자산은 1,000,000원입니다.")]
+    res = await stream(client, tony, "내 계좌 얼마 있어?")
+    assert res.headers["content-type"].startswith("text/event-stream")
+    evs = events_of(res)
+    stages = [d.get("stage") for e, d in evs if e == "status"]
+    assert next(d["label"] for e, d in evs if e == "status" and d["stage"] == "routed") == "계좌 담당에게 보낼게요"
+    assert stages == ["routing", "routed", "agent", "tool"]  # 담당 고르기 → 순서 → 담당 시작 → 도구
+    assert [d["tool"] for e, d in evs if e == "status" and d["stage"] == "tool"] == ["get_my_accounts"]
+    tokens = [d for e, d in evs if e == "token"]
+    assert "".join(t["text"] for t in tokens) == "총자산은 1,000,000원입니다." and {t["agent"] for t in tokens} == {"account"}
+    assert evs[-1][0] == "done" and evs[-1][1]["reply"] == "총자산은 1,000,000원입니다."
+    history = (await client.get(f"/chat/{evs[-1][1]['session_id']}", headers=tony)).json()["data"]
+    assert [t["role"] for t in history] == ["user", "assistant"]  # 스트리밍도 대화가 저장된다
+
+
+async def test_stream_compound_answers_in_order(bank):
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(agents=["card", "account"])]
+    fake.replies = [AIMessage("카드 한도는 100만 원이에요."), AIMessage("잔액은 100만 원이에요.")]
+    evs = events_of(await stream(client, tony, "카드 한도랑 잔액"))
+    tokens = [(d["agent"], d["text"]) for e, d in evs if e == "token"]
+    assert [a for a, _ in tokens] == sorted([a for a, _ in tokens], key=["card", "account"].index)  # 먼저 끝난 담당 답부터
+    assert "".join(t for a, t in tokens if a == "account").startswith("\n\n잔액")  # 담당이 바뀌면 빈 줄
+    assert "".join(d["text"] for e, d in evs if e == "token") == evs[-1][1]["reply"]  # 이어 붙이면 전체 답과 같다
+    routed = next(d for e, d in evs if e == "status" and d["stage"] == "routed")
+    assert routed["agents"] == ["card", "account"] and "카드 → 계좌" in routed["label"]
+
+
+async def test_stream_router_only_busy_and_error(bank):
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(reply="안녕하세요!")]
+    evs = events_of(await stream(client, tony, "안녕"))
+    assert [e for e, _ in evs] == ["status", "done"] and evs[-1][1]["reply"] == "안녕하세요!"  # 라우터 JSON은 안 샘
+
+    from avengers_bank.domains.agent import service
+
+    session_id = str(uuid.uuid4())
+    service.busy.add(service.thread_id(1, session_id))  # 같은 대화방 턴이 처리 중
+    try:
+        busy = await stream(client, tony, "또", session_id)
+        assert busy.status_code == 409 and busy.json()["error"]["code"] == "CHAT_BUSY"  # 스트림을 열기 전에 거절
+    finally:
+        service.busy.clear()
+
+    fake.fail = True
+    evs = events_of(await stream(client, tony, "내 계좌", session_id))
+    assert evs[-1] == ("error", {"code": "AI_UNAVAILABLE", "message": "AI 상담을 지금 쓸 수 없습니다. 잠시 후 다시 시도해 주세요."})
+    assert service.busy == set()  # 실패해도 잠금이 풀린다
+
+
+async def test_stream_tokens_come_in_pieces_and_preamble_is_left_out_of_done(bank):
+    """실제 Gemini처럼 글자가 조각으로 온다. 도구를 부르기 전 군말은 token으로는 보일 수 있지만 done(최종 답)에는 없다"""
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(agents=["account"])]
+    preamble = AIMessage("확인해 볼게요.", tool_calls=call("get_my_accounts").tool_calls)
+    fake.replies = [preamble, AIMessage("총자산은 1,000,000원입니다.")]
+    evs = events_of(await stream(client, tony, "내 계좌 얼마 있어?"))
+    tokens = [d["text"] for e, d in evs if e == "token"]
+    assert len(tokens) > 2 and "".join(tokens).endswith("총자산은 1,000,000원입니다.")
+    assert [d["tool"] for e, d in evs if e == "status" and d["stage"] == "tool"] == ["get_my_accounts"]
+    assert evs[-1][1]["reply"] == "총자산은 1,000,000원입니다."  # 화면은 done의 답으로 바꿔 끼운다
+
+
+async def test_stream_turn_finishes_even_if_client_disconnects(bank):
+    """연결이 끊겨도 턴은 끝까지 가서 대화가 저장되고 잠금이 풀린다 (PR #25 리뷰)"""
+    client, tony, peter, src, dst, fake = bank
+    from avengers_bank.domains.agent import service
+
+    fake.routes = [Plan(reply="안녕하세요!")]
+    fake.delay = 0.2
+    session_id = str(uuid.uuid4())
+    events = service.agent_service.open_stream(fake, 1, "token", session_id, "안녕")
+    assert "routing" in await anext(events)
+    await events.aclose()  # 사용자가 첫 진행 상태만 보고 나감
+    await asyncio.gather(*service.running)
+    assert service.busy == set()
+    history = await service.agent_service.history(1, session_id)
+    assert [(t.role, t.content) for t in history] == [("user", "안녕"), ("assistant", "안녕하세요!")]

@@ -1,6 +1,6 @@
-"""감독관 + 도메인 Agent (ADR 0006·0015).
+"""라우터 + 도메인 Agent (ADR 0006·0015·0016·0018).
 
-감독관은 턴 처음에 한 번, 처리할 담당을 순서대로 고른다(구조화된 출력, 정해진 이름만, ADR 0016).
+라우터는 턴 처음에 한 번, 처리할 담당을 순서대로 고른다(구조화된 출력, 정해진 이름만, ADR 0016).
 도메인 Agent는 자기 도구만 가진 Agent이고, 계획 순서대로 차례로 일한다(복합 요청, 최대 MAX_HOPS).
 예산 컨텍스트·코멘트 노드와 대출·예산 Agent는 그 기능을 만들 때 붙인다 (ADR 0013).
 """
@@ -31,7 +31,7 @@ TOOLS: dict[str, list[str]] = {  # ADR 0014의 MCP 도구를 도메인별로 (AD
 }
 
 COMMON = """너는 캡아메리카뱅크 앱의 AI 상담원이다. 한국어로 짧고 정확하게 답한다. 오늘은 {today}(한국)이다.
-- 네 담당 업무만 답한다. 사용자의 말에 다른 담당 업무가 섞여 있으면 언급하지 말고 그대로 둔다(감독관이 그 담당에게 맡긴다).
+- 네 담당 업무만 답한다. 사용자의 말에 다른 담당 업무가 섞여 있으면 언급하지 말고 그대로 둔다(라우터가 그 담당에게 맡긴다).
 - 숫자(잔액·금액·한도)는 도구 결과에 있는 값만 말한다. 지어내지 않는다.
 - 금액·계좌·카드가 모호하거나 빠졌으면 도구를 부르지 말고 되묻는다. 앞 대화에서 정해진 것은 다시 묻지 않는다.
 - 이체·예금 개설·카드 정지 해제는 승인 대기만 만든다. 만든 뒤 "은행 앱 승인 화면에서 PIN을 입력해 주세요"라고 안내한다.
@@ -46,10 +46,11 @@ PROMPTS = {
     "card": "너는 카드 담당이다: 카드 조회, 발급, 사용내역, 한도, 정지·분실 신고, 정지 해제 요청. "
             "카드가 여러 장이면 어느 카드인지 되묻는다.",
     "product": "너는 상품·약관 담당이다: 상품 목록과 상세, 약관·규칙 질문. 규칙 질문은 ask_bank_docs로 근거와 함께 답하고 "
-               "근거가 없으면 모른다고 한다. 투자를 권유하지 않는다.",
+               "근거가 없으면 모른다고 한다. ask_bank_docs의 답과 근거에 없는 내용(예: 신용도 영향, 법적 효과)은 덧붙이지 않는다. "
+               "투자를 권유하지 않는다.",
 }
 
-SUPERVISOR = """너는 캡아메리카뱅크 AI 상담의 감독관이다. 사용자의 마지막 말을 처리할 담당을 처리할 순서대로 고른다.
+ROUTER = """너는 캡아메리카뱅크 AI 상담의 라우터다. 사용자의 마지막 말을 처리할 담당을 처리할 순서대로 고른다.
 - account: 계좌·잔액·거래내역·이체·계좌 개설과 해지. "어디서 얼마 썼어", "이번 달 지출"처럼 쓴 돈을 묻는 질문도 account(체크카드 결제도 계좌 거래내역에 있다)
 - card: 카드 조회·발급·한도·정지·분실, 특정 카드의 사용내역을 콕 집어 물을 때
 - product: 상품 소개·금리·가입 조건, 약관·규칙 질문. 카드 상품의 혜택·연회비처럼 "어떤 상품인지"를 묻는 질문도 product(내 카드 자체를 묻는 것은 card)
@@ -58,8 +59,8 @@ SUPERVISOR = """너는 캡아메리카뱅크 AI 상담의 감독관이다. 사�
 
 
 class Plan(BaseModel):
-    """감독관의 출력: 이번 턴에 일할 담당과 순서. 정해진 이름만 고를 수 있다 (ADR 0006: 엉뚱한 Agent로 보내지 않게).
-    턴 처음에 한 번만 정한다: 담당이 끝날 때마다 감독관을 다시 부르지 않아 LLM 호출이 준다 (ADR 0016)"""
+    """라우터의 출력: 이번 턴에 일할 담당과 순서. 정해진 이름만 고를 수 있다 (ADR 0006: 엉뚱한 Agent로 보내지 않게).
+    턴 처음에 한 번만 정한다: 담당이 끝날 때마다 라우터를 다시 부르지 않아 LLM 호출이 준다 (ADR 0016)"""
 
     agents: list[AgentName] = Field(default_factory=list, description="처리할 담당, 처리 순서대로. 은행 업무가 아니면 빈 목록")
     reply: str | None = Field(default=None, description="agents가 비었을 때 사용자에게 할 짧은 답")
@@ -93,9 +94,9 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
         for name, names in TOOLS.items()
     }
 
-    async def supervisor(state: ChatState) -> Command:
+    async def router(state: ChatState) -> Command:
         # 턴 처음에 한 번만: 대화는 사람 말로 끝난다 (Gemini는 AI 메시지로 끝나는 요청을 거절한다)
-        plan = await llm.with_structured_output(Plan).ainvoke([SystemMessage(SUPERVISOR), *recent(state["messages"])])
+        plan = await llm.with_structured_output(Plan).ainvoke([SystemMessage(ROUTER), *recent(state["messages"])])
         agents_in_order = list(dict.fromkeys(plan.agents))[:MAX_HOPS]  # 같은 담당 두 번, 핑퐁 없이
         if not agents_in_order:
             return Command(goto=END, update={"messages": [AIMessage(plan.reply or "무엇을 도와드릴까요?")]})
@@ -116,8 +117,8 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
         return run
 
     graph = StateGraph(ChatState)
-    graph.add_node("supervisor", supervisor, destinations=(*TOOLS, END))
+    graph.add_node("router", router, destinations=(*TOOLS, END))
     for name in TOOLS:
         graph.add_node(name, domain(name), destinations=(*TOOLS, END))
-    graph.add_edge(START, "supervisor")
+    graph.add_edge(START, "router")
     return graph.compile(checkpointer=checkpointer)
