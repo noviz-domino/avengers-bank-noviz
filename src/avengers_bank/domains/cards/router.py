@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from avengers_bank.core.database import get_db
 from avengers_bank.core.exceptions import BadRequestException
 from avengers_bank.core.clock import today_kst
-from avengers_bank.core.dependencies import get_current_user, require_system_key
+from avengers_bank.core.dependencies import RequestedBy, get_current_user, require_system_key
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.approvals.schemas import ActionResponse
 from avengers_bank.domains.cards.schemas import (
@@ -71,9 +71,10 @@ async def suspend_card(card_id: int, data: CardSuspend, db: DB, me: Me):
 
 @router.post("/{card_id}/unsuspend", response_model=SuccessResponse[ActionResponse],
              status_code=status.HTTP_202_ACCEPTED, responses=error_responses(404, 409))
-async def request_unsuspend(card_id: int, data: UnsuspendRequest, response: Response, db: DB, me: Me):
+async def request_unsuspend(card_id: int, data: UnsuspendRequest, response: Response, db: DB, me: Me,
+                            requested_by: RequestedBy):
     """정지 해제: 승인 대기만 만든다. `POST /approvals/{action_id}/approve`(PIN)로 풀린다"""
-    action, created = await card_service.request_unsuspend(db, me.user_id, card_id, data.idempotency_key)
+    action, created = await card_service.request_unsuspend(db, me.user_id, card_id, data.idempotency_key, requested_by)
     if not created:
         response.status_code = status.HTTP_200_OK
     return SuccessResponse[ActionResponse](data=action, message="승인 화면에서 PIN을 입력하면 정지가 풀립니다.")

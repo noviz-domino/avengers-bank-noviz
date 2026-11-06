@@ -12,6 +12,7 @@ from avengers_bank.domains.approvals.router import router as approval_router
 from avengers_bank.domains.cards.router import products_router as card_product_router
 from avengers_bank.domains.cards.router import router as card_router
 from avengers_bank.domains.cards.router import system_router as card_system_router
+from avengers_bank.domains.mcp_server.server import mcp
 from avengers_bank.domains.rag.router import router as rag_router
 from avengers_bank.domains.rag.router import system_router as rag_system_router
 from avengers_bank.domains.products.router import router as product_router
@@ -22,11 +23,13 @@ from avengers_bank.domains.users.router import router as user_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        yield
+        async with mcp.session_manager.run():  # /mcp 요청을 받는 동안 MCP 세션 관리자가 돈다
+            yield
     finally:
         await engine.dispose()
 
 
+mcp_app = mcp.streamable_http_app()  # session_manager는 이걸 만들 때 생긴다 (lifespan보다 먼저)
 app = FastAPI(title="AvengersBank", lifespan=lifespan, responses=error_responses(500))
 app.add_middleware(
     CORSMiddleware,
@@ -51,3 +54,6 @@ app.include_router(rag_system_router)
 @app.get("/", response_model=SuccessResponse[dict[str, str]])
 async def get_root():
     return SuccessResponse[dict[str, str]](data={"Hello": "AvengersBank"})
+# MCP(ADR 0014): Authorization 헤더의 사용자 토큰으로 위 REST API를 부르는 도구들.
+# mount 대신 경로 하나로 붙인다: mount는 /mcp를 /mcp/로 307 리다이렉트해서 따라가지 않는 클라이언트가 실패한다
+app.add_route("/mcp", mcp_app)

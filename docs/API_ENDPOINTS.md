@@ -257,6 +257,23 @@
 - 결제 실패(신용): `409 CARD_OVERDUE` (대금을 못 낸 사용분이 있음, [ADR 0011](decisions/0011-card-bills.md))
 - 취소: 안 낸 것(`UNBILLED`·`BILLED`)은 기록만, 낸 것(체크카드, `PAID`)은 결제 계좌로 환불. 결제 계좌가 해지됐으면 **환불 대기**(`refund_pending: true`)로 두고 상담원이 다른 계좌로 보냄([ADR 0012](decisions/0012-account-close.md)). 실패: `404 CARD_TX_NOT_FOUND`, `409 CARD_TX_ALREADY_CANCELED`
 
+## mcp: AI 도구 (`domains/mcp_server`)
+
+MCP(Model Context Protocol) 서버. 도구 16개가 아래 REST API를 사용자 토큰으로 부릅니다. 결정 이유: [ADR 0014](decisions/0014-mcp-server.md), 코드 설명: [가이드 11](guides/11-mcp.md)
+
+| 상태 | 입구 | 인증 | 설명 |
+|---|---|---|---|
+| ✅ | `POST /mcp` (streamable HTTP, JSON 응답) | `Authorization: Bearer <access token>` | 우리 Agent용. 헤더의 토큰을 그대로 REST에 넘김 |
+| ✅ | `python -m avengers_bank.domains.mcp_server` (stdio) | refresh token 파일 (`login` 명령) | Claude Desktop·Claude Code용 |
+
+- 도구: 계좌 `get_my_accounts` `get_account` `search_transactions` `request_transfer` `open_account` `request_deposit` `close_account` / 카드 `get_my_cards` `issue_card` `search_card_transactions` `get_card_limit` `suspend_card` `request_unsuspend_card` / 상품 `search_products` `get_product_detail` `ask_bank_docs`
+- 없는 것: 승인·PIN, 카드 결제, `/system/*`, 대출
+- 실패하면 REST의 오류를 `코드: 메시지`로 돌려줍니다(예: `CARD_NOT_FOUND: 카드를 찾을 수 없습니다.`).
+
+### 요청한 곳 (`X-Requested-By`)
+
+승인 대기를 만드는 API(`POST /transfers`, `POST /accounts/deposits`, `POST /cards/{id}/unsuspend`)는 `X-Requested-By: WEB | AGENT | MCP` 헤더를 받아 `requested_by`에 남깁니다(없으면 `WEB`). 승인 화면이 "AI가 만든 요청"이라고 보여 주는 **정보용**이고, 보안은 PIN 승인이 맡습니다.
+
 ## rag: 상품·약관 질문 (`domains/rag`)
 
 상품 DB와 데모 약관을 근거로 답합니다. Gemini 키(`GEMINI_API_KEY`)가 없으면 `503 AI_DISABLED`, Gemini가 실패하면(한도 초과·시간 초과 등) `503 AI_UNAVAILABLE`, 답이 형식에 안 맞으면 `503 AI_BAD_RESPONSE`. 사용자당 1분에 10번(검색·답변 합쳐), 넘으면 `429 AI_RATE_LIMITED`. 결정 이유: [ADR 0013](decisions/0013-agent-rag-plan.md), 코드 설명: [가이드 10](guides/10-rag.md)
