@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 TURN_TIMEOUT = 90.0  # LLM 여러 번 + 도구. 넘으면 503 (요청을 끝없이 붙잡지 않게)
 # shortcut: 서버 한 프로세스 안에서만 막는다. 여러 대가 되면 DB advisory lock으로 바꾼다
 busy: set[str] = set()
+running: set[asyncio.Task] = set()  # 스트리밍 턴 작업 (참조를 잡아 두지 않으면 도중에 사라질 수 있다)
 
 
 def thread_id(user_id: int, session_id: str) -> str:
@@ -67,6 +68,12 @@ def first_turn(message: str) -> dict:
     return {"messages": [HumanMessage(message)], "plan": [], "routed": []}
 
 
+async def read(queue: asyncio.Queue) -> AsyncIterator[str]:
+    """턴 작업이 쌓은 이벤트를 끝(None)까지 보낸다. 연결이 끊기면 여기서 멈출 뿐 턴은 계속 간다"""
+    while (item := await queue.get()) is not None:
+        yield item
+
+
 class AgentService:
     async def chat(self, llm: BaseChatModel, user_id: int, token: str, session_id: str, message: str,
                    callbacks: list | None = None) -> ChatResponse:
@@ -95,30 +102,37 @@ class AgentService:
 
     def open_stream(self, llm: BaseChatModel, user_id: int, token: str, session_id: str, message: str,
                     callbacks: list | None = None) -> AsyncIterator[str]:
-        """스트리밍 한 턴 (ADR 0018). 같은 대화방 잠금은 스트림을 열기 전에 잡아서, 처리 중이면 스트림 대신 409가 나간다"""
+        """스트리밍 한 턴 (ADR 0018). 같은 대화방 잠금은 스트림을 열기 전에 잡아서, 처리 중이면 스트림 대신 409가 나간다.
+        턴은 따로 작업으로 끝까지 돌고 스트림은 쌓인 이벤트를 읽기만 한다: 사용자가 연결을 끊어도 턴은 /chat처럼 끝까지 가서
+        대화가 저장된다(승인 대기만 만들고 기록이 빠지면 다시 요청해 승인 대기가 두 개 생길 수 있다. PR #25 리뷰)"""
         thread = thread_id(user_id, session_id)
         take(thread)
         callbacks = [*tracing.handlers(), *(callbacks or [])]
-        return self._stream(llm, thread, session_id, prepare(token, thread, callbacks, tracing.metadata(user_id, session_id)),
-                            message)
+        config = prepare(token, thread, callbacks, tracing.metadata(user_id, session_id))
+        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        task = asyncio.create_task(self._run(llm, thread, session_id, config, message, queue.put_nowait))  # 토큰 등 ContextVar를 물려받는다
+        running.add(task)
+        task.add_done_callback(running.discard)
+        return read(queue)
 
-    async def _stream(self, llm, thread: str, session_id: str, config: dict, message: str) -> AsyncIterator[str]:
+    async def _run(self, llm, thread: str, session_id: str, config: dict, message: str, put) -> None:
         try:
-            yield sse("status", {"stage": "routing", "label": "담당을 고르고 있어요"})
+            put(sse("status", {"stage": "routing", "label": "담당을 고르고 있어요"}))
             translate = EventTranslator()
             async with asyncio.timeout(TURN_TIMEOUT):
                 async with create_connected_server_and_client_session(mcp) as session:
                     graph = build(llm, await load_mcp_tools(session), checkpoint.saver)
                     async for ev in graph.astream_events(first_turn(message), config, version="v2"):
                         for out in translate(ev):
-                            yield out
+                            put(out)
                     state = (await graph.aget_state(config)).values
-            yield sse("done", {"session_id": session_id, "reply": final_reply(state["messages"]), "routed": state["routed"]})
+            put(sse("done", {"session_id": session_id, "reply": final_reply(state["messages"]), "routed": state["routed"]}))
         except Exception:  # 스트림은 이미 200으로 시작해서 오류도 이벤트로 알린다
             logger.exception("agent stream failed: thread=%s", thread)
-            yield sse("error", {"code": "AI_UNAVAILABLE", "message": "AI 상담을 지금 쓸 수 없습니다. 잠시 후 다시 시도해 주세요."})
-        finally:  # 끝까지 갔든, 실패했든, 사용자가 연결을 끊었든
+            put(sse("error", {"code": "AI_UNAVAILABLE", "message": "AI 상담을 지금 쓸 수 없습니다. 잠시 후 다시 시도해 주세요."}))
+        finally:  # 끝까지 갔든, 실패했든, 서버가 꺼지며 취소됐든
             busy.discard(thread)
+            put(None)
 
     async def history(self, user_id: int, session_id: str) -> list[ChatTurn]:
         """사람 말과 AI의 최종 답만 (도구 호출·결과는 빼고)"""
