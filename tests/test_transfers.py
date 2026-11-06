@@ -30,7 +30,7 @@ async def user(client, login_id: str, name: str, pin: str | None = PIN) -> dict:
     return headers
 
 
-async def open_account(client, headers, name="어벤져스 입출금통장", balance=0, **body) -> dict:
+async def open_account(client, headers, name="캡아메리카 입출금통장", balance=0, **body) -> dict:
     async with SessionLocal() as db:
         pid = await db.scalar(select(AccountProduct.product_id).where(AccountProduct.name == name))
     account = (await client.post("/accounts", json={"product_id": pid, **body}, headers=headers)).json()["data"]

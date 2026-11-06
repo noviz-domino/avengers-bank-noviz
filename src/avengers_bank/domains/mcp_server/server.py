@@ -1,4 +1,4 @@
-"""AvengersBank MCP 서버 (ADR 0004·0006·0014). 도구는 모두 REST API를 사용자 토큰으로 부르는 얇은 어댑터다.
+"""캡아메리카뱅크 MCP 서버 (ADR 0004·0006·0014). 도구는 모두 REST API를 사용자 토큰으로 부르는 얇은 어댑터다.
 
 넣지 않는 것: 승인·PIN API(사람만 승인), 카드 결제(가맹점 시뮬레이터, ADR 0010), /system/*(서버 키).
 돈이 움직이는 도구는 승인 대기만 만든다. 실제 실행은 사용자가 승인 화면에서 PIN을 넣어야 한다.
@@ -18,7 +18,7 @@ from pydantic import Field
 from avengers_bank.domains.accounts.schemas import Category
 from avengers_bank.domains.mcp_server.api import call
 
-INSTRUCTIONS = """어벤져스은행 고객의 계좌·카드·상품 업무를 돕는 도구입니다.
+INSTRUCTIONS = """캡아메리카뱅크 고객의 계좌·카드·상품 업무를 돕는 도구입니다.
 - 이체·예금 개설·카드 정지 해제는 승인 대기만 만듭니다. 사용자에게 "은행 앱 승인 화면에서 PIN을 입력해 주세요"라고 안내하세요.
 - 같은 요청을 이미 만들었으면 다시 부르지 마세요. 승인 대기가 하나 더 생기면 사용자가 두 번 승인할 수 있습니다.
 - 바로 실행되는 도구(open_account, issue_card, close_account, suspend_card)는 무엇을 할지 말하고 사용자가 확인한 뒤에만 부르세요. 분실 신고(lost=true)는 되돌릴 수 없습니다.

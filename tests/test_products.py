@@ -31,7 +31,7 @@ async def test_list_filters_by_type(seeded):
     response = await seeded.get("/products/accounts", params={"type": "SAVINGS"})
     assert response.status_code == 200
     names = [p["name"] for p in response.json()["data"]]
-    assert names == ["스타크 자유적금", "주니어 어벤져스 적금"]
+    assert names == ["스타크 자유적금", "주니어 캡아메리카 적금"]
 
     response = await seeded.get("/products/accounts", params={"type": "CARD"})
     assert response.status_code == 422

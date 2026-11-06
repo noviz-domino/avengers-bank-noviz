@@ -1,4 +1,4 @@
-# AvengersBank (개인 구현 레포)
+# 캡아메리카뱅크 (개인 구현 레포, 코드 이름 avengers_bank)
 
 팀 공통 뼈대(jjh7757/avengers-bank)에서 시작해 각자 구현하는 레포다. 구조와 실행 방법은 [README.md](README.md)와 [docs/](docs/README.md)를 본다.
 
