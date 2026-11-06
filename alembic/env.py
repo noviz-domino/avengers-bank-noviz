@@ -25,17 +25,22 @@ if config.config_file_name and config.attributes.get("configure_logging", True):
 target_metadata = Base.metadata
 
 
+def include_object(obj, name, type_, reflected, compare_to):
+    """LangGraph 체크포인터 테이블(checkpoint*)은 LangGraph가 만들고 관리한다 (ADR 0015). alembic check가 지우라고 하지 않게"""
+    return not (type_ == "table" and reflected and name.startswith("checkpoint"))
+
+
 def run_migrations_offline():
     context.configure(
         url=config.get_main_option("sqlalchemy.url"), target_metadata=target_metadata,
-        literal_binds=True, dialect_opts={"paramstyle": "named"},
+        literal_binds=True, dialect_opts={"paramstyle": "named"}, include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(connection=connection, target_metadata=target_metadata, include_object=include_object)
     with context.begin_transaction():
         context.run_migrations()
 

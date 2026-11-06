@@ -9,6 +9,7 @@ import json
 import os
 import time
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 import httpx
@@ -95,6 +96,10 @@ class TokenFile:
 
 # 로컬 stdio로 띄우면 __main__이 채운다. 비어 있으면 HTTP 모드(요청 헤더의 토큰)
 token_file: TokenFile | None = None
+# 우리 Agent가 메모리 연결로 부를 때: 채팅 요청마다 그 사용자의 토큰과 "AGENT"를 넣는다.
+# ContextVar라서 동시에 들어온 다른 사용자의 요청과 섞이지 않는다 (ADR 0015)
+agent_token: ContextVar[str | None] = ContextVar("agent_token", default=None)
+requester: ContextVar[str] = ContextVar("requester", default="MCP")
 API_URL = os.environ.get("AVENGERS_API_URL", "http://localhost:8000")
 
 
@@ -107,6 +112,8 @@ def client() -> httpx.AsyncClient:
 
 
 async def token_for(ctx: Context, c: httpx.AsyncClient) -> str:
+    if (token := agent_token.get()) is not None:
+        return token
     if token_file is not None:
         return await token_file.token(c)
     request = getattr(ctx.request_context, "request", None)
@@ -117,7 +124,7 @@ async def token_for(ctx: Context, c: httpx.AsyncClient) -> str:
 
 
 async def send(ctx: Context, c: httpx.AsyncClient, method: str, path: str, body, params) -> httpx.Response:
-    headers = {"Authorization": f"Bearer {await token_for(ctx, c)}", "X-Requested-By": "MCP"}  # 승인 화면에 "AI가 만든 요청"
+    headers = {"Authorization": f"Bearer {await token_for(ctx, c)}", "X-Requested-By": requester.get()}  # 승인 화면에 "AI가 만든 요청"
     return await c.request(method, path, json=body, params=params, headers=headers)
 
 

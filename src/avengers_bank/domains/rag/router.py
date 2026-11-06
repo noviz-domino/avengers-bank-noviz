@@ -27,14 +27,18 @@ LIMIT, WINDOW = 10, 60.0  # 사용자당 1분에 10번: 한 사람이 무료 한
 calls: dict[int, deque[float]] = defaultdict(deque)
 
 
-def limit_ai_calls(me: Me) -> None:
+def spend_ai_calls(user_id: int, cost: int) -> None:
     """shortcut: 서버 메모리에 기록한다(서버 한 대 기준). 여러 대가 되면 Redis 같은 공용 저장소로"""
-    now, recent = time.monotonic(), calls[me.user_id]
+    now, recent = time.monotonic(), calls[user_id]
     while recent and now - recent[0] > WINDOW:
         recent.popleft()
-    if len(recent) >= LIMIT:
+    if len(recent) + cost > LIMIT:
         raise ApiException(status_code=429, code="AI_RATE_LIMITED", message="잠시 후 다시 물어봐 주세요(1분에 10번까지).")
-    recent.append(now)
+    recent.extend([now] * cost)
+
+
+def limit_ai_calls(me: Me) -> None:
+    spend_ai_calls(me.user_id, 1)
 
 
 Limited = Annotated[None, Depends(limit_ai_calls)]

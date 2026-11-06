@@ -1,6 +1,6 @@
 # 0006. Agent 구조: 감독관(supervisor)과 도메인별 Agent
 
-- 상태: 제안 (이 PR에서 리뷰)
+- 상태: 채택, 일부 구현 (→ [0015](0015-agent-chat.md): 감독관 + 계좌·카드·상품 Agent 구현. 예산 노드·대출·예산 Agent·Langfuse는 이후)
 - 날짜: 2026-11-04
 - 관련 PR: #5
 - 관련: [ADR 0004](0004-agent-integration.md) Agent 연결 구조, [ADR 0007](0007-money-execution-and-budget-guard.md) 돈 실행 지점과 예산 가드
