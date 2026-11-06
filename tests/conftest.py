@@ -3,6 +3,7 @@ import os
 # 앱을 import하기 전에 테스트용 설정을 넣는다 (SQLite 파일 DB).
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-test-secret-key-0000"
+os.environ["SYSTEM_API_KEY"] = "test-system-key-test-system-key-0000"
 
 import pytest
 from httpx import ASGITransport, AsyncClient

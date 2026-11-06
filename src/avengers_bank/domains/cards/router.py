@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Response, status
@@ -5,10 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
-from avengers_bank.core.dependencies import get_current_user
+from avengers_bank.core.clock import today_kst
+from avengers_bank.core.dependencies import get_current_user, require_system_key
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.approvals.schemas import ActionResponse
 from avengers_bank.domains.cards.schemas import (
+    CardBillRunResponse,
     CardIssue,
     CardLimitsResponse,
     CardPayment,
@@ -22,6 +25,9 @@ from avengers_bank.domains.users.schemas import UserResponse
 
 router = APIRouter(prefix="/cards", tags=["cards"], responses=error_responses(401, 422))
 products_router = APIRouter(prefix="/products", tags=["products"], responses=error_responses(422))
+# 사용자 토큰이 아니라 서버 키(X-System-Key)로만 부르는 시스템 작업 (ADR 0011)
+system_router = APIRouter(prefix="/system", tags=["system"], dependencies=[Depends(require_system_key)],
+                          responses=error_responses(403, 422))
 
 DB = Annotated[AsyncSession, Depends(get_db)]
 Me = Annotated[UserResponse, Depends(get_current_user)]
@@ -99,3 +105,10 @@ async def cancel_card_transaction(card_id: int, card_tx_id: int, db: DB, me: Me)
 @router.get("/{card_id}/limits", response_model=SuccessResponse[CardLimitsResponse], responses=error_responses(404))
 async def card_limits(card_id: int, db: DB, me: Me):
     return SuccessResponse[CardLimitsResponse](data=await card_service.limits(db, me.user_id, card_id))
+
+
+@system_router.post("/card-bills/run", response_model=SuccessResponse[CardBillRunResponse])
+async def run_card_bills(db: DB, run_date: date | None = None):
+    """신용카드 대금 출금. 매일 한 번 부른다(cron 등). 날짜를 비우면 오늘(한국). 같은 날짜로 다시 불러도 한 번만 출금"""
+    result = await card_service.run_bills(db, run_date or today_kst())
+    return SuccessResponse[CardBillRunResponse](data=result, message="카드 대금 출금을 실행했습니다.")

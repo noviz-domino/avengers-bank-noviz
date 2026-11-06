@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.domains.cards.models import Card, CardProduct, CardTransaction
@@ -58,6 +58,33 @@ class CardRepository:
         return await db.scalar(select(func.coalesce(func.sum(CardTransaction.amount), 0)).where(
             CardTransaction.card_id == card_id, CardTransaction.status == "APPROVED",
             CardTransaction.billing_status != "PAID"))
+
+    async def has_overdue(self, db: AsyncSession, card_id: int) -> bool:
+        """청구됐는데 못 낸(BILLED) 사용분이 있나. 출금되면 같은 트랜잭션에서 PAID가 돼서 BILLED는 연체뿐이다"""
+        return await db.scalar(select(func.count()).where(
+            CardTransaction.card_id == card_id, CardTransaction.status == "APPROVED",
+            CardTransaction.billing_status == "BILLED")) > 0
+
+    async def cards_to_bill(self, db: AsyncSession, day: int) -> list[int]:
+        """오늘이 결제일인 신용카드 + 연체가 있는 카드 (정지·분실 카드도 빚은 남아서 포함)"""
+        overdue = select(CardTransaction.card_id).where(
+            CardTransaction.status == "APPROVED", CardTransaction.billing_status == "BILLED")
+        return list(await db.scalars(select(Card.card_id).where(
+            Card.card_type == "CREDIT", or_(Card.payment_day == day, Card.card_id.in_(overdue))
+        ).order_by(Card.card_id)))
+
+    async def bill(self, db: AsyncSession, card_id: int, before: datetime) -> None:
+        """결제일 0시 전에 쓴 UNBILLED를 BILLED로"""
+        await db.execute(update(CardTransaction).where(
+            CardTransaction.card_id == card_id, CardTransaction.status == "APPROVED",
+            CardTransaction.billing_status == "UNBILLED", CardTransaction.approved_at < before,
+        ).values(billing_status="BILLED"))
+
+    async def find_billed(self, db: AsyncSession, card_id: int) -> list[CardTransaction]:
+        return list(await db.scalars(select(CardTransaction).where(
+            CardTransaction.card_id == card_id, CardTransaction.status == "APPROVED",
+            CardTransaction.billing_status == "BILLED",
+        ).execution_options(populate_existing=True)))
 
 
 card_repository = CardRepository()

@@ -1,6 +1,6 @@
 """카드 발급·조회·정지·해제 (ADR 0009), 결제·취소·사용내역·한도 (ADR 0010). 체크카드 출금은 실행 함수(ADR 0007)를 거친다"""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,13 @@ from avengers_bank.domains.approvals.repository import approval_repository
 from avengers_bank.domains.cards.card_number import make_card_num, mask, prefix
 from avengers_bank.domains.cards.models import Card, CardProduct, CardTransaction
 from avengers_bank.domains.cards.repository import card_repository
-from avengers_bank.domains.cards.schemas import CardIssue, CardLimitsResponse, CardPayment, CardResponse
+from avengers_bank.domains.cards.schemas import (
+    CardBillRunResponse,
+    CardIssue,
+    CardLimitsResponse,
+    CardPayment,
+    CardResponse,
+)
 
 # 기본 한도. 올리는 것은 보안을 약하게 해서 승인 기능과 함께 만든다 (ADR 0009)
 DEBIT_DAILY_LIMIT = 1_000_000
@@ -181,6 +187,8 @@ class CardService:
                 category=category, amount=data.amount, status="APPROVED",
             )
             if card.card_type == "CREDIT":
+                if await card_repository.has_overdue(db, card_id):
+                    raise ConflictException(message="밀린 카드 대금이 있어 결제할 수 없습니다.", code="CARD_OVERDUE")
                 unpaid = await card_repository.unpaid_credit(db, card_id)
                 if unpaid + data.amount > card.credit_limit:
                     left = max(card.credit_limit - unpaid, 0)
@@ -201,7 +209,8 @@ class CardService:
             return tx, True
 
     async def cancel(self, db: AsyncSession, user_id: int, card_id: int, card_tx_id: int) -> CardTransaction:
-        """전액 취소. 체크카드는 결제 계좌로 환불(REFUND), 신용카드는 사용 기록만 취소. 정지·분실 카드도 취소는 된다"""
+        """전액 취소. 이미 돈이 나간 것(체크카드, 대금을 낸 신용카드)은 결제 계좌로 환불(REFUND),
+        아직 안 나간 것(UNBILLED·BILLED 신용카드)은 기록만 취소. 정지·분실 카드도 취소는 된다"""
         async with db.begin():
             card = await self._my_card(db, user_id, card_id, lock=True)
             tx = await db.get(CardTransaction, card_tx_id, populate_existing=True)
@@ -209,10 +218,7 @@ class CardService:
                 raise tx_not_found()
             if tx.status == "CANCELED":
                 raise ConflictException(message="이미 취소된 결제입니다.", code="CARD_TX_ALREADY_CANCELED")
-            # shortcut: 청구된 뒤의 취소(다음 대금에서 빼기)는 대금 출금 PR에서 만든다
-            if tx.billing_status not in (None, "UNBILLED"):
-                raise ConflictException(message="청구된 결제는 아직 취소할 수 없습니다.", code="CARD_TX_ALREADY_BILLED")
-            if tx.account_tx_id is not None:
+            if tx.account_tx_id is not None or tx.billing_status == "PAID":
                 try:
                     refund = await execute_card_ledger(  # 쓴 업종 그대로: 예산에서 그 업종 지출이 줄어든다
                         db, owner_user_id=user_id, account_id=card.linked_account_id, tx_type="REFUND",
@@ -238,6 +244,35 @@ class CardService:
             credit_limit=card.credit_limit,
             credit_used=await card_repository.unpaid_credit(db, card_id) if card.card_type == "CREDIT" else None,
         )
+
+    async def run_bills(self, db: AsyncSession, run_date: date) -> CardBillRunResponse:
+        """신용카드 대금 출금 (ADR 0011). 카드마다 트랜잭션 하나: 한 카드가 실패해도 다른 카드는 진행된다.
+        결제일이면 전날까지 쓴 UNBILLED를 BILLED로 묶고, BILLED 합계를 전액 출금해 PAID로. 못 내면 BILLED(연체)로 남는다"""
+        cutoff = kst_midnight_utc(run_date)
+        paid = overdue = total = 0
+        async with db.begin():  # 목록만 읽고 닫는다: 카드마다 새 트랜잭션을 연다
+            card_ids = await card_repository.cards_to_bill(db, run_date.day)
+        for card_id in card_ids:
+            async with db.begin():
+                card, product_name = await card_repository.find_by_id(db, card_id, lock=True)
+                if card.payment_day == run_date.day:
+                    await card_repository.bill(db, card_id, cutoff)
+                billed = await card_repository.find_billed(db, card_id)
+                amount = sum(t.amount for t in billed)
+                if amount == 0:
+                    continue
+                try:
+                    ledger = await execute_card_ledger(
+                        db, owner_user_id=card.user_id, account_id=card.linked_account_id, tx_type="CARD_BILL",
+                        amount=-amount, merchant_name=f"{product_name} 대금", category=classify("CARD_BILL", None),
+                    )
+                except TransferRejected:
+                    overdue += 1  # BILLED로 커밋되고 다음 실행 때 다시 시도. 그동안 결제는 CARD_OVERDUE
+                    continue
+                for t in billed:
+                    t.billing_status, t.bill_tx_id = "PAID", ledger.tx_id
+                paid, total = paid + 1, total + amount
+        return CardBillRunResponse(run_date=run_date, paid_cards=paid, overdue_cards=overdue, total_paid=total)
 
 
 card_service = CardService()

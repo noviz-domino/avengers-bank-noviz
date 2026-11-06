@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -76,3 +76,12 @@ class CardLimitsResponse(BaseModel):
     daily_used: int  # 오늘(한국 날짜) 쓴 금액, 취소 제외
     credit_limit: int | None
     credit_used: int | None  # 신용만: 안 갚은 사용액
+
+
+class CardBillRunResponse(BaseModel):
+    """POST /system/card-bills/run 결과. 같은 날짜로 다시 부르면 이미 낸 것은 건너뛴다"""
+
+    run_date: date
+    paid_cards: int  # 대금을 출금한 카드 수
+    overdue_cards: int  # 잔액 부족 등으로 못 낸 카드 수 (BILLED로 남음)
+    total_paid: int
