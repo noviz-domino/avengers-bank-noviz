@@ -193,3 +193,31 @@ def test_measurement_helpers():
                                "p50": 2.0, "p95": 2.0}
     names = {"account", "card", "product"}
     assert all(set(route) <= names for item in load_routing() for alt in item["expected"] for route in [alt])
+
+
+async def test_plan_resets_every_turn(bank):
+    # 같은 대화방에서 복합 요청 뒤 단일 요청·후속 답("응")이 와도 앞 턴의 계획이 남지 않는다 (PR #22 리뷰)
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(agents=["card", "account"]), Plan(agents=["account"]), Plan(agents=["account"])]
+    fake.replies = [AIMessage("카드 한도예요."), AIMessage("잔액이에요."), AIMessage("어느 계좌에서 보낼까요?"),
+                    AIMessage("생활비 통장에서 보낼게요.")]
+    first = (await chat(client, tony, "카드 한도랑 잔액")).json()["data"]
+    second = (await chat(client, tony, "토니한테 보내줘", first["session_id"])).json()["data"]
+    third = (await chat(client, tony, "응, 생활비 통장", first["session_id"])).json()["data"]
+    assert [first["routed"], second["routed"], third["routed"]] == [["card", "account"], ["account"], ["account"]]
+    assert third["reply"] == "생활비 통장에서 보낼게요."  # 이번 턴 답만
+
+
+def test_thinking_setting_and_trace_metadata(monkeypatch):
+    from pydantic import ValidationError
+
+    from avengers_bank.core.config import Settings
+    from avengers_bank.domains.agent.tracing import metadata
+
+    for bad in ("minimal", "LOW"):  # 3.8 Flash가 지원하지 않거나 틀린 값은 서버가 뜰 때 바로 알린다
+        monkeypatch.setenv("GEMINI_THINKING", bad)
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None)
+    monkeypatch.setenv("GEMINI_THINKING", "")  # 비우면 기본값
+    assert Settings(_env_file=None).gemini_thinking == "low"
+    assert metadata(7, "s") == {"langfuse_user_id": "user-7", "langfuse_session_id": "s", "langfuse_tags": ["chat"]}

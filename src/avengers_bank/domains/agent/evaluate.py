@@ -19,6 +19,7 @@ import httpx
 from avengers_bank.domains.agent.llm import gemini_chat
 from avengers_bank.domains.agent.service import agent_service
 from avengers_bank.domains.agent.tracing import CallCounter
+from avengers_bank.seed import DEMO_LOGIN_ID, DEMO_PASSWORD
 
 ROUTING = Path(__file__).parent / "routing.jsonl"
 
@@ -69,8 +70,10 @@ def main() -> None:
     parser.add_argument("--pause", type=float, default=6.0)
     parser.add_argument("--api", default="http://localhost:8000")
     args = parser.parse_args()
-    login = httpx.post(f"{args.api}/users/login", json={"login_id": "demo", "password": "demo-password-1234"}).json()
-    token = login["data"]["access_token"]
+    login = httpx.post(f"{args.api}/users/login", json={"login_id": DEMO_LOGIN_ID, "password": DEMO_PASSWORD})
+    if login.is_error:
+        raise SystemExit(f"데모 계정 로그인 실패({login.status_code}). 서버를 띄우고 seed가 들어갔는지 확인하세요.")
+    token = login.json()["data"]["access_token"]
     me = httpx.get(f"{args.api}/users/me", headers={"Authorization": f"Bearer {token}"}).json()["data"]
     rows = asyncio.run(run(token, me["user_id"], args.pause))
     print(json.dumps({"label": args.label, **summarize(rows)}, ensure_ascii=False))

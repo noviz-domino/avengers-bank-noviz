@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
         async with mcp.session_manager.run(), postgres_saver():
             yield
     finally:
-        tracing.flush()  # 남은 Langfuse 추적을 보내고 끈다
+        await tracing.flush()  # 남은 Langfuse 추적을 보낸다 (최대 5초, 실패해도 아래 정리는 한다)
         await engine.dispose()
 
 
