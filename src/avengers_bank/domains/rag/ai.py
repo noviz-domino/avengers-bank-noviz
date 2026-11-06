@@ -32,9 +32,9 @@ def unavailable(message: str, code: str = "AI_UNAVAILABLE") -> ApiException:
 
 
 class GeminiAI:
-    def __init__(self, api_key: str, model: str, embedding_model: str):
+    def __init__(self, api_key: str, model: str, embedding_model: str, thinking: str = "low"):
         self.client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_MS))
-        self.model, self.model_name = model, embedding_model
+        self.model, self.model_name, self.thinking = model, embedding_model, thinking
         self.embedding_model = f"{embedding_model}/{EMBED_DIM}/{EMBED_FORMAT}"
 
     async def embed(self, texts: list[str], *, query: bool, titles: list[str] | None = None) -> list[list[float]]:
@@ -65,7 +65,8 @@ class GeminiAI:
             res = await self.client.aio.models.generate_content(
                 model=self.model, contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0, response_mime_type="application/json", response_schema=schema
+                    temperature=0, response_mime_type="application/json", response_schema=schema,
+                    thinking_config=types.ThinkingConfig(thinking_level=self.thinking),  # Agent와 같은 수준 (ADR 0016)
                 ),
             )
             return schema.model_validate_json(res.text or "")
@@ -80,7 +81,7 @@ def gemini() -> GeminiAI | None:
     s = get_settings()
     if s.gemini_api_key is None:
         return None
-    return GeminiAI(s.gemini_api_key.get_secret_value(), s.gemini_model, s.gemini_embedding_model)
+    return GeminiAI(s.gemini_api_key.get_secret_value(), s.gemini_model, s.gemini_embedding_model, s.gemini_thinking)
 
 
 def get_ai() -> AI:

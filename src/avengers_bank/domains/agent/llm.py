@@ -16,7 +16,7 @@ def gemini_chat() -> BaseChatModel | None:
         return None
     return ChatGoogleGenerativeAI(
         model=s.gemini_model, google_api_key=s.gemini_api_key.get_secret_value(),
-        temperature=0, timeout=60, max_retries=2,
+        temperature=0, timeout=60, max_retries=2, reasoning_effort=s.gemini_thinking,
     )
 
 

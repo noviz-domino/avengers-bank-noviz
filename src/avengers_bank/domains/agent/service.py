@@ -10,7 +10,7 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from avengers_bank.core.exceptions import ApiException, ConflictException
-from avengers_bank.domains.agent import checkpoint
+from avengers_bank.domains.agent import checkpoint, tracing
 from avengers_bank.domains.agent.graph import MAX_HOPS, build
 from avengers_bank.domains.agent.schemas import ChatResponse, ChatTurn
 from avengers_bank.domains.mcp_server import api as mcp_api
@@ -48,26 +48,30 @@ def final_reply(messages: list) -> str:
 
 
 class AgentService:
-    async def chat(self, llm: BaseChatModel, user_id: int, token: str, session_id: str, message: str) -> ChatResponse:
+    async def chat(self, llm: BaseChatModel, user_id: int, token: str, session_id: str, message: str,
+                   callbacks: list | None = None) -> ChatResponse:
         thread = thread_id(user_id, session_id)
         # 같은 대화방에 동시에 두 턴이 오면 같은 저장 지점에서 갈라져 한쪽 메시지가 덮어써진다 (PR #21 리뷰)
         if thread in busy:
             raise ConflictException(message="이전 메시지를 처리하고 있습니다. 답을 받은 뒤 다시 보내 주세요.", code="CHAT_BUSY")
         busy.add(thread)
         try:
-            return await self._turn(llm, thread, session_id, token, message)
+            callbacks = [*tracing.handlers(), *(callbacks or [])]
+            return await self._turn(llm, thread, session_id, token, message, callbacks, tracing.metadata(user_id, session_id))
         finally:
             busy.discard(thread)
 
-    async def _turn(self, llm, thread: str, session_id: str, token: str, message: str) -> ChatResponse:
+    async def _turn(self, llm, thread: str, session_id: str, token: str, message: str, callbacks: list,
+                    metadata: dict) -> ChatResponse:
         mcp_api.agent_token.set(token)  # 이 요청(태스크) 안에서만 보이는 값. 아래 MCP 서버 태스크가 물려받는다
         mcp_api.requester.set("AGENT")  # 승인 대기에 "AI 상담이 만든 요청"으로 남는다
-        config = {"configurable": {"thread_id": thread}, "recursion_limit": 10 + MAX_HOPS * 10}
+        config = {"configurable": {"thread_id": thread}, "recursion_limit": 10 + MAX_HOPS * 10,
+                  "callbacks": callbacks, "metadata": metadata, "run_name": "chat"}
         try:
             async with asyncio.timeout(TURN_TIMEOUT):
                 async with create_connected_server_and_client_session(mcp) as session:
                     graph = build(llm, await load_mcp_tools(session), checkpoint.saver)
-                    state = await graph.ainvoke({"messages": [HumanMessage(message)], "hops": 0, "routed": []}, config)
+                    state = await graph.ainvoke({"messages": [HumanMessage(message)], "plan": [], "routed": []}, config)
         except ApiException:
             raise
         except Exception:  # LLM(외부 서비스) 실패·시간 초과·형식 오류. 원인은 로그로 (버그도 여기로 오니 로그를 본다)

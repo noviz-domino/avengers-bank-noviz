@@ -7,6 +7,7 @@ from avengers_bank.core.database import engine
 from avengers_bank.core.exception_handlers import register_exception_handlers
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.accounts.router import router as account_router
+from avengers_bank.domains.agent import tracing
 from avengers_bank.domains.agent.checkpoint import postgres_saver
 from avengers_bank.domains.agent.router import router as chat_router
 from avengers_bank.domains.accounts.router import tx_router as transaction_router
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI):
         async with mcp.session_manager.run(), postgres_saver():
             yield
     finally:
+        await tracing.flush()  # 남은 Langfuse 추적을 보낸다 (최대 5초, 실패해도 아래 정리는 한다)
         await engine.dispose()
 
 

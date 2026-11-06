@@ -55,7 +55,7 @@ avengers-bank/
         ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
         ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성
         ├── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소·대금 출금(/system)
-        ├── agent/          # AI 상담: 감독관 + 계좌·카드·상품 Agent(graph.py), 채팅 API, 체크포인터 ✅
+        ├── agent/          # AI 상담: 감독관 + 계좌·카드·상품 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl) ✅
         ├── mcp_server/     # MCP 도구 16개(REST를 사용자 토큰으로), HTTP /mcp + 로컬 stdio(login, 토큰 파일) ✅
         └── rag/            # 상품·약관 RAG: 데모 약관(docs/*.md), 청킹, Gemini 연결(ai.py), 하이브리드 검색, 평가(golden.jsonl) ✅
 ```

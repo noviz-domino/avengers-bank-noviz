@@ -1,0 +1,14 @@
+{"q": "내 계좌 잔액 알려줘", "expected": [["account"]]}
+{"q": "이번 달에 편의점에서 얼마 썼어?", "expected": [["account"]]}
+{"q": "이번 달 들어온 돈이 얼마야?", "expected": [["account"]]}
+{"q": "생활비 통장 상세 보여줘", "expected": [["account"]]}
+{"q": "내 카드 목록 보여줘", "expected": [["card"]]}
+{"q": "체크카드 한도 얼마 남았어?", "expected": [["card"]]}
+{"q": "카드 사용내역 보여줘", "expected": [["card"]]}
+{"q": "적금 상품 뭐 있어?", "expected": [["product"]]}
+{"q": "카드 대금 못 내면 어떻게 돼?", "expected": [["product"]]}
+{"q": "이체 한도가 얼마야?", "expected": [["product"], ["account"]]}
+{"q": "스타크 신용카드 혜택이 뭐야?", "expected": [["product"]]}
+{"q": "카드 한도랑 내 잔액 알려줘", "expected": [["card", "account"], ["account", "card"]]}
+{"q": "안녕", "expected": [[]]}
+{"q": "고마워!", "expected": [[]]}

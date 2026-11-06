@@ -21,6 +21,7 @@
 | [0013](0013-agent-rag-plan.md) | Agent·RAG 구현 계획: Gemini 무료 티어(3.8 Flash, embedding-2), 우리 문서 + 상품 DB, RAG → MCP → Agent | 채택 | 2026-11-06 |
 | [0014](0014-mcp-server.md) | MCP 서버: HTTP(/mcp)와 로컬 stdio, 도구 16개, 사용자 토큰으로 REST만 | 채택 | 2026-11-06 |
 | [0015](0015-agent-chat.md) | AI 상담 Agent: 감독관 + 계좌·카드·상품 Agent, 도구는 메모리 연결 MCP, PostgreSQL 체크포인터 | 채택 | 2026-11-06 |
+| [0016](0016-agent-latency-tracing.md) | Agent 실행 추적과 응답 시간: Langfuse 클라우드, 감독관은 턴마다 한 번 계획, 생각 수준 low (p50 15→8초) | 채택 | 2026-11-06 |
 
 ## 새로 쓰는 법
 
