@@ -263,7 +263,7 @@
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
-| ✅ | GET | `/system/card-refunds` | 🔑 | 상담원용: 환불 대기 목록 (결제 계좌가 해지돼 못 돌려준 결제 취소) |
+| ✅ | GET | `/system/card-refunds` | 🔑 | 상담원용: 환불 대기 목록 (결제 계좌를 쓸 수 없어 못 돌려준 결제 취소). 카드 주인 `user_id`, 원래 결제 계좌 `linked_account_id` 포함 |
 | ✅ | POST | `/system/card-refunds/{card_tx_id}` | 🔑 | 상담원용: 고객 확인 후 `to_account_id`(카드 주인의 입출금 계좌)로 환불. 실패: `400 ACCOUNT_NOT_FOUND`, `404 CARD_TX_NOT_FOUND`, `409 REFUND_NOT_PENDING` |
 | ✅ | POST | `/system/card-bills/run?run_date=` | 🔑 | 신용카드 대금 출금. 날짜를 비우면 오늘(한국), 오늘 이후는 거절. 결제일이면 전날까지 쓴 것을 묶어 전액 출금(`CARD_BILL`), 못 내면 연체로 남기고 다음 실행 때 다시. 같은 날짜로 다시 불러도 한 번만 |
 

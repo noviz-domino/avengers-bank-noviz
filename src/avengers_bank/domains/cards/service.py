@@ -15,6 +15,7 @@ from avengers_bank.domains.accounts.money import TransferRejected, execute_card_
 from avengers_bank.domains.accounts.repository import kst_midnight_utc
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
+from avengers_bank.domains.audit.repository import audit_repository
 from avengers_bank.domains.cards.card_number import make_card_num, mask, prefix
 from avengers_bank.domains.cards.models import Card, CardProduct, CardTransaction
 from avengers_bank.domains.cards.repository import card_repository
@@ -24,6 +25,8 @@ from avengers_bank.domains.cards.schemas import (
     CardLimitsResponse,
     CardPayment,
     CardResponse,
+    CardTransactionResponse,
+    PendingRefundResponse,
 )
 
 # 기본 한도. 올리는 것은 보안을 약하게 해서 승인 기능과 함께 만든다 (ADR 0009)
@@ -240,8 +243,12 @@ class CardService:
             await db.refresh(tx)
             return tx
 
-    async def list_pending_refunds(self, db: AsyncSession) -> list[CardTransaction]:
-        return await card_repository.find_pending_refunds(db)
+    async def list_pending_refunds(self, db: AsyncSession) -> list[PendingRefundResponse]:
+        return [
+            PendingRefundResponse(**CardTransactionResponse.model_validate(tx).model_dump(),
+                                  user_id=card.user_id, linked_account_id=card.linked_account_id)
+            for tx, card in await card_repository.find_pending_refunds(db)
+        ]
 
     async def refund_to(self, db: AsyncSession, card_tx_id: int, to_account_id: int) -> CardTransaction:
         """상담원 처리: 환불 대기 건을 카드 주인의 다른 입출금 계좌로 (ADR 0012). 잠금 순서 카드 → 계좌"""
@@ -264,6 +271,10 @@ class CardService:
             except TransferRejected as e:
                 raise rejected(e) from None
             tx.refund_tx_id = refund.tx_id
+            await audit_repository.record(  # 누가 어느 계좌로 보냈는지 (상담원 역할이 생기면 actor를 그 직원으로)
+                db, user_id=card.user_id, actor="SYSTEM", action="CARD_REFUND_TO", target=str(card_tx_id),
+                detail={"to_account_id": to_account_id, "amount": tx.amount, "refund_tx_id": refund.tx_id},
+            )
             await db.flush()
             await db.refresh(tx)
             return tx

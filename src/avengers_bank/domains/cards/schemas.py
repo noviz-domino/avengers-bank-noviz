@@ -95,3 +95,10 @@ class CardRefundTo(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     to_account_id: int
+
+
+class PendingRefundResponse(CardTransactionResponse):
+    """GET /system/card-refunds — 상담원이 누구에게 연락하고 어느 계좌로 보낼지 정할 수 있게"""
+
+    user_id: int  # 카드 주인
+    linked_account_id: int  # 해지된 원래 결제 계좌

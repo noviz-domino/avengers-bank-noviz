@@ -21,6 +21,7 @@ from avengers_bank.domains.cards.schemas import (
     CardResponse,
     CardSuspend,
     CardTransactionResponse,
+    PendingRefundResponse,
 )
 from avengers_bank.domains.cards.service import card_service
 from avengers_bank.domains.users.schemas import UserResponse
@@ -101,7 +102,7 @@ async def list_card_transactions(card_id: int, db: DB, me: Me):
 async def cancel_card_transaction(card_id: int, card_tx_id: int, db: DB, me: Me):
     """전액 취소: 체크는 결제 계좌로 환불, 신용은 사용 기록만 취소"""
     tx = await card_service.cancel(db, me.user_id, card_id, card_tx_id)
-    pending = "결제는 취소됐고, 결제 계좌가 해지되어 상담원이 확인한 뒤 환불합니다."
+    pending = "결제는 취소됐고, 결제 계좌를 쓸 수 없어 상담원이 확인한 뒤 환불합니다."
     return SuccessResponse[CardTransactionResponse](data=tx, message=pending if tx.refund_pending else "결제가 취소되었습니다.")
 
 
@@ -120,10 +121,10 @@ async def run_card_bills(db: DB, run_date: date | None = None):
     return SuccessResponse[CardBillRunResponse](data=result, message="카드 대금 출금을 실행했습니다.")
 
 
-@system_router.get("/card-refunds", response_model=SuccessResponse[list[CardTransactionResponse]])
+@system_router.get("/card-refunds", response_model=SuccessResponse[list[PendingRefundResponse]])
 async def list_pending_refunds(db: DB):
-    """상담원용: 결제 계좌가 해지돼 못 돌려준 카드 결제 취소 (ADR 0012)"""
-    return SuccessResponse[list[CardTransactionResponse]](data=await card_service.list_pending_refunds(db))
+    """상담원용: 결제 계좌를 쓸 수 없어 못 돌려준 카드 결제 취소 (ADR 0012). 카드 주인·원래 결제 계좌 포함"""
+    return SuccessResponse[list[PendingRefundResponse]](data=await card_service.list_pending_refunds(db))
 
 
 @system_router.post("/card-refunds/{card_tx_id}", response_model=SuccessResponse[CardTransactionResponse],
