@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     db_echo: bool = False
     # 대금 출금 같은 시스템 작업 API의 키 (ADR 0011). 없으면 그 API는 꺼진다
     system_api_key: SecretStr | None = Field(default=None, min_length=32)
+    # RAG·Agent (ADR 0013). 키가 없으면 RAG API는 503. 무료 티어 키만, GitHub Secrets에 넣지 않는다
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-3.8-flash"
+    gemini_embedding_model: str = "gemini-embedding-2"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore",

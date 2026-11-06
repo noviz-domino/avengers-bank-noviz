@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 10
     services:
       postgres:
-        image: postgres:17
+        image: pgvector/pgvector:pg17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -59,6 +59,8 @@ jobs:
       - run: uv sync --locked --no-dev
       # 빈 DB에 처음부터 끝까지 적용되는지
       - run: uv run alembic upgrade head
+      # pgvector 코사인 검색이 실제 PostgreSQL에서 도는지 (pytest는 SQLite라 못 지남)
+      - run: uv run python tests/smoke_pgvector.py
       # 모델을 바꾸고 마이그레이션을 안 만들었는지 (CHECK 제약은 감지 못 함 → tests/test_account_number.py)
       - run: uv run alembic check
       # 되돌린 뒤 다시 적용되는지 (downgrade가 남긴 찌꺼기 확인)

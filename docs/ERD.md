@@ -6,7 +6,7 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs), `cards`(card_products, cards, card_transactions). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록), `a7c3e9f15b20`(승인 결과), `b6e1f3a8c442`(카드), `c4f8a2d6e1b7`(카드 사용내역, `credit_limit` 이름 변경), `d7b3e5f9a2c1`(대금 출금 줄 `bill_tx_id`)
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs), `cards`(card_products, cards, card_transactions), `rag`(rag_chunks). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록), `a7c3e9f15b20`(승인 결과), `b6e1f3a8c442`(카드), `c4f8a2d6e1b7`(카드 사용내역, `credit_limit` 이름 변경), `d7b3e5f9a2c1`(대금 출금 줄 `bill_tx_id`), `e8c1a4f7b3d2`(RAG `rag_chunks`, pgvector 확장)
 
 ## 핵심 테이블 (구현됨)
 
@@ -26,6 +26,17 @@ erDiagram
     cards ||--o{ card_transactions : "사용내역"
     account_transactions |o--o| card_transactions : "체크카드 출금·환불"
     pending_actions |o--o{ account_transactions : "실행 결과"
+    rag_chunks {
+        string chunk_id PK "card-terms#8, product:savings:1"
+        string source "문서 파일 또는 product"
+        string title "문서 > 제8조(연체)"
+        text content
+        string content_hash "바뀐 청크만 다시 임베딩"
+        json tokens "Kiwi 내용어 (BM25)"
+        string embedding_model "바뀌면 전부 다시"
+        vector embedding "768, pgvector"
+        datetime updated_at
+    }
     users {
         int user_id PK
         string login_id UK
@@ -238,7 +249,6 @@ erDiagram
 | 예산 | `budget_profiles`, `fixed_expenses`, `savings_goals`, `budget_cycles`, `budget_decisions` | [budget.md](planning/budget.md) 참고. `budget_cycles`가 결제 검사 때 잠그는 행 |
 | Agent | `recipients` | user_id, bank_name, account_num, holder_name, nickname, last_sent_at |
 | Agent | `chat_messages` | user_id, session_id, channel(WEB/MCP), role, content, intent, action_id |
-| RAG | `rag_chunks` | content, embedding(pgvector), metadata(출처·제목) |
 | 2차 | `passkeys` | user_id, credential_id, public_key, sign_count |
 | 범위 안, 나중 | `notifications` | user_id, type, message, link, is_read |
 

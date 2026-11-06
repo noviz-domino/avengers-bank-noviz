@@ -55,7 +55,7 @@
 | 대출 | ✅ 명세 16개 중 9개, 흐름 ⑤ | 📐 `loans`, `loan_schedules` | 가볍게 구현 ([scope.md](scope.md)) |
 | 수취인·알림 | ✅ 명세 | 📐 `recipients`, `notifications` | 자동이체는 예산의 저축 이체만 |
 | 자연어 입력 | ⚠️ 흐름 ⑥만 있음, 기능 명세 없음 | 📐 `chat_messages`, `pending_actions` | ADR 0004 |
-| RAG | ⚠️ 흐름 ⑥만 있음 | 📐 `rag_chunks` (pgvector) | |
+| RAG | ⚠️ 흐름 ⑥만 있음 | ✅ `rag_chunks` (pgvector) | ✅ 상품 DB + 데모 약관, 하이브리드 검색(RRF), 근거 인용 답변, 정답 세트 38문항 (ADR 0013). Agent 연결은 MCP·Agent PR |
 | **예산 관리** (추가 기능) | ✅ budget.md, 흐름 ⑦⑧ | 📐 예산 테이블 6개 (우대금리 표는 상품으로 옮겨 구현) | |
 
 ✅ = 테이블이 코드·마이그레이션에 있음. 📐 = [ERD](../ERD.md) "예정" 표에 설계됨, 그 기능의 PR에서 추가합니다.

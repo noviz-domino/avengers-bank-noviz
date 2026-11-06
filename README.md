@@ -72,6 +72,24 @@ uv run fastapi dev
 
 API 문서: http://127.0.0.1:8000/docs
 
+## RAG 쓰기 (선택)
+
+상품·약관 질문 답변(`/rag/*`)은 Gemini 키가 있어야 동작합니다. 없으면 그 API만 `503`이고 나머지 은행 기능은 그대로입니다.
+
+1. [Google AI Studio](https://aistudio.google.com/apikey)에서 무료 키를 발급합니다. 결제 수단을 등록하지 않으면 과금되지 않습니다. 무료 티어는 입력이 구글 모델 개선에 쓰일 수 있어서 데모 데이터만 넣습니다.
+2. `.env`의 `GEMINI_API_KEY`에 넣습니다. **GitHub Secrets에는 넣지 않습니다**(테스트·CI는 Gemini를 부르지 않음).
+3. 서버를 띄운 뒤 색인을 만듭니다(바뀐 청크만 임베딩, 처음엔 30개 정도).
+
+```bash
+curl -X POST http://localhost:8000/system/rag/reindex -H "X-System-Key: $SYSTEM_API_KEY"
+```
+
+4. 검색 성능 평가(정답 세트 38문항, 질문마다 임베딩 1번):
+
+```bash
+uv run python -m avengers_bank.domains.rag.evaluate
+```
+
 ## 테스트
 
 ```bash
@@ -100,4 +118,5 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 | accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), **예금 개설(PIN 승인)**, 내 계좌 목록과 총자산, 상세, 거래내역, 별칭, 입출금 계좌 해지 |
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → 거래 PIN 승인 → 실행(잔액·한도 재검사, 장부 두 줄), 거절, 멱등키, PIN 5회 잠금, 감사 기록 |
+| rag | ✅ 상품·약관 질문에 근거와 함께 답변(`/rag/ask`), 검색, 색인 갱신(`/system/rag/reindex`). Gemini 무료 키 필요 |
 | cards | ✅ 카드 상품, 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN 승인), 결제·취소·사용내역·한도(카드 행 잠금), 신용 대금 출금(`/system`, 서버 키) |
