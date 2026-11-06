@@ -92,7 +92,7 @@ DB까지 지우려면 `docker compose down -v`. 로컬(uv) 실행과 마이그�
 2. `GET /accounts` → 총자산과 계좌 목록
 3. `GET /transactions?category=카페·간식` → 거래 검색과 합계
 4. `POST /transfers` → **`202` 승인 대기**만 생김(돈은 안 움직임)
-5. `PUT /users/me/pin`(데모 계정은 PIN이 없음) → `POST /approvals/{action_id}/approve`에 PIN → 그때 이체 실행
+5. `PUT /users/me/pin`으로 PIN 설정(데모 계정은 PIN이 없음. 토큰만으로 PIN을 바꾸지 못하게 비밀번호도 함께 보냄) → `POST /approvals/{action_id}/approve`에 PIN → 그때 이체 실행
 6. `POST /cards` → `POST /cards/{id}/suspend`(`LOST`) → `POST /cards/{id}/payments`가 막히는지
 
 ### 자연어 요청 예시 (실제 Gemini 응답, 2026-11-06)
@@ -129,7 +129,7 @@ AI가 만든 승인 대기는 `requested_by = AGENT`로 남아서, 승인 화면
 | 8 | PIN이 잠긴 상태에서 로그인 | `200` | PIN만 잠기고 로그인은 됨(토큰을 가진 AI가 PIN을 틀려 사용자를 쫓아내지 못하게) |
 | 9 | 분실 신고한 카드로 결제 | `409 CARD_NOT_ACTIVE` | 취소·환불은 됨 |
 | 10 | 분실 신고한 카드 정지 해제 요청 | `409 CARD_LOST` | 분실은 되돌릴 수 없음 |
-| 11 | 서버 키 없이 신용카드 대금 출금 실행 | `403 SYSTEM_KEY_INVALID` | 시스템 작업은 서버 키로만 |
+| 11 | 서버 키 없이 신용카드 대금 출금 실행 | `403 SYSTEM_KEY_INVALID` | 서버에 `SYSTEM_API_KEY`가 설정된 경우. 비어 있으면 `403 SYSTEM_API_DISABLED`(API가 꺼짐) |
 
 동시 요청(같은 승인을 동시에 두 번, 같은 카드로 동시 결제, PIN을 동시에 여러 번 등)과 그 밖의 실패 상황은 테스트로 확인합니다. 전체 목록: [기획의 실패 상황 모음](docs/planning/user-flows.md#실패-상황-모음).
 
@@ -144,7 +144,7 @@ AI가 만든 승인 대기는 `requested_by = AGENT`로 남아서, 승인 화면
 | Gemini 키 없음 / Gemini 장애 | `503 AI_DISABLED` / `503 AI_UNAVAILABLE`, 은행 기능은 그대로 (테스트) |
 | 문서에 없는 질문(RAG) | 인용이 검색된 근거 안에 없으면 답 대신 "자료가 없습니다" (테스트) |
 
-실제 Gemini로 점검하면서 가짜 LLM 테스트로는 안 보인 문제 4개를 찾아 고쳤습니다(예: Gemini는 AI 메시지로 끝나는 요청을 거절해서 담당이 일한 턴이 모두 실패했음). [ADR 0015](docs/decisions/0015-agent-chat.md) 끝에 있습니다.
+실제 Gemini로 점검하면서 가짜 LLM 테스트로는 안 보인 문제들을 찾아 고쳤습니다(예: Gemini는 AI 메시지로 끝나는 요청을 거절해서 담당이 일한 턴이 모두 실패했음, 지출 질문이 카드 담당으로 감). [ADR 0015](docs/decisions/0015-agent-chat.md)의 "실제 Gemini 점검" 절에 있습니다.
 
 ## 5. 품질·성능 수치
 
