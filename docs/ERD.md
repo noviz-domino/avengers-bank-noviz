@@ -6,7 +6,7 @@
 
 - 이 문서가 **이 레포의 기준 ERD**입니다. `AvengersBankDiagram.drawio`는 팀 뼈대의 원안으로 남겨 둡니다(이 문서와 다릅니다).
 - **지금 구현하는 테이블만 그립니다.** 다음 기능에서 추가할 테이블은 아래 [예정](#예정) 표에 있고, 그 기능의 PR에서 이 문서에 옮깁니다.
-- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs), `cards`(card_products, cards, card_transactions). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록), `a7c3e9f15b20`(승인 결과), `b6e1f3a8c442`(카드), `c4f8a2d6e1b7`(카드 사용내역, `credit_limit` 이름 변경)
+- 코드의 모델은 `src/avengers_bank/domains/*/models.py`에 있습니다: `users`, `products`(account_products, product_preferential_rates), `accounts`(accounts, account_terms, account_transactions), `approvals`(pending_actions), `users`(refresh_tokens), `audit`(audit_logs), `cards`(card_products, cards, card_transactions). 돈 실행 지점: `accounts/money.py`(ADR 0007). 마이그레이션: `c3d9e1a47b20`(핵심 6개), `d81f4b6c2e90`(우대금리), `e5a72c9d31f4`(refresh token), `f2b8d4e6a913`(감사 기록), `a7c3e9f15b20`(승인 결과), `b6e1f3a8c442`(카드), `c4f8a2d6e1b7`(카드 사용내역, `credit_limit` 이름 변경), `d7b3e5f9a2c1`(대금 출금 줄 `bill_tx_id`)
 
 ## 핵심 테이블 (구현됨)
 
@@ -91,9 +91,10 @@ erDiagram
         string category "가맹점 이름으로 서버가 정함"
         bigint amount "0보다 큼"
         string status "APPROVED CANCELED"
-        string billing_status "신용만: UNBILLED BILLED PAID"
+        string billing_status "신용만: UNBILLED BILLED(연체) PAID"
         int account_tx_id FK "체크만: 출금 줄"
-        int refund_tx_id FK "체크 취소: 환불 줄"
+        int refund_tx_id FK "취소 환불 줄"
+        int bill_tx_id FK "신용: 갚은 대금 출금 줄, PAID일 때만"
         datetime approved_at
         datetime canceled_at "CANCELED일 때만"
     }

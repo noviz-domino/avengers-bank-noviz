@@ -21,7 +21,7 @@ Docker Desktop이 필요합니다. PostgreSQL은 컨테이너로 같이 뜹니�
 cp .env.example .env
 ```
 
-`.env`의 `JWT_SECRET_KEY`를 32자 이상으로 채웁니다(`openssl rand -hex 32`). `DATABASE_URL`은 compose가 컨테이너용 주소로 덮어쓰므로 그대로 둬도 됩니다.
+`.env`의 `JWT_SECRET_KEY`를 32자 이상으로 채웁니다(`openssl rand -hex 32`). 신용카드 대금 출금 API(`/system/card-bills/run`)를 쓰려면 `SYSTEM_API_KEY`도 같은 방법으로 채웁니다(비우면 그 API는 꺼짐). `DATABASE_URL`은 compose가 컨테이너용 주소로 덮어쓰므로 그대로 둬도 됩니다.
 
 ```bash
 docker compose up --build
@@ -100,4 +100,4 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 | accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), **예금 개설(PIN 승인)**, 내 계좌 목록과 총자산, 상세, 거래내역, 별칭 |
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → 거래 PIN 승인 → 실행(잔액·한도 재검사, 장부 두 줄), 거절, 멱등키, PIN 5회 잠금, 감사 기록 |
-| cards | ✅ 카드 상품, 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN 승인), 결제·취소·사용내역·한도(카드 행 잠금). 신용 대금 출금은 다음 PR |
+| cards | ✅ 카드 상품, 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN 승인), 결제·취소·사용내역·한도(카드 행 잠금), 신용 대금 출금(`/system`, 서버 키) |

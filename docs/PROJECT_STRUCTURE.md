@@ -29,6 +29,7 @@ avengers-bank/
 │   ├── test_transaction_search.py  # 검색 조건·합계·한국 날짜·쪽, 남의 거래 404, 카테고리 규칙·수정
 │   ├── test_cards.py           # 카드번호·Luhn, 발급, 결제 계좌 규칙, 정지·분실·해제(PIN), 남의 카드 404
 │   ├── test_card_payments.py   # 카드 결제·재전송·한도·취소 환불·신용 안 갚은 금액·남의 카드 404
+│   ├── test_card_bills.py      # 신용 대금 출금·다시 불러도 한 번·결제일 당일분 제외·연체·청구 후 취소·서버 키
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
 └── src/avengers_bank/
@@ -49,7 +50,7 @@ avengers-bank/
         ├── approvals/      # 승인 대기 작업, PIN 승인·거절        ✅
         ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
         ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성
-        └── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소
+        └── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소·대금 출금(/system)
 ```
 
 ## 도메인 안의 5개 파일

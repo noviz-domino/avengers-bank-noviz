@@ -23,7 +23,7 @@ from avengers_bank.core.database import Base, in_sql
 CARD_TYPES = ("CREDIT", "DEBIT")
 CARD_STATUSES = ("ACTIVE", "SUSPENDED", "LOST")
 CARD_TX_STATUSES = ("APPROVED", "CANCELED")
-# 신용카드 사용분의 대금 상태. 대금 출금 PR에서 BILLED·PAID로 바뀐다. 체크카드는 NULL
+# 신용카드 사용분의 대금 상태: 쓴 뒤 UNBILLED → 결제일에 BILLED → 출금되면 PAID. 출금 못 하면 BILLED(연체)로 남음 (ADR 0011). 체크카드는 NULL
 BILLING_STATUSES = ("UNBILLED", "BILLED", "PAID")
 
 
@@ -98,6 +98,12 @@ class CardTransaction(Base):
             "(status = 'APPROVED' AND canceled_at IS NULL) OR (status = 'CANCELED' AND canceled_at IS NOT NULL)",
             name="ck_card_transactions_canceled_at",
         ),
+        # 갚은(PAID) 사용분만 대금 출금 줄이 있다 (billing_status가 NULL인 체크카드는 둘째 줄)
+        CheckConstraint(
+            "(billing_status = 'PAID' AND bill_tx_id IS NOT NULL)"
+            " OR (COALESCE(billing_status, '') <> 'PAID' AND bill_tx_id IS NULL)",
+            name="ck_card_transactions_bill_tx",
+        ),
         Index("ix_card_transactions_card_id_approved_at", "card_id", "approved_at"),
     )
 
@@ -110,7 +116,8 @@ class CardTransaction(Base):
     status: Mapped[str] = mapped_column(String(10), default="APPROVED", nullable=False)
     billing_status: Mapped[str | None] = mapped_column(String(10))  # 신용만
     account_tx_id: Mapped[int | None] = mapped_column(ForeignKey("account_transactions.tx_id"))  # 체크만: 출금 줄
-    refund_tx_id: Mapped[int | None] = mapped_column(ForeignKey("account_transactions.tx_id"))  # 체크 취소: 환불 줄
+    refund_tx_id: Mapped[int | None] = mapped_column(ForeignKey("account_transactions.tx_id"))  # 취소 환불 줄
+    bill_tx_id: Mapped[int | None] = mapped_column(ForeignKey("account_transactions.tx_id"))  # 신용: 갚은 대금 출금 줄
     approved_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
