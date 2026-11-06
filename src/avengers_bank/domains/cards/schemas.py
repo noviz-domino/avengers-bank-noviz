@@ -67,6 +67,7 @@ class CardTransactionResponse(BaseModel):
     billing_status: str | None  # 신용만: UNBILLED / BILLED / PAID
     approved_at: datetime
     canceled_at: datetime | None
+    refund_pending: bool  # 결제 계좌가 해지돼 상담원 확인 후 환불 (ADR 0012)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,3 +87,11 @@ class CardBillRunResponse(BaseModel):
     overdue_cards: int  # 잔액 부족 등으로 못 낸 카드 수 (BILLED로 남음)
     failed_cards: int  # 예상 못 한 오류로 건너뛴 카드 수 (그 카드만 되돌림, 로그 확인)
     total_paid: int
+
+
+class CardRefundTo(BaseModel):
+    """POST /system/card-refunds/{card_tx_id} — 상담원이 고른 같은 사람의 입출금 계좌로 환불"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    to_account_id: int

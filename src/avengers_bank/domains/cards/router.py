@@ -17,6 +17,7 @@ from avengers_bank.domains.cards.schemas import (
     CardLimitsResponse,
     CardPayment,
     CardProductResponse,
+    CardRefundTo,
     CardResponse,
     CardSuspend,
     CardTransactionResponse,
@@ -100,7 +101,8 @@ async def list_card_transactions(card_id: int, db: DB, me: Me):
 async def cancel_card_transaction(card_id: int, card_tx_id: int, db: DB, me: Me):
     """전액 취소: 체크는 결제 계좌로 환불, 신용은 사용 기록만 취소"""
     tx = await card_service.cancel(db, me.user_id, card_id, card_tx_id)
-    return SuccessResponse[CardTransactionResponse](data=tx, message="결제가 취소되었습니다.")
+    pending = "결제는 취소됐고, 결제 계좌가 해지되어 상담원이 확인한 뒤 환불합니다."
+    return SuccessResponse[CardTransactionResponse](data=tx, message=pending if tx.refund_pending else "결제가 취소되었습니다.")
 
 
 @router.get("/{card_id}/limits", response_model=SuccessResponse[CardLimitsResponse], responses=error_responses(404))
@@ -116,3 +118,17 @@ async def run_card_bills(db: DB, run_date: date | None = None):
         raise BadRequestException(message="오늘 이후 날짜로는 실행할 수 없습니다.", code="RUN_DATE_IN_FUTURE")
     result = await card_service.run_bills(db, run_date or today)
     return SuccessResponse[CardBillRunResponse](data=result, message="카드 대금 출금을 실행했습니다.")
+
+
+@system_router.get("/card-refunds", response_model=SuccessResponse[list[CardTransactionResponse]])
+async def list_pending_refunds(db: DB):
+    """상담원용: 결제 계좌가 해지돼 못 돌려준 카드 결제 취소 (ADR 0012)"""
+    return SuccessResponse[list[CardTransactionResponse]](data=await card_service.list_pending_refunds(db))
+
+
+@system_router.post("/card-refunds/{card_tx_id}", response_model=SuccessResponse[CardTransactionResponse],
+                    responses=error_responses(400, 404, 409))
+async def refund_to_account(card_tx_id: int, data: CardRefundTo, db: DB):
+    """상담원용: 고객 요청을 확인하고, 카드 주인의 다른 입출금 계좌로 환불"""
+    tx = await card_service.refund_to(db, card_tx_id, data.to_account_id)
+    return SuccessResponse[CardTransactionResponse](data=tx, message="환불했습니다.")

@@ -78,6 +78,14 @@ async def rename_account(account_id: int, data: AccountUpdate, db: DB, me: Me):
     return SuccessResponse[AccountDetailResponse](data=account)
 
 
+
+@router.post("/{account_id}/close", response_model=SuccessResponse[AccountDetailResponse],
+             responses=error_responses(400, 404, 409))
+async def close_account(account_id: int, db: DB, me: Me):
+    """잔액 0인 입출금 계좌를 바로 해지 (ADR 0012). 남은 돈은 먼저 이체(PIN 승인)로 옮긴다"""
+    account = await account_service.close(db, me.user_id, account_id)
+    return SuccessResponse[AccountDetailResponse](data=account, message="계좌를 해지했습니다.")
+
 # 계좌를 가로지르는 거래 검색 (Agent의 search_transactions 도구도 이걸 쓴다: ADR 0006)
 tx_router = APIRouter(prefix="/transactions", tags=["transactions"], responses=error_responses(401, 422))
 
