@@ -131,7 +131,7 @@ class CardService:
         return response(*found)
 
     async def request_unsuspend(
-        self, db: AsyncSession, user_id: int, card_id: int, idempotency_key: str
+        self, db: AsyncSession, user_id: int, card_id: int, idempotency_key: str, requested_by: str = "WEB"
     ) -> tuple[PendingAction, bool]:
         """정지 해제는 위험해지는 쪽이라 승인 대기만 만든다 (PIN 승인 뒤 run_unsuspend_card)"""
         async with db.begin():
@@ -151,7 +151,7 @@ class CardService:
             if card.status != "SUSPENDED":
                 raise ConflictException(message="정지된 카드가 아닙니다.", code="CARD_NOT_SUSPENDED")
             action = PendingAction(
-                user_id=user_id, action_type="UNSUSPEND_CARD", requested_by="WEB",
+                user_id=user_id, action_type="UNSUSPEND_CARD", requested_by=requested_by,
                 idempotency_key=idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
                 payload={"card_id": card_id},
                 summary=f"{card.nickname or product_name}({mask(card.card_num)}) 정지 풀기",

@@ -165,7 +165,7 @@ class AccountService:
             return self._detail(account, product.name, terms)
 
     async def request_deposit(
-        self, db: AsyncSession, user: UserResponse, data: DepositCreate
+        self, db: AsyncSession, user: UserResponse, data: DepositCreate, requested_by: str = "WEB"
     ) -> tuple[PendingAction, bool]:
         """예금 개설 신청: 조건과 출금 계좌를 미리 검사하고 승인 대기만 만든다 (ADR 0004·0008)"""
         async with db.begin():
@@ -189,7 +189,7 @@ class AccountService:
                 raise BadRequestException(message="잔액이 부족합니다.", code="INSUFFICIENT_BALANCE")
 
             action = PendingAction(
-                user_id=user.user_id, action_type="OPEN_DEPOSIT", requested_by="WEB",
+                user_id=user.user_id, action_type="OPEN_DEPOSIT", requested_by=requested_by,
                 idempotency_key=data.idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
                 payload=deposit_payload(data),
                 summary=(f"{src.nickname or '내 계좌'}({src.account_num})에서 {data.amount:,}원을 "

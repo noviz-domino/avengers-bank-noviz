@@ -1,6 +1,6 @@
 # 0004. Agent 연결 구조: REST API 위의 MCP, 승인은 서버가 강제
 
-- 상태: 제안, 일부 변경 (→ [0006](0006-agent-orchestration.md): MCP 도구 목록을 도메인별로 다시 정함)
+- 상태: 채택, 일부 변경 (→ [0006](0006-agent-orchestration.md): 도구 목록을 도메인별로 다시 정함, [0014](0014-mcp-server.md): MCP 서버 구현)
 - 날짜: 2026-11-04
 - 관련 PR: #4
 

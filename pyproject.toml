@@ -17,6 +17,7 @@ dependencies = [
     "pgvector>=0.4,<1",
     "kiwipiepy>=0.21,<1",
     "rank-bm25>=0.2.2,<1",
+    "mcp>=1.10,<2",
 ]
 
 [dependency-groups]

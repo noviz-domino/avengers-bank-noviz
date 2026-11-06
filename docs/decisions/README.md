@@ -19,6 +19,7 @@
 | [0011](0011-card-bills.md) | 신용카드 대금 출금: 시스템 API, 결제일 전날까지 전부, 못 내면 연체 | 채택 | 2026-11-06 |
 | [0012](0012-account-close.md) | 입출금 계좌 해지: 잔액 0·연결 카드 없음, 해지 뒤 환불은 상담원이 | 채택 | 2026-11-06 |
 | [0013](0013-agent-rag-plan.md) | Agent·RAG 구현 계획: Gemini 무료 티어(3.8 Flash, embedding-2), 우리 문서 + 상품 DB, RAG → MCP → Agent | 채택 | 2026-11-06 |
+| [0014](0014-mcp-server.md) | MCP 서버: HTTP(/mcp)와 로컬 stdio, 도구 16개, 사용자 토큰으로 REST만 | 채택 | 2026-11-06 |
 
 ## 새로 쓰는 법
 

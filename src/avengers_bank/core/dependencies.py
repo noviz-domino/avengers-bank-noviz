@@ -1,5 +1,5 @@
 import secrets
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -32,3 +32,14 @@ async def require_system_key(x_system_key: Annotated[str | None, Header()] = Non
         raise ForbiddenException(message="시스템 작업 API가 꺼져 있습니다.", code="SYSTEM_API_DISABLED")
     if x_system_key is None or not secrets.compare_digest(x_system_key.encode(), key.get_secret_value().encode()):
         raise ForbiddenException(message="시스템 키가 맞지 않습니다.", code="SYSTEM_KEY_INVALID")
+
+
+async def get_requested_by(
+    x_requested_by: Annotated[Literal["WEB", "AGENT", "MCP"], Header()] = "WEB",
+) -> str:
+    """승인 대기를 누가 만들었나 (승인 화면에 "AI가 만든 요청"으로 보여 줌). 클라이언트가 보내는 값이라
+    정보용일 뿐 보안 장치가 아니다: 어느 입구든 PIN 없이는 돈이 움직이지 않는다 (ADR 0004)"""
+    return x_requested_by
+
+
+RequestedBy = Annotated[str, Depends(get_requested_by)]

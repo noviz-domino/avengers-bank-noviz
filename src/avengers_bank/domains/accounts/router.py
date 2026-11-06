@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
-from avengers_bank.core.dependencies import get_current_user
+from avengers_bank.core.dependencies import RequestedBy, get_current_user
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.accounts.schemas import (
     AccountCreate,
@@ -46,9 +46,9 @@ async def open_account(data: AccountCreate, db: DB, me: Me):
     "/deposits", response_model=SuccessResponse[ActionResponse],
     status_code=status.HTTP_202_ACCEPTED, responses=error_responses(400, 404, 409),
 )
-async def request_deposit(data: DepositCreate, response: Response, db: DB, me: Me):
+async def request_deposit(data: DepositCreate, response: Response, db: DB, me: Me, requested_by: RequestedBy):
     """예금 개설 신청 → 승인 대기. `POST /approvals/{action_id}/approve`(PIN)로 계좌가 열리고 돈이 옮겨진다."""
-    action, created = await account_service.request_deposit(db, me, data)
+    action, created = await account_service.request_deposit(db, me, data, requested_by)
     if not created:
         response.status_code = status.HTTP_200_OK
     return SuccessResponse[ActionResponse](data=action, message="승인 화면에서 PIN을 입력하면 예금이 열립니다.")

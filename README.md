@@ -72,6 +72,25 @@ uv run fastapi dev
 
 API 문서: http://127.0.0.1:8000/docs
 
+## Claude Desktop에서 쓰기 (MCP, 선택)
+
+서버(`docker compose up`)를 띄운 뒤, 한 번 로그인해 refresh token을 파일(`~/.avengers-bank/mcp-token.json`)에 저장합니다. 비밀번호는 저장하지 않습니다.
+
+```bash
+uv run python -m avengers_bank.domains.mcp_server login
+```
+
+Claude Desktop 설정(`claude_desktop_config.json`)에 추가합니다. `--directory`는 이 레포 경로입니다.
+
+```json
+{ "mcpServers": { "avengers-bank": {
+    "command": "uv",
+    "args": ["--directory", "C:/Users/USER/Desktop/261103미니프로젝트/avengers-bank-noviz", "run", "python", "-m", "avengers_bank.domains.mcp_server"],
+    "env": { "AVENGERS_API_URL": "http://localhost:8000" } } } }
+```
+
+"내 계좌 보여줘", "어제 카페에서 얼마 썼어?", "카드 잃어버렸어 정지해줘", "토니한테 3만 원 보내줘"(승인 대기까지, PIN은 은행 화면에서)처럼 쓸 수 있습니다. 승인·PIN·카드 결제는 도구에 없습니다([ADR 0014](docs/decisions/0014-mcp-server.md)).
+
 ## RAG 쓰기 (선택)
 
 상품·약관 질문 답변(`/rag/*`)은 Gemini 키가 있어야 동작합니다. 없으면 그 API만 `503`이고 나머지 은행 기능은 그대로입니다.
@@ -118,5 +137,6 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 | accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), **예금 개설(PIN 승인)**, 내 계좌 목록과 총자산, 상세, 거래내역, 별칭, 입출금 계좌 해지 |
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → 거래 PIN 승인 → 실행(잔액·한도 재검사, 장부 두 줄), 거절, 멱등키, PIN 5회 잠금, 감사 기록 |
+| mcp | ✅ AI 도구 16개(계좌·카드·상품, 이체는 승인 대기까지). HTTP `/mcp`(Bearer), 로컬 stdio(Claude Desktop) |
 | rag | ✅ 상품·약관 질문에 근거와 함께 답변(`/rag/ask`), 검색, 색인 갱신(`/system/rag/reindex`). Gemini 무료 키 필요 |
 | cards | ✅ 카드 상품, 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN 승인), 결제·취소·사용내역·한도(카드 행 잠금), 신용 대금 출금(`/system`, 서버 키) |
