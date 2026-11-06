@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column('content', sa.Text(), nullable=False),
         sa.Column('content_hash', sa.String(length=64), nullable=False),
         sa.Column('tokens', sa.JSON(), nullable=False),
-        sa.Column('embedding_model', sa.String(length=50), nullable=False),
+        sa.Column('embedding_model', sa.String(length=100), nullable=False),
         sa.Column('embedding', Vector(768), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('chunk_id'),

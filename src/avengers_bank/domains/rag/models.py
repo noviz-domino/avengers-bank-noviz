@@ -20,7 +20,8 @@ class RagChunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # 바뀐 청크만 다시 임베딩
     tokens: Mapped[list] = mapped_column(JSON, nullable=False)  # Kiwi 내용어 (BM25용, 색인 때 한 번)
-    embedding_model: Mapped[str] = mapped_column(String(50), nullable=False)  # 모델이 바뀌면 전부 다시 (벡터 호환 안 됨)
+    # 모델/차원/입력 형식. 하나라도 바뀌면 전부 다시 (벡터 호환 안 됨)
+    embedding_model: Mapped[str] = mapped_column(String(100), nullable=False)
     # shortcut: SQLite 테스트는 JSON에 담고 파이썬으로 거리 계산, 운영은 pgvector
     embedding: Mapped[list] = mapped_column(Vector(EMBED_DIM).with_variant(JSON(), "sqlite"), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

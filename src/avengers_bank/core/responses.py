@@ -33,6 +33,7 @@ ERROR_EXAMPLES = {
     423: ("LOCKED", "잠긴 상태라 처리할 수 없습니다."),
     422: ("VALIDATION_ERROR", "입력값을 확인해 주세요."),
     500: ("INTERNAL_SERVER_ERROR", "서버에서 오류가 발생했습니다."),
+    429: ("TOO_MANY_REQUESTS", "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
     503: ("AI_UNAVAILABLE", "AI 기능을 지금 쓸 수 없습니다."),
 }
 

@@ -1,6 +1,8 @@
 """RAG 색인·검색·답변 (ADR 0013). 검색은 벡터 + 단어(Kiwi BM25)를 RRF로 합친다 (지난 RAG 레포와 같은 설정)"""
 
+import asyncio
 import math
+import re
 from typing import Literal
 
 from rank_bm25 import BM25Okapi
@@ -17,6 +19,8 @@ K = 5
 FETCH_K = 20  # 합치기 전에 각 방식에서 가져오는 수
 RRF_K = 60
 Mode = Literal["hybrid", "vector", "bm25"]
+# shortcut: 서버 한 프로세스 안에서만 막는다. 서버를 여러 대 띄우면 DB advisory lock으로 바꾼다
+REINDEX_LOCK = asyncio.Lock()
 
 PROMPT = """너는 어벤져스은행의 상품·약관 안내 담당이다. 아래 <근거>만 보고 <질문>에 답한다.
 
@@ -48,9 +52,8 @@ def rrf_fuse(rank_lists: list[list[str]], k: int = RRF_K) -> list[tuple[str, flo
     return sorted(score.items(), key=lambda kv: (-kv[1], first[kv[0]]))
 
 
-def bm25_rank(rows: list[tuple[str, list[str]]], query: str, n: int) -> list[str]:
+def bm25_rank(rows: list[tuple[str, list[str]]], words: list[str], n: int) -> list[str]:
     """질문 낱말이 하나도 없는 청크는 뺀다 (작은 말뭉치에서 IDF가 0 이하여도 순위가 남도록)"""
-    words = tokenize(query)
     if not words or not rows:
         return []
     scores = BM25Okapi([tokens or ["_"] for _, tokens in rows]).get_scores(words)
@@ -76,7 +79,12 @@ async def vector_rank(db: AsyncSession, qv: list[float], n: int) -> list[str]:
 
 class RagService:
     async def reindex(self, db: AsyncSession, ai: AI) -> ReindexResponse:
-        """문서·상품을 다시 잘라 바뀐 청크(본문 해시 또는 임베딩 모델이 다름)만 임베딩한다. 무료 한도를 아끼려고"""
+        """문서·상품을 다시 잘라 바뀐 청크(본문 해시 또는 임베딩 모델이 다름)만 임베딩한다. 무료 한도를 아끼려고.
+        동시에 두 번 오면 차례로: 두 번째는 앞의 결과를 보고 바뀐 것이 없으면 임베딩하지 않는다"""
+        async with REINDEX_LOCK:
+            return await self._reindex(db, ai)
+
+    async def _reindex(self, db: AsyncSession, ai: AI) -> ReindexResponse:
         async with db.begin():
             chunks = doc_chunks() + await product_chunks(db)
             have = {r.chunk_id: (r.content_hash, r.embedding_model)
@@ -85,13 +93,14 @@ class RagService:
         # 임베딩(바깥 API)은 트랜잭션 밖에서: 느린 호출 동안 DB를 잡고 있지 않게
         vectors = await ai.embed([c.content for c in stale], query=False, titles=[c.title for c in stale]) if stale else []
         gone = set(have) - {c.chunk_id for c in chunks}
+        tokens = await asyncio.to_thread(lambda: [tokenize(f"{c.title} {c.content}") for c in stale])  # Kiwi는 CPU 작업
         async with db.begin():
             if gone:
                 await db.execute(delete(RagChunk).where(RagChunk.chunk_id.in_(gone)))
-            for c, v in zip(stale, vectors):
+            for c, v, words in zip(stale, vectors, tokens, strict=True):
                 await db.merge(RagChunk(
                     chunk_id=c.chunk_id, source=c.source, title=c.title, content=c.content,
-                    content_hash=c.content_hash, tokens=tokenize(f"{c.title} {c.content}"),
+                    content_hash=c.content_hash, tokens=words,
                     embedding_model=ai.embedding_model, embedding=list(v),
                 ))
         return ReindexResponse(total=len(chunks), embedded=len(stale), deleted=len(gone),
@@ -99,16 +108,18 @@ class RagService:
 
     async def search(self, db: AsyncSession, ai: AI, query: str, k: int = K, mode: Mode = "hybrid") -> list[SearchHit]:
         qv = (await ai.embed([query], query=True))[0] if mode != "bm25" else []
+        query_words = await asyncio.to_thread(tokenize, query) if mode != "vector" else []
         async with db.begin():
             vec = await vector_rank(db, qv, FETCH_K) if mode != "bm25" else []
             rows = (await db.execute(select(RagChunk.chunk_id, RagChunk.tokens))).all() if mode != "vector" else []
-            words = bm25_rank([(i, t) for i, t in rows], query, FETCH_K)
+            words = bm25_rank([(i, t) for i, t in rows], query_words, FETCH_K)
             ranked = rrf_fuse([r for r in (vec, words) if r])[:k]
             found = {c.chunk_id: c for c in await db.scalars(
                 select(RagChunk).where(RagChunk.chunk_id.in_([i for i, _ in ranked])))}
         return [SearchHit(chunk_id=i, title=found[i].title, content=found[i].content, score=s) for i, s in ranked]
 
     async def ask(self, db: AsyncSession, ai: AI, question: str) -> AskResponse:
+        question = re.sub(r"</?\s*질문\s*>", " ", question)  # 질문이 <질문> 구분자를 닫고 규칙처럼 보이게 하지 못하게
         hits = await self.search(db, ai, question)
         if not hits:
             return AskResponse(action="abstain", answer="자료가 없습니다. 색인된 문서가 없습니다.", citations=[])

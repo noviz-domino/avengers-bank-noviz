@@ -13,8 +13,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from avengers_bank.core.clock import today_kst
 from avengers_bank.domains.cards.models import CardProduct
 from avengers_bank.domains.products.models import AccountProduct
+from avengers_bank.domains.products.repository import on_sale
 
 DOCS = Path(__file__).parent / "docs"
 MAX_CHARS = 1200
@@ -89,10 +91,11 @@ def account_product_text(p: AccountProduct) -> str:
 
 
 async def product_chunks(db: AsyncSession) -> list[Chunk]:
-    """판매 중인 계좌·카드 상품. 대출은 기능이 아직 없어서 넣지 않는다"""
+    """판매 중인 계좌·카드 상품 (상품 API와 같은 기준: 특판 기간 포함). 대출은 기능이 아직 없어서 넣지 않는다.
+    shortcut: 특판이 끝난 날 색인을 다시 만들어야 빠진다. 대금 출금처럼 매일 /system으로 부르면 된다"""
     accounts = await db.scalars(
         select(AccountProduct).options(selectinload(AccountProduct.preferential_rates))
-        .where(AccountProduct.is_active.is_(True), AccountProduct.type != "LOAN")
+        .where(*on_sale(today_kst()), AccountProduct.type != "LOAN")
         .order_by(AccountProduct.type, AccountProduct.product_code)
     )
     cards = await db.scalars(select(CardProduct).where(CardProduct.is_active.is_(True))

@@ -259,7 +259,7 @@
 
 ## rag: 상품·약관 질문 (`domains/rag`)
 
-상품 DB와 데모 약관을 근거로 답합니다. Gemini 키(`GEMINI_API_KEY`)가 없으면 `503 AI_DISABLED`, Gemini가 실패하면(한도 초과 등) `503 AI_UNAVAILABLE`. 결정 이유: [ADR 0013](decisions/0013-agent-rag-plan.md), 코드 설명: [가이드 10](guides/10-rag.md)
+상품 DB와 데모 약관을 근거로 답합니다. Gemini 키(`GEMINI_API_KEY`)가 없으면 `503 AI_DISABLED`, Gemini가 실패하면(한도 초과·시간 초과 등) `503 AI_UNAVAILABLE`, 답이 형식에 안 맞으면 `503 AI_BAD_RESPONSE`. 사용자당 1분에 10번(검색·답변 합쳐), 넘으면 `429 AI_RATE_LIMITED`. 결정 이유: [ADR 0013](decisions/0013-agent-rag-plan.md), 코드 설명: [가이드 10](guides/10-rag.md)
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
@@ -279,7 +279,7 @@
 |---|---|---|---|---|
 | ✅ | GET | `/system/card-refunds` | 🔑 | 상담원용: 환불 대기 목록 (결제 계좌를 쓸 수 없어 못 돌려준 결제 취소). 카드 주인 `user_id`, 원래 결제 계좌 `linked_account_id` 포함 |
 | ✅ | POST | `/system/card-refunds/{card_tx_id}` | 🔑 | 상담원용: 고객 확인 후 `to_account_id`(카드 주인의 입출금 계좌)로 환불. 실패: `400 ACCOUNT_NOT_FOUND`, `404 CARD_TX_NOT_FOUND`, `409 REFUND_NOT_PENDING` |
-| ✅ | POST | `/system/rag/reindex` | 🔑 | RAG 색인 갱신: 데모 약관과 판매 중인 상품을 다시 자르고, 본문 해시나 임베딩 모델이 바뀐 청크만 임베딩. 상품을 바꾸면 부른다. `total`, `embedded`, `deleted` |
+| ✅ | POST | `/system/rag/reindex` | 🔑 | RAG 색인 갱신: 데모 약관과 판매 중인 상품(특판 기간 포함)을 다시 자르고, 본문 해시나 임베딩 모델·차원·입력 형식이 바뀐 청크만 임베딩. 상품을 바꾸거나 특판이 끝나면 부른다(매일 부르면 됨). 동시에 두 번 오면 차례로 처리. `total`, `embedded`, `deleted` |
 | ✅ | POST | `/system/card-bills/run?run_date=` | 🔑 | 신용카드 대금 출금. 날짜를 비우면 오늘(한국), 오늘 이후는 거절. 결제일이면 전날까지 쓴 것을 묶어 전액 출금(`CARD_BILL`), 못 내면 연체로 남기고 다음 실행 때 다시. 같은 날짜로 다시 불러도 한 번만 |
 
 ```json
