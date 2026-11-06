@@ -31,6 +31,7 @@ TOOLS: dict[str, list[str]] = {  # ADR 0014의 MCP 도구를 도메인별로 (AD
 }
 
 COMMON = """너는 어벤져스은행 앱의 AI 상담원이다. 한국어로 짧고 정확하게 답한다. 오늘은 {today}(한국)이다.
+- 네 담당 업무만 답한다. 사용자의 말에 다른 담당 업무가 섞여 있으면 언급하지 말고 그대로 둔다(감독관이 그 담당에게 맡긴다).
 - 숫자(잔액·금액·한도)는 도구 결과에 있는 값만 말한다. 지어내지 않는다.
 - 금액·계좌·카드가 모호하거나 빠졌으면 도구를 부르지 말고 되묻는다. 앞 대화에서 정해진 것은 다시 묻지 않는다.
 - 이체·예금 개설·카드 정지 해제는 승인 대기만 만든다. 만든 뒤 "은행 앱 승인 화면에서 PIN을 입력해 주세요"라고 안내한다.
@@ -49,8 +50,8 @@ PROMPTS = {
 }
 
 SUPERVISOR = """너는 어벤져스은행 AI 상담의 감독관이다. 대화를 보고 다음에 일할 담당을 하나 고른다.
-- account: 계좌·잔액·거래내역·이체·계좌 개설과 해지
-- card: 카드 조회·발급·사용내역·한도·정지·분실
+- account: 계좌·잔액·거래내역·이체·계좌 개설과 해지. "어디서 얼마 썼어", "이번 달 지출"처럼 쓴 돈을 묻는 질문도 account(체크카드 결제도 계좌 거래내역에 있다)
+- card: 카드 조회·발급·한도·정지·분실, 특정 카드의 사용내역을 콕 집어 물을 때
 - product: 상품 소개·금리·가입 조건, 약관·규칙 질문
 - FINISH: 사용자의 요청이 모두 처리됐거나, 담당이 되물었거나, 은행 업무가 아닌 말(인사 등)
 여러 업무가 섞이면 하나씩 차례로 고른다. 이미 담당이 답한 업무는 다시 고르지 않는다.
@@ -105,11 +106,16 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
     async def supervisor(state: ChatState) -> Command:
         if state["hops"] >= MAX_HOPS:
             return Command(goto=END)
-        route = await llm.with_structured_output(Route).ainvoke([SystemMessage(SUPERVISOR), *recent(state["messages"])])
+        # Gemini는 모델 차례(AI 메시지)로 끝나는 요청을 거절한다. 담당이 답한 뒤에는 대화가 AI로 끝나므로
+        # 감독관에게 할 일을 사람 말로 붙인다. 이 안내는 저장하지 않는다 (실제 Gemini 점검에서 발견)
+        ask = HumanMessage("(상담 안내) 위 대화를 보고 다음 담당을 고르세요. 모두 처리됐으면 FINISH.")
+        route = await llm.with_structured_output(Route).ainvoke([SystemMessage(SUPERVISOR), *recent(state["messages"]), ask])
         if route.next == "FINISH":
             if answered_this_turn(state["messages"]):
                 return Command(goto=END)
             return Command(goto=END, update={"messages": [AIMessage(route.reply or "무엇을 도와드릴까요?")]})
+        if route.next in state["routed"]:  # 같은 담당을 한 턴에 두 번 부르지 않는다 (담당이 되물었는데 또 부르는 핑퐁)
+            return Command(goto=END)
         return Command(goto=route.next, update={"routed": [*state["routed"], route.next]})
 
     def domain(name: str):

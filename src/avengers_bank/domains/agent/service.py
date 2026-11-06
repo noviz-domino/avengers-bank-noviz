@@ -36,13 +36,15 @@ def text(content) -> str:
 
 
 def final_reply(messages: list) -> str:
-    """이번 턴(마지막 사람 말 뒤)의 마지막 AI 답. 없으면 예전 턴의 답을 돌려주지 않는다"""
+    """이번 턴(마지막 사람 말 뒤)의 담당 답을 차례대로 합친다. 복합 요청("카드 한도랑 잔액")은 두 담당의 답이 다 나간다.
+    이번 턴에 답이 없으면 예전 턴의 답을 돌려주지 않는다"""
+    answers = []
     for m in reversed(messages):
         if isinstance(m, HumanMessage):
             break
         if isinstance(m, AIMessage) and m.content and not m.tool_calls:
-            return text(m.content)
-    return "죄송합니다. 답을 만들지 못했습니다. 다시 말씀해 주세요."
+            answers.append(text(m.content))
+    return "\n\n".join(reversed(answers)) or "죄송합니다. 답을 만들지 못했습니다. 다시 말씀해 주세요."
 
 
 class AgentService:

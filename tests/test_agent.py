@@ -19,6 +19,12 @@ from tests.test_transfers import balance, open_account, user
 pytestmark = pytest.mark.anyio
 
 
+def like_gemini(messages):
+    """실제 Gemini 규칙: 모델 차례(AI 메시지)로 끝나는 요청은 400 (실제 점검에서 이걸로 모든 대화가 실패했다)"""
+    if isinstance(messages[-1], AIMessage):
+        raise ValueError("Requests ending with a model turn are not supported.")
+
+
 class FakeChat(BaseChatModel):
     """Gemini 대신: 감독관의 선택(routes)과 담당 Agent의 응답(replies)을 차례로 내놓는다. 도구는 진짜로 불린다"""
 
@@ -34,6 +40,7 @@ class FakeChat(BaseChatModel):
         return "fake"
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        like_gemini(messages)
         self.agent_inputs.append(messages)
         return ChatResult(generations=[ChatGeneration(message=self.replies.pop(0))])
 
@@ -42,6 +49,7 @@ class FakeChat(BaseChatModel):
 
     def with_structured_output(self, schema, **kwargs):
         def route(messages):
+            like_gemini(messages)
             if self.fail:
                 raise RuntimeError("Gemini 장애")
             self.supervisor_inputs.append(messages)
@@ -106,7 +114,7 @@ async def test_context_is_kept_and_private(bank):
     first = (await chat(client, tony, "안녕")).json()["data"]
     assert first["reply"] == "안녕하세요! 무엇을 도와드릴까요?" and first["routed"] == []
     await chat(client, tony, "고마워", first["session_id"])
-    humans = [m.content for m in fake.supervisor_inputs[1] if isinstance(m, HumanMessage)]
+    humans = [m.content for m in fake.supervisor_inputs[1] if isinstance(m, HumanMessage) and not m.content.startswith("(상담 안내)")]
     assert humans == ["안녕", "고마워"]  # 같은 대화방이면 앞 대화를 기억한다
 
     history = (await client.get(f"/chat/{first['session_id']}", headers=tony)).json()["data"]
@@ -115,15 +123,21 @@ async def test_context_is_kept_and_private(bank):
 
     fake.routes = [Route(next="FINISH", reply="처음 뵙겠습니다")]
     await chat(client, peter, "안녕?", first["session_id"])  # 토니의 session_id를 써도 피터의 새 대화
-    assert [m.content for m in fake.supervisor_inputs[-1] if isinstance(m, HumanMessage)] == ["안녕?"]
+    assert [m.content for m in fake.supervisor_inputs[-1] if isinstance(m, HumanMessage) and not m.content.startswith("(상담 안내)")] == ["안녕?"]
 
 
-async def test_hop_limit_stops_ping_pong(bank):
+async def test_same_agent_once_per_turn_and_hop_limit(bank):
     client, tony, peter, src, dst, fake = bank
-    fake.routes = [Route(next="account")] * MAX_HOPS  # 감독관이 계속 같은 담당을 고르는 경우
+    fake.routes = [Route(next="account"), Route(next="account")]  # 담당이 되물었는데 감독관이 또 고르는 핑퐁
+    fake.replies = [AIMessage("어느 계좌로 보낼까요?")]
+    data = (await chat(client, tony, "토니한테 보내줘")).json()["data"]
+    assert data["routed"] == ["account"] and data["reply"] == "어느 계좌로 보낼까요?"
+
+    fake.routes = [Route(next="account"), Route(next="card"), Route(next="product")]
     fake.replies = [AIMessage(f"답 {i}") for i in range(MAX_HOPS)]
-    data = (await chat(client, tony, "계좌")).json()["data"]
-    assert data["routed"] == ["account"] * MAX_HOPS and data["reply"] == f"답 {MAX_HOPS - 1}"
+    data = (await chat(client, tony, "다 알려줘")).json()["data"]
+    assert data["routed"] == ["account", "card", "product"]  # 세 번에서 멈춤 (네 번째 감독관 호출 없음)
+    assert data["reply"] == "답 0\n\n답 1\n\n답 2"
 
 
 async def test_llm_failure_and_disabled(bank):
@@ -154,7 +168,8 @@ async def test_compound_request_second_agent_gets_its_task(bank):
     fake.routes = [Route(next="card"), Route(next="account"), Route(next="FINISH")]
     fake.replies = [AIMessage("카드를 정지했어요."), AIMessage("잔액은 1,000,000원이에요.")]
     data = (await chat(client, tony, "카드 정지하고 잔액 알려줘")).json()["data"]
-    assert data["routed"] == ["card", "account"] and data["reply"] == "잔액은 1,000,000원이에요."
+    assert data["routed"] == ["card", "account"]
+    assert data["reply"] == "카드를 정지했어요.\n\n잔액은 1,000,000원이에요."  # 두 담당의 답이 모두 나간다
     second = fake.agent_inputs[1][-1]  # 두 번째 담당이 받은 마지막 메시지: 앞 담당의 AI 답이 아니라 할 일 안내
     assert isinstance(second, HumanMessage) and "계좌" in second.content
     history = (await client.get(f"/chat/{data['session_id']}", headers=tony)).json()["data"]

@@ -1,6 +1,6 @@
 services:
   db:
-    image: pgvector/pgvector:pg17 # PostgreSQL 17 + pgvector (RAG, ADR 0013)
+    image: pgvector/pgvector:pg17-trixie # PostgreSQL 17 + pgvector (RAG, ADR 0013). trixie: postgres:17과 같은 glibc라 기존 데이터의 정렬 규칙이 맞음
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
