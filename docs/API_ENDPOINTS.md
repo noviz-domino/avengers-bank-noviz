@@ -263,7 +263,7 @@ MCP(Model Context Protocol) 서버. 도구 16개가 아래 REST API를 사용자
 
 | 상태 | 입구 | 인증 | 설명 |
 |---|---|---|---|
-| ✅ | `POST /mcp/` (streamable HTTP, JSON 응답) | `Authorization: Bearer <access token>` | 우리 Agent용. 헤더의 토큰을 그대로 REST에 넘김 |
+| ✅ | `POST /mcp` (streamable HTTP, JSON 응답) | `Authorization: Bearer <access token>` | 우리 Agent용. 헤더의 토큰을 그대로 REST에 넘김 |
 | ✅ | `python -m avengers_bank.domains.mcp_server` (stdio) | refresh token 파일 (`login` 명령) | Claude Desktop·Claude Code용 |
 
 - 도구: 계좌 `get_my_accounts` `get_account` `search_transactions` `request_transfer` `open_account` `request_deposit` `close_account` / 카드 `get_my_cards` `issue_card` `search_card_transactions` `get_card_limit` `suspend_card` `request_unsuspend_card` / 상품 `search_products` `get_product_detail` `ask_bank_docs`

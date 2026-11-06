@@ -68,6 +68,9 @@ async def test_transfer_tool_only_creates_pending(bank, monkeypatch):
     result = await tool("request_transfer", from_account_id=src["account_id"],
                         to_account_num=dst["account_num"], amount=50_000, memo="밥값")
     assert result["data"]["status"] == "PENDING" and "PIN" in result["message"]
+    again = await tool("request_transfer", from_account_id=src["account_id"],  # 시간 초과·재시도로 또 불려도
+                       to_account_num=dst["account_num"], amount=50_000, memo="밥값")
+    assert again["data"]["action_id"] == result["data"]["action_id"]  # 승인 대기는 하나
     assert result["data"]["requested_by"] == "MCP"  # 승인 화면이 AI가 만든 요청임을 보여 줄 수 있게
     assert await balance(src["account_id"]) == 1_000_000  # PIN 없이는 돈이 안 움직임
 
@@ -89,8 +92,8 @@ async def test_http_mcp_forwards_bearer_token(bank):
     rpc = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "get_my_accounts", "arguments": {}}}
     accept = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
     async with mcp.session_manager.run():  # 테스트 클라이언트는 앱 lifespan을 돌리지 않는다
-        ok = await client.post("/mcp/", content=json.dumps(rpc), headers={**accept, **tony})
-        anonymous = await client.post("/mcp/", content=json.dumps(rpc), headers=accept)
+        ok = await client.post("/mcp", content=json.dumps(rpc), headers={**accept, **tony})  # 리다이렉트 없이
+        anonymous = await client.post("/mcp", content=json.dumps(rpc), headers=accept)
     result = ok.json()["result"]
     assert not result["isError"] and json.loads(result["content"][0]["text"])["data"]["total_balance"] == 1_000_000
     assert anonymous.json()["result"]["isError"] and "Bearer" in anonymous.json()["result"]["content"][0]["text"]
@@ -111,3 +114,52 @@ async def test_token_file_rotates_once_and_saves(client, tmp_path, monkeypatch):
         assert res.status_code == 200
         store.access = None  # 만료된 것처럼
         assert await store.token(c)  # 파일의 새 refresh token으로 다시 받을 수 있다
+
+
+async def test_two_processes_share_token_file(client, tmp_path):
+    # Claude Desktop과 Claude Code가 같은 토큰 파일로 서버를 하나씩 띄운 상황 (리뷰 🟡1)
+    await user(client, "ironman", "토니", pin=None)
+    login = (await client.post("/users/login", json={"login_id": "ironman", "password": "password1234"})).json()
+    desktop, code = api.TokenFile(tmp_path / "t.json"), api.TokenFile(tmp_path / "t.json")
+    desktop.save(login["data"]["refresh_token"])
+    async with asgi_client() as c:
+        a, b = await asyncio.gather(desktop.token(c), code.token(c))  # 파일 잠금 → 뒤에 온 쪽은 바뀐 토큰을 읽음
+        for token in (a, b):  # 재사용으로 끊겼다면 둘 중 하나는 401
+            assert (await c.get("/users/me", headers={"Authorization": f"Bearer {token}"})).status_code == 200
+
+
+def mock_client(handler):
+    return lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://bank")
+
+
+async def test_refresh_failure_kinds(tmp_path):
+    store = api.TokenFile(tmp_path / "t.json")
+    store.save("old")
+    for status, expected in ((503, "연결할 수 없습니다"), (401, "로그인이 필요")):
+        async with mock_client(lambda r, s=status: httpx.Response(s, json={}))() as c:
+            with pytest.raises(ToolError, match=expected):  # 일시 장애에 다시 로그인하라고 하지 않는다
+                await store.token(c)
+
+
+async def test_call_retries_once_after_401(monkeypatch):
+    class Stub:
+        forgot = 0
+
+        async def token(self, c):
+            return f"t{self.forgot}"
+
+        def forget(self):
+            self.forgot += 1
+
+    def handler(request):
+        if request.headers["authorization"] == "Bearer t0":  # 만료 전에 무효가 된 토큰
+            return httpx.Response(401, json={"error": {"code": "INVALID_TOKEN", "message": "x"}})
+        return httpx.Response(200, json={"success": True, "data": {"ok": 1}})
+
+    stub = Stub()
+    monkeypatch.setattr(api, "token_file", stub)
+    monkeypatch.setattr(api, "client", mock_client(handler))
+    assert (await tool("get_my_cards"))["data"] == {"ok": 1} and stub.forgot == 1
+    monkeypatch.setattr(api, "client", mock_client(lambda r: httpx.Response(502, text="<html>bad gateway</html>")))
+    with pytest.raises(ToolError, match="연결할 수 없습니다"):  # JSON이 아닌 응답
+        await tool("get_my_cards")
