@@ -266,7 +266,7 @@
 | ✅ | POST | `/chat` | 🔒 | `message`(1000자까지), `session_id`(UUID, 없으면 새 대화) → `session_id`, `reply`, `routed`(일한 담당). 이체 등은 승인 대기까지, PIN은 승인 화면에서 |
 | ✅ | GET | `/chat/{session_id}` | 🔒 | 내 대화 기록(사람 말과 AI 답). 남의 대화방이면 빈 목록 |
 
-- 실패: `503 AI_DISABLED`(Gemini 키 없음), `503 AI_UNAVAILABLE`(LLM 실패), `429 AI_RATE_LIMITED`(RAG와 합쳐 사용자당 1분 10번)
+- 실패: `503 AI_DISABLED`(Gemini 키 없음), `503 AI_UNAVAILABLE`(LLM 실패·90초 초과), `409 CHAT_BUSY`(같은 대화방의 앞 메시지를 처리 중), `429 AI_RATE_LIMITED`(RAG와 같은 한도 1분 10, 채팅 한 번은 3으로 셈)
 - Agent가 만든 승인 대기는 `requested_by = AGENT`
 
 ```json

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 import pytest
@@ -7,7 +8,8 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
-from avengers_bank.domains.agent.graph import MAX_HOPS, Route
+from avengers_bank.domains.agent.graph import HISTORY, MAX_HOPS, Route, recent
+from avengers_bank.domains.agent.service import final_reply
 from avengers_bank.domains.agent.llm import get_llm
 from avengers_bank.domains.rag import router as rag_router
 from avengers_bank.main import app
@@ -25,6 +27,7 @@ class FakeChat(BaseChatModel):
     agent_inputs: list = Field(default_factory=list)  # 담당 Agent가 받은 메시지들
     supervisor_inputs: list = Field(default_factory=list)
     fail: bool = False
+    delay: float = 0.0  # 감독관이 생각하는 시간 (동시 요청 테스트)
 
     @property
     def _llm_type(self) -> str:
@@ -43,7 +46,11 @@ class FakeChat(BaseChatModel):
                 raise RuntimeError("Gemini 장애")
             self.supervisor_inputs.append(messages)
             return self.routes.pop(0)
-        return RunnableLambda(route)
+
+        async def aroute(messages):
+            await asyncio.sleep(self.delay)
+            return route(messages)
+        return RunnableLambda(route, afunc=aroute)
 
 
 def call(name, **args):
@@ -128,3 +135,34 @@ async def test_llm_failure_and_disabled(bank):
     res = await chat(client, tony, "내 계좌")  # 키가 없으면 (테스트는 항상 없음)
     assert res.status_code == 503 and res.json()["error"]["code"] == "AI_DISABLED"
     assert (await client.post("/chat", json={"message": "안녕"})).status_code == 401
+
+
+async def test_same_session_one_turn_at_a_time(bank):
+    client, tony, peter, src, dst, fake = bank
+    session_id = str(uuid.uuid4())
+    fake.delay = 0.2
+    fake.routes = [Route(next="FINISH", reply="네")]
+    first, second = await asyncio.gather(chat(client, tony, "안녕", session_id), chat(client, tony, "안녕", session_id))
+    assert sorted([first.status_code, second.status_code]) == [200, 409]  # 두 번 눌러도 한 턴만
+    assert 409 in (first.status_code, second.status_code)
+    busy = first if first.status_code == 409 else second
+    assert busy.json()["error"]["code"] == "CHAT_BUSY"
+
+
+async def test_compound_request_second_agent_gets_its_task(bank):
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Route(next="card"), Route(next="account"), Route(next="FINISH")]
+    fake.replies = [AIMessage("카드를 정지했어요."), AIMessage("잔액은 1,000,000원이에요.")]
+    data = (await chat(client, tony, "카드 정지하고 잔액 알려줘")).json()["data"]
+    assert data["routed"] == ["card", "account"] and data["reply"] == "잔액은 1,000,000원이에요."
+    second = fake.agent_inputs[1][-1]  # 두 번째 담당이 받은 마지막 메시지: 앞 담당의 AI 답이 아니라 할 일 안내
+    assert isinstance(second, HumanMessage) and "계좌" in second.content
+    history = (await client.get(f"/chat/{data['session_id']}", headers=tony)).json()["data"]
+    assert not any("상담 안내" in t["content"] for t in history)  # 안내는 저장하지 않음
+
+
+def test_recent_starts_at_human_and_reply_is_this_turn():
+    messages = [HumanMessage("q0")] + [m for i in range(HISTORY) for m in (AIMessage("", tool_calls=[
+        {"name": "x", "args": {}, "id": f"c{i}"}]), ToolMessage("r", tool_call_id=f"c{i}"))] + [HumanMessage("q1")]
+    assert isinstance(recent(messages)[0], HumanMessage)  # 도구 결과로 시작해서 짝이 어긋나지 않게
+    assert final_reply([HumanMessage("a"), AIMessage("예전 답"), HumanMessage("b")]).startswith("죄송합니다")

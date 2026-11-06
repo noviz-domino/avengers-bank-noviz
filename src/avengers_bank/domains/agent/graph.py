@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from avengers_bank.core.clock import today_kst
 
 MAX_HOPS = 3  # 한 턴에 도메인 Agent를 부르는 최대 횟수 (복합 요청 "정지하고 잔액 알려줘"는 2번)
+LABELS = {"account": "계좌", "card": "카드", "product": "상품·약관"}
 AgentName = Literal["account", "card", "product"]
 
 TOOLS: dict[str, list[str]] = {  # ADR 0014의 MCP 도구를 도메인별로 (ADR 0006)
@@ -72,6 +73,16 @@ def common_prompt() -> str:
     return COMMON.format(today=today_kst().isoformat())
 
 
+HISTORY = 30  # LLM에 보내는 최근 메시지 수. 저장은 전부 하고, 보낼 때만 자른다 (도구 결과가 쌓여 느려지고 비싸지지 않게)
+
+
+def recent(messages: list) -> list:
+    """최근 HISTORY개. 사람 말에서 시작하게 앞을 더 잘라서 도구 호출과 결과가 짝이 어긋나지 않게 한다"""
+    tail = messages[-HISTORY:]
+    start = next((i for i, m in enumerate(tail) if isinstance(m, HumanMessage)), 0)
+    return tail[start:]
+
+
 def answered_this_turn(messages) -> bool:
     """마지막 사람 메시지 뒤에 AI 답이 있나"""
     for m in reversed(messages):
@@ -85,7 +96,8 @@ def answered_this_turn(messages) -> bool:
 def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpointSaver):
     by_name = {t.name: t for t in tools}
     agents = {
-        name: create_agent(llm, [by_name[t] for t in names], name=name,
+        # checkpointer=False: 담당 Agent의 중간 상태는 따로 저장하지 않는다 (바깥 그래프가 결과만 저장, 중복 저장 방지)
+        name: create_agent(llm, [by_name[t] for t in names], name=name, checkpointer=False,
                            system_prompt=f"{common_prompt()}\n\n{PROMPTS[name]}")
         for name, names in TOOLS.items()
     }
@@ -93,7 +105,7 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
     async def supervisor(state: ChatState) -> Command:
         if state["hops"] >= MAX_HOPS:
             return Command(goto=END)
-        route = await llm.with_structured_output(Route).ainvoke([SystemMessage(SUPERVISOR), *state["messages"]])
+        route = await llm.with_structured_output(Route).ainvoke([SystemMessage(SUPERVISOR), *recent(state["messages"])])
         if route.next == "FINISH":
             if answered_this_turn(state["messages"]):
                 return Command(goto=END)
@@ -102,8 +114,12 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
 
     def domain(name: str):
         async def run(state: ChatState) -> Command:
-            out = await agents[name].ainvoke({"messages": state["messages"]})
-            new = out["messages"][len(state["messages"]):]  # 이 Agent가 더한 도구 호출·결과·답
+            # 복합 요청에서 두 번째 담당은 대화가 앞 담당의 답(AI)으로 끝난 채 불린다. 모델 차례로 끝난 대화에는
+            # 빈 답을 내는 모델이 있어서, 이번에 할 일을 사람 말로 붙인다. 이 안내는 저장하지 않는다
+            ask = HumanMessage(f"(상담 안내) 위 대화에서 아직 처리하지 않은 {LABELS[name]} 업무를 처리하세요.")
+            sent = [*recent(state["messages"]), ask]
+            out = await agents[name].ainvoke({"messages": sent})
+            new = out["messages"][len(sent):]  # 이 Agent가 더한 도구 호출·결과·답
             return Command(goto="supervisor", update={"messages": new, "hops": state["hops"] + 1})
         return run
 
