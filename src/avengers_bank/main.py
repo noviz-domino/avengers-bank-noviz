@@ -7,6 +7,8 @@ from avengers_bank.core.database import engine
 from avengers_bank.core.exception_handlers import register_exception_handlers
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.accounts.router import router as account_router
+from avengers_bank.domains.agent.checkpoint import postgres_saver
+from avengers_bank.domains.agent.router import router as chat_router
 from avengers_bank.domains.accounts.router import tx_router as transaction_router
 from avengers_bank.domains.approvals.router import router as approval_router
 from avengers_bank.domains.cards.router import products_router as card_product_router
@@ -23,7 +25,8 @@ from avengers_bank.domains.users.router import router as user_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        async with mcp.session_manager.run():  # /mcp 요청을 받는 동안 MCP 세션 관리자가 돈다
+        # /mcp 요청을 받는 동안 MCP 세션 관리자가 돌고, 대화는 PostgreSQL 체크포인터에 남는다
+        async with mcp.session_manager.run(), postgres_saver():
             yield
     finally:
         await engine.dispose()
@@ -49,6 +52,7 @@ app.include_router(card_product_router)
 app.include_router(card_system_router)
 app.include_router(rag_router)
 app.include_router(rag_system_router)
+app.include_router(chat_router)
 
 
 @app.get("/", response_model=SuccessResponse[dict[str, str]])

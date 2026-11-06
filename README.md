@@ -72,6 +72,19 @@ uv run fastapi dev
 
 API 문서: http://127.0.0.1:8000/docs
 
+## AI 상담 쓰기 (선택)
+
+`.env`에 `GEMINI_API_KEY`가 있으면(아래 "RAG 쓰기" 1~2) 로그인한 뒤 `POST /chat`으로 자연어 요청을 보낼 수 있습니다. 같은 `session_id`를 보내면 앞 대화를 기억합니다.
+
+| 예시 | 하는 일 |
+|---|---|
+| "내 계좌 얼마 있어?" | 계좌 담당 → `get_my_accounts` |
+| "어제 카페에서 얼마 썼어?" | 계좌 담당 → `search_transactions`(어제 날짜, 카페·간식) |
+| "피터한테 5만 원 보내줘" | 계좌 담당 → 받는 계좌를 되묻거나 `request_transfer` → **승인 대기**, PIN은 승인 화면에서 |
+| "카드 잃어버렸어" | 카드 담당 → 어느 카드인지·분실 신고 확인 → `suspend_card(lost)` |
+| "자유적금 우대금리 조건이 뭐야?" | 상품 담당 → `ask_bank_docs`(근거 인용) |
+| "카드 정지하고 남은 잔액 알려줘" | 카드 담당 → 계좌 담당 (복합 요청) |
+
 ## Claude Desktop에서 쓰기 (MCP, 선택)
 
 서버(`docker compose up`)를 띄운 뒤, 한 번 로그인해 refresh token을 파일(`~/.avengers-bank/mcp-token.json`)에 저장합니다. 비밀번호는 저장하지 않습니다.
@@ -137,6 +150,7 @@ PR을 올리거나 `main`에 push하면 GitHub Actions([`.github/workflows/ci.ym
 | accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), **예금 개설(PIN 승인)**, 내 계좌 목록과 총자산, 상세, 거래내역, 별칭, 입출금 계좌 해지 |
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → 거래 PIN 승인 → 실행(잔액·한도 재검사, 장부 두 줄), 거절, 멱등키, PIN 5회 잠금, 감사 기록 |
+| chat | ✅ AI 상담(`POST /chat`): 감독관 + 계좌·카드·상품 Agent, 대화 기억, 이체는 승인 대기까지. Gemini 무료 키 필요 |
 | mcp | ✅ AI 도구 16개(계좌·카드·상품, 이체는 승인 대기까지). HTTP `/mcp`(Bearer), 로컬 stdio(Claude Desktop) |
 | rag | ✅ 상품·약관 질문에 근거와 함께 답변(`/rag/ask`), 검색, 색인 갱신(`/system/rag/reindex`). Gemini 무료 키 필요 |
 | cards | ✅ 카드 상품, 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN 승인), 결제·취소·사용내역·한도(카드 행 잠금), 신용 대금 출금(`/system`, 서버 키) |

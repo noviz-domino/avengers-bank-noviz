@@ -20,6 +20,7 @@
 | [0012](0012-account-close.md) | 입출금 계좌 해지: 잔액 0·연결 카드 없음, 해지 뒤 환불은 상담원이 | 채택 | 2026-11-06 |
 | [0013](0013-agent-rag-plan.md) | Agent·RAG 구현 계획: Gemini 무료 티어(3.8 Flash, embedding-2), 우리 문서 + 상품 DB, RAG → MCP → Agent | 채택 | 2026-11-06 |
 | [0014](0014-mcp-server.md) | MCP 서버: HTTP(/mcp)와 로컬 stdio, 도구 16개, 사용자 토큰으로 REST만 | 채택 | 2026-11-06 |
+| [0015](0015-agent-chat.md) | AI 상담 Agent: 감독관 + 계좌·카드·상품 Agent, 도구는 메모리 연결 MCP, PostgreSQL 체크포인터 | 채택 | 2026-11-06 |
 
 ## 새로 쓰는 법
 

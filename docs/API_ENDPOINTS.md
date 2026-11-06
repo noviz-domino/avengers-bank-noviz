@@ -257,6 +257,22 @@
 - 결제 실패(신용): `409 CARD_OVERDUE` (대금을 못 낸 사용분이 있음, [ADR 0011](decisions/0011-card-bills.md))
 - 취소: 안 낸 것(`UNBILLED`·`BILLED`)은 기록만, 낸 것(체크카드, `PAID`)은 결제 계좌로 환불. 결제 계좌가 해지됐으면 **환불 대기**(`refund_pending: true`)로 두고 상담원이 다른 계좌로 보냄([ADR 0012](decisions/0012-account-close.md)). 실패: `404 CARD_TX_NOT_FOUND`, `409 CARD_TX_ALREADY_CANCELED`
 
+## chat: AI 상담 (`domains/agent`)
+
+자연어로 은행 업무를 합니다. 감독관이 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구(아래 절)로 REST를 부릅니다. 결정 이유: [ADR 0015](decisions/0015-agent-chat.md), 코드 설명: [가이드 12](guides/12-agent.md)
+
+| 상태 | 메서드 | 경로 | 인증 | 설명 |
+|---|---|---|---|---|
+| ✅ | POST | `/chat` | 🔒 | `message`(1000자까지), `session_id`(UUID, 없으면 새 대화) → `session_id`, `reply`, `routed`(일한 담당). 이체 등은 승인 대기까지, PIN은 승인 화면에서 |
+| ✅ | GET | `/chat/{session_id}` | 🔒 | 내 대화 기록(사람 말과 AI 답). 남의 대화방이면 빈 목록 |
+
+- 실패: `503 AI_DISABLED`(Gemini 키 없음), `503 AI_UNAVAILABLE`(LLM 실패), `429 AI_RATE_LIMITED`(RAG와 합쳐 사용자당 1분 10번)
+- Agent가 만든 승인 대기는 `requested_by = AGENT`
+
+```json
+{ "success": true, "data": { "session_id": "6f1c…", "reply": "피터님 계좌로 50,000원 이체를 요청했어요. 은행 앱 승인 화면에서 PIN을 입력해 주세요.", "routed": ["account"] } }
+```
+
 ## mcp: AI 도구 (`domains/mcp_server`)
 
 MCP(Model Context Protocol) 서버. 도구 16개가 아래 REST API를 사용자 토큰으로 부릅니다. 결정 이유: [ADR 0014](decisions/0014-mcp-server.md), 코드 설명: [가이드 11](guides/11-mcp.md)
