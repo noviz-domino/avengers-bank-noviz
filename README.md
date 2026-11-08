@@ -224,8 +224,6 @@ docker compose exec app alembic upgrade head
 
 ## 8. 문서
 
-모바일 UI 디자인을 이어서 작업하려면 [디자인 인계 문서](docs/design-drafts/HANDOFF.md)를 먼저 봅니다. 선택·미선택 시안 43개와 최신 결정, 남은 작업을 함께 보관했습니다.
-
 | 문서 | 내용 |
 |---|---|
 | [docs/planning/](docs/planning/README.md) | 기획서: 과제 요구사항, 기능 목록, 이용 흐름, 화면 구성, 실패 상황 |
