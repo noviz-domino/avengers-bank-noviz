@@ -1,0 +1,260 @@
+[
+  {
+    "file": "01-home-option-1-blue.png",
+    "description": "홈 초기 1번 — 최초 선택",
+    "source_file": "exec-0d871240-88dc-4612-9c77-99532bd86604.png",
+    "sha256": "FB66FAC822238BFF39462186CBB229CB6E15777373D1684C75A3F997863391A2"
+  },
+  {
+    "file": "02-home-option-2-white-shield.png",
+    "description": "홈 초기 2번 — 방패 로고 참조",
+    "source_file": "exec-9ce5b438-1b3b-4e7f-9960-c9ce9c2c7b53.png",
+    "sha256": "C4BFB61B8E2E8CCCCF6E60A9EE2F90F4A71B5E72E14DD41FAB7F441E31DB49E4"
+  },
+  {
+    "file": "03-home-option-3-navy.png",
+    "description": "홈 초기 3번",
+    "source_file": "exec-daf5d497-4498-47da-8f30-b66a0a8dde3f.png",
+    "sha256": "99EFE4537C56659C10B63F9F5B356D60FEE3483B9949913A0C0DF30B014DA1EA"
+  },
+  {
+    "file": "04-home-revision-wide.png",
+    "description": "홈 확장 수정 — 모바일 비율 수정 전",
+    "source_file": "exec-b7aeb108-d891-4381-8e07-b43a048eeeb7.png",
+    "sha256": "21BB0025C6521FE6688AFFD8B558D5BE756F9E2BEDE6DBD447138C671ABD72D0"
+  },
+  {
+    "file": "05-home-revision-mobile.png",
+    "description": "홈 확장 수정 — 모바일 세로형",
+    "source_file": "exec-113e212e-c06a-446d-ac86-afe1149dd56f.png",
+    "sha256": "04B918E5258E42234A48784B04AEF3ABE204DA629268E648DA6D05DCD34C43E2"
+  },
+  {
+    "file": "06-banner-bank-opening.png",
+    "description": "신규 오픈 배너",
+    "source_file": "exec-2be385cb-725f-4a8c-bd16-d5ca149da51f.png",
+    "sha256": "03E659FF67D07051D26A08536CCA0F51A67A22CCFE0002205A632B467ED78EA7"
+  },
+  {
+    "file": "07-banner-signup-event.png",
+    "description": "신규가입 이벤트 배너",
+    "source_file": "exec-03e37acf-0e89-494d-a7e8-59b7e6ccefd7.png",
+    "sha256": "FCA69DEA729E29B9005FED69CCCDE5207E17128D220CC66E8636FAC1F7C5A2DB"
+  },
+  {
+    "file": "08-home-banner-carousel-peek.png",
+    "description": "배너 배치 — 다음 장 노출 수정 전",
+    "source_file": "exec-c1a251e9-9927-405a-933b-10d4f9c07bba.png",
+    "sha256": "31CBFBDF6C33F0C076ADA076D5BBC1438B263689452E56F4531265B9AB3CC247"
+  },
+  {
+    "file": "09-home-banner-overlay-controls.png",
+    "description": "배너 한 칸 전환·이미지 위 제어",
+    "source_file": "exec-5eca1b6f-c463-42fc-84ce-882433b2ead6.png",
+    "sha256": "3F7943F3C0C1D764DF5208B42E4F34BFF1D8A8F99BDE363EF68C4DDB76A85934"
+  },
+  {
+    "file": "10-home-right-aligned-balances.png",
+    "description": "계좌 잔액 오른쪽 정렬",
+    "source_file": "exec-846c7a88-fa0f-4462-b6e0-838dbf7b9bc6.png",
+    "sha256": "DCBAFE0613E662532135EC83D358A167E9ADA58E8622BA9CC53872EB0FAABDAF"
+  },
+  {
+    "file": "11-home-shield-logo.png",
+    "description": "방패 로고 반영",
+    "source_file": "exec-a6b4299f-3e58-429d-b7b2-385994ae2f8d.png",
+    "sha256": "554091A8F9BF39D579FD37EAD48992A8871454E70FD33B9CB6CB4BD981B39AED"
+  },
+  {
+    "file": "12-home-cream-neutral.png",
+    "description": "크림·중성색 조정",
+    "source_file": "exec-eee82e5a-054a-4638-8d74-de1ce66589b9.png",
+    "sha256": "C1015A79AC777C40566CDC2498739798004E2C2102517380C962EF2703512426"
+  },
+  {
+    "file": "13-home-category-colors.png",
+    "description": "입출금 블루·예적금 세이지·최근 거래 앰버",
+    "source_file": "exec-a996a780-2369-4d5b-9af7-dd1d32e26f76.png",
+    "sha256": "1EFC1F302041D3C24485342D49E6AB7C7413F611CA138CE1B3CCF74783BECE3F"
+  },
+  {
+    "file": "14-home-compact-privacy-latest.png",
+    "description": "최신 홈 이미지 — 눈 아이콘 축소; 승인 대기 안내 제거는 미반영",
+    "source_file": "exec-30a64abe-e74d-455a-9704-f452814bfa7e.png",
+    "sha256": "433A2C9B27DA334EB687D0D2A5A021DD5C8C2A423F1F7C3D11D025BB8C51291D"
+  },
+  {
+    "file": "15-products-option-1-selected.png",
+    "description": "상품 1번 — 선택",
+    "source_file": "exec-c3714b27-b476-4da0-a8df-cea0df0566c8.png",
+    "sha256": "34439BA2FC468794233A1B40629E323A6D509F2E06EA4D39ADF58417BB11FAC9"
+  },
+  {
+    "file": "16-products-option-2.png",
+    "description": "상품 2번",
+    "source_file": "exec-9328f920-544f-47c1-9c86-97c54c23aeba.png",
+    "sha256": "EEF31026F58F46C405E37CEE99D27C95BAA114587D8E42FB407713A75CEC02BD"
+  },
+  {
+    "file": "17-products-option-3.png",
+    "description": "상품 3번",
+    "source_file": "exec-b8eaf9d4-91dd-4c0f-81ce-488a27ae72b9.png",
+    "sha256": "434D266492AA96F507EE8FAD00E8BFC3C12AF1496273B837BF807C1A00ACE8DB"
+  },
+  {
+    "file": "18-ai-chat-option-1.png",
+    "description": "AI 상담 1번",
+    "source_file": "exec-fbcbe446-a39e-491c-ad05-861de6d190f1.png",
+    "sha256": "C07409E6A9A8237A2AE2B3AEA08815FDC308B4563ABF139FEAAF389725CC7B00"
+  },
+  {
+    "file": "19-ai-chat-option-2.png",
+    "description": "AI 상담 2번",
+    "source_file": "exec-f6aceefb-aa8a-421c-aa9a-03e508d130cf.png",
+    "sha256": "CFE41121D2B72FC59524A01F286C08785DF75963F3CD068D490C5754D9D3B50D"
+  },
+  {
+    "file": "20-ai-chat-option-3-selected.png",
+    "description": "AI 상담 3번 — 선택",
+    "source_file": "exec-8c164d01-37bf-4a36-b359-3afb0bfe62ff.png",
+    "sha256": "AADA66747F27F295E74BB1A8ED8FD3F8D8FECDD105C5248A3D0E50FBBFA02D84"
+  },
+  {
+    "file": "21-cards-option-1.png",
+    "description": "카드 1번 — 카드 이미지 중심",
+    "source_file": "exec-40e79297-0ec4-40c9-86e6-5579aa8aeb87.png",
+    "sha256": "094E936419B70A5D910C9CD90D4E75B6E91226EB27B924EA1E06C56334009440"
+  },
+  {
+    "file": "22-cards-option-2.png",
+    "description": "카드 2번 — 이용금액 중심",
+    "source_file": "exec-9f812dd9-9a0f-402d-9dd3-6c4c8fe1d7b1.png",
+    "sha256": "A58B62B2E6EBEF71024ACB6B38DE84C5AC48C3DA446908EC8822F67F4ACDA5B2"
+  },
+  {
+    "file": "23-cards-option-3.png",
+    "description": "카드 3번 — 보유 카드 목록 중심",
+    "source_file": "exec-3ce8c342-3517-4555-917c-abdefd5c038d.png",
+    "sha256": "14C8006D50719795192ADB1A54E02EFD8861FD4B80FE82F5BDF5C256E8DDC074"
+  },
+  {
+    "file": "24-all-menu-option-1.png",
+    "description": "전체 메뉴 1번 — 주요 업무 아이콘과 설정 목록",
+    "source_file": "exec-ce0f64ee-a258-4162-96ad-9d3118e0e38e.png",
+    "sha256": "2EA44BD6B94C9B9E07CF40E96F077B85EBD1386180AF60C43FD613FB58BE2501"
+  },
+  {
+    "file": "25-all-menu-option-2.png",
+    "description": "전체 메뉴 2번 — 선택; 업무별 접기 펼치기",
+    "source_file": "exec-4759bf64-b722-4642-b8fa-8f4c851f4d8c.png",
+    "sha256": "1188919AC8FFDA1C07F9B02B0857F32B5B6270143115C48A527DF1C69E72A9F4"
+  },
+  {
+    "file": "26-all-menu-option-3.png",
+    "description": "전체 메뉴 3번 — 왼쪽 분류와 세부 메뉴",
+    "source_file": "exec-0bd7a2e9-baeb-4c92-a470-1c4cfc682236.png",
+    "sha256": "A7865A836D019663FFA3F6D52E32172C9A2CFF016569BB8E2FB66C8B4D2CEFCD"
+  },
+  {
+    "file": "27-account-detail-option-1.png",
+    "description": "계좌 상세 1번 — 잔액과 이체 중심",
+    "source_file": "exec-51cd5bc8-43a9-4ee1-9980-37caa7fd3f9b.png",
+    "sha256": "DEEBB71EDEAD58C5E90250D6C5AEC1E11FA9356085FABB582D903E85DA0D7072"
+  },
+  {
+    "file": "28-account-detail-option-2.png",
+    "description": "계좌 상세 2번 — 거래 검색과 내역 중심",
+    "source_file": "exec-c6636b9d-781e-4b09-bf1d-5d6b1e793982.png",
+    "sha256": "EBEE7C4CDA9576FB48010E84EAFB6FB96FE1F9DA91C71A04A1013FE4B37E2B8C"
+  },
+  {
+    "file": "29-account-detail-option-3.png",
+    "description": "계좌 화면 3번 — 선택; 하단 이체 버튼 고정, 정보 진입은 관리로 통합 예정",
+    "source_file": "exec-4769136e-3038-45d6-aba9-1b712ed7c95e.png",
+    "sha256": "9DD44B0048F8AC372DE19A34353057C4CF84176DEA8D8F45EC39487B1051CCB2"
+  },
+  {
+    "file": "30-transfer-option-1.png",
+    "description": "이체 1번 — 계좌와 금액 한 화면 입력",
+    "source_file": "exec-6336f8c2-fe19-484a-92de-7fef83f12ba8.png",
+    "sha256": "01664B8D99E668B5F0D68CFA66FFCEF3A5A9278BE2F0D5439D4EB797A63CDF88"
+  },
+  {
+    "file": "31-transfer-option-2.png",
+    "description": "이체 2번 — 받는 계좌부터 단계별 입력",
+    "source_file": "exec-d02baa89-a4d5-4f33-a9c4-c3e9d515c52b.png",
+    "sha256": "8893ABD03EAC3D00F9B5A6D1E5F8A6523EF0CEC12F21CCB2D7B10BEC28E27D53"
+  },
+  {
+    "file": "32-transfer-option-3.png",
+    "description": "이체 3번 — 계좌 연결 요약과 금액 강조",
+    "source_file": "exec-808f6bfe-de2e-4c32-ae06-1059e6aa6573.png",
+    "sha256": "33609CAA4A0A7E0C949B0DC7C4430EC08CC003B3EA8A29B008086D50C2BD81CB"
+  },
+  {
+    "file": "33-transfer-reference-toss.png",
+    "description": "이체 추가 시안 1 — 선택; 토스 공식 화면 참조, 간결한 질문형",
+    "source_file": "exec-c9614720-6892-40e6-bfdd-0b7d5d60d2fc.png",
+    "sha256": "8F23F0472799E51D463846160049BDC39974CB26E07E200AC1454CEDEB30E035"
+  },
+  {
+    "file": "34-transfer-reference-kakaopay.png",
+    "description": "이체 추가 시안 2 — 카카오페이 공식 2023 가이드 참조, 밑줄 입력형",
+    "source_file": "exec-efbd9ab2-76de-4f1d-97e4-2625fd290305.png",
+    "sha256": "FFA6301A13A1576D5EC9EBC7880955C258A741B440441AC7798770871C828405"
+  },
+  {
+    "file": "35-transfer-flow-amount.png",
+    "description": "이체 후속 흐름 — 금액 입력",
+    "source_file": "exec-34217717-b240-4955-93e3-ba598a95e695.png",
+    "sha256": "48B89078F7EE8A56A3804000C2C6C0F44A76F01383E3B0E730ABE45D83F994CD"
+  },
+  {
+    "file": "36-transfer-flow-review.png",
+    "description": "이체 후속 흐름 — 내용 확인",
+    "source_file": "exec-8ae6d84f-6033-407c-9736-ceae891c1912.png",
+    "sha256": "5B7728ACEBAFC65889EACDC86E98A2CE551EBB47C2CEBDCD79B1E1F8C94CB1A8"
+  },
+  {
+    "file": "37-transfer-flow-pin.png",
+    "description": "이체 후속 흐름 — 6자리 거래 PIN 승인",
+    "source_file": "exec-2fb542f0-c4fd-4e2f-86f9-7a1785e78d9c.png",
+    "sha256": "0489BF151F1D6FA4804B7845F86F8391018E5BF70E7C9B88FCDF2375453A0E5D"
+  },
+  {
+    "file": "38-transfer-flow-success.png",
+    "description": "이체 후속 흐름 — 서버 실행 확인 후 완료",
+    "source_file": "exec-15cdc20d-8b49-494a-a1db-91b7e71abb4d.png",
+    "sha256": "746EB8433288CDB27EA5BA23EA094005DA16E35B6E311C08573CCC87AB7892BD"
+  },
+  {
+    "file": "39-transfer-recipient-small-logo.png",
+    "description": "이체 최신 수정 — 받는 계좌, 상단 로고 제거·은행 로고 축소",
+    "source_file": "exec-7c6df83d-fcb5-43b8-a1e1-189e64edcb36.png",
+    "sha256": "D0EC0377A095041380ADDC485CF641A8A8ED039F9543CD165AC8D00FF7F5DF45"
+  },
+  {
+    "file": "40-transfer-amount-small-logo.png",
+    "description": "이체 최신 수정 — 금액 입력, 상단 로고 제거·은행 로고 축소",
+    "source_file": "exec-54694cb1-18b7-4d7b-82c2-6fc947068d65.png",
+    "sha256": "4D129016AAC41448F216B8052075A3D13338185E0617337EAC21476EDB73A589"
+  },
+  {
+    "file": "41-transfer-review-small-logo.png",
+    "description": "이체 최신 수정 — 내용 확인, 상단 로고 제거·은행 로고 축소",
+    "source_file": "exec-15f4d449-9446-4416-9048-566b261f66dd.png",
+    "sha256": "67984F0861B60E17B512916F93DF71366CC7F6AB0D173710F02B1D594D20882C"
+  },
+  {
+    "file": "42-transfer-pin-small-logo.png",
+    "description": "이체 최신 수정 — PIN, 상단 로고 제거·은행 로고 축소",
+    "source_file": "exec-c0973662-9f41-4da6-8bd0-237532ed3f60.png",
+    "sha256": "6E485A9122F76E03A470033AA6B86186E89803C3F3551822709E87843F6C4F92"
+  },
+  {
+    "file": "43-transfer-success-small-logo.png",
+    "description": "이체 최신 수정 — 완료, 상단 로고 제거·은행 로고 축소",
+    "source_file": "exec-7760ff87-81b6-483e-8ff4-795ed62cf7a8.png",
+    "sha256": "BEB86721FAB7E4B535920FF96D253187FA0A11798E445BE89140023AAF8D343F"
+  }
+]
