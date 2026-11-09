@@ -1,7 +1,6 @@
 import { approveTransfer, dailyLimit, money, newDemo, recipients, replyTo, transferError } from "./demo.mjs";
 import { mountCards } from "./cards.mjs";
-import { newCardsDemo } from "./cards-demo.mjs";
-import { renderProducts } from "./products.mjs";
+import { mountProducts } from "./products.mjs";
 
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
@@ -27,9 +26,8 @@ let pending;
 let responding = false;
 let chatTimer;
 let transfer;
-let cards = newCardsDemo();
 let unmountCards;
-let productKind = "all";
+let unmountProducts;
 
 const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -64,8 +62,6 @@ function reset() {
   pending = undefined;
   responding = false;
   transfer = undefined;
-  cards = newCardsDemo();
-  productKind = "all";
 }
 
 function header(title, back = "", right = "") {
@@ -256,15 +252,18 @@ function sendQuestion(question) {
 function render() {
   unmountCards?.();
   unmountCards = undefined;
+  unmountProducts?.();
+  unmountProducts = undefined;
   const page = currentPage();
   const body = {
     login, home, account: () => accountPage(false), manage: () => accountPage(true),
     chat: chatPage, transfer: transferPage,
     cards: () => '<div class="cards-screen" id="cards-screen"></div>' + nav("cards"),
-    products: () => '<div class="products-app">' + renderProducts(location.hash.slice(1), productKind, undefined, true) + '</div>' + nav("products"),
+    products: () => '<div class="products-app" id="products-screen"></div>' + nav("products"),
   }[page]();
   app.innerHTML = (page === "login" ? "" : '<div class="demo-label">DEMO · 시연용 은행</div>') + body;
-  if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { cards, embedded: true });
+  if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { embedded: true });
+  if (page === "products") unmountProducts = mountProducts(app.querySelector("#products-screen"), location.hash.slice(1));
   if (page === "chat" && chat.length) document.querySelector(".composer").scrollIntoView({ block: "nearest" });
 }
 
@@ -321,12 +320,6 @@ app.addEventListener("submit", (event) => {
 app.addEventListener("click", (event) => {
   const clicked = event.target.closest("button");
   if (!clicked) return;
-  if (clicked.dataset.productFilter) {
-    productKind = clicked.dataset.productFilter;
-    render();
-    app.querySelector('[data-product-filter="' + productKind + '"]')?.focus();
-    return;
-  }
   const { action, question, recipient } = clicked.dataset;
   if (question) return sendQuestion(question);
   if (recipient) {
