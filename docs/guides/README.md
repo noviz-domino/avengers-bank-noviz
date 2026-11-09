@@ -21,6 +21,7 @@
 | 10 | [RAG](10-rag.md) | 조항 단위 청크를 pgvector에. 벡터 + BM25를 RRF로 합쳐 근거 5개, Gemini가 근거만으로 답하고 서버가 인용을 검사 |
 | 11 | [MCP 서버](11-mcp.md) | 도구 16개가 사용자 토큰으로 REST만 부른다. HTTP(/mcp)와 로컬 stdio(refresh token 파일, 교체 잠금) |
 | 12 | [AI 상담 Agent](12-agent.md) | 라우터가 담당을 고르고, 담당은 MCP 도구로 REST를 부른다. 토큰은 ContextVar, 대화는 PostgreSQL |
+| 13 | [모바일 데모](13-mobile-demo.md) | 일반 이체와 상담 이체가 하나의 확인·PIN 승인 경로로 합류 |
 
 ## 면접에서 한 문장으로 말한다면
 
