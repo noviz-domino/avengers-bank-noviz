@@ -2,14 +2,14 @@
 
 > 코드 패키지·레포 이름은 처음 이름(`avengers_bank`, `avengers-bank-noviz`)을 그대로 씁니다([ADR 0017](docs/decisions/0017-rename-bank.md)).
 
-은행 앱 클론 백엔드입니다. 계좌·카드·이체 같은 은행 기능 위에 **자연어 AI 상담(LangGraph Agent)**과 **상품·약관 RAG**를 얹었고, AI가 무엇을 하든 **돈은 사람이 PIN으로 승인해야만 움직이도록** 서버가 강제합니다.
+은행 앱 클론입니다. 계좌·카드·이체 API에 **자연어 AI 상담(LangGraph Agent)**과 **상품·약관 RAG**를 연결했습니다. 서버는 거래 PIN으로 승인한 이체를 실행합니다. 모바일 화면은 별도로 데모 데이터로 체험할 수 있습니다.
 
 FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph · MCP · Gemini · Langfuse
 
 - **돈 처리**: 잔액·장부를 바꾸는 곳은 실행 함수 하나, 행 잠금, 요청 번호(같은 요청이 두 번 와도 한 번만), 승인 대기 + 거래 PIN
 - **AI 상담**: 라우터가 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구로 REST만 부름 → AI는 사용자보다 큰 권한이 없음
 - **RAG**: 상품 DB + 앱 규칙을 쓴 데모 약관, 벡터 + 단어 하이브리드 검색, 근거 인용(정답 세트 Hit@5 1.000)
-- **문서**: 설계 결정 18개(ADR), 기능별 코드 가이드 12개, 테스트 147개
+- **문서**: [설계 결정](docs/decisions/README.md), [기능별 코드 가이드](docs/guides/README.md)
 
 ## 목차
 
@@ -35,7 +35,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 | 자연어 입력 | `POST /chat`: 라우터 + 계좌·카드·상품 Agent, **대화 맥락 유지**(PostgreSQL), **정보가 부족하면 되묻기**, 이체·정지 해제는 승인 대기까지 |
 | RAG | `POST /rag/ask`, 상품 Agent의 `ask_bank_docs`: 상품 DB + 데모 약관, 조항 단위 청킹, 하이브리드 검색, 근거 인용, 근거 없으면 "자료 없음" |
 
-화면은 아직 없습니다. API 문서(`/docs`)로 확인합니다.
+모바일 데모는 로그인·계좌 조회·이체·AI 상담 흐름을 제공합니다. 백엔드 API는 실행 후 `/docs`에서 확인할 수 있습니다.
 
 ### 도메인별
 
@@ -54,6 +54,18 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 대출·예산 관리는 기획만 있고 구현하지 않았습니다([범위](docs/planning/scope.md)).
 
 ## 2. 실행 방법
+
+### 모바일 데모
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1 --directory frontend
+```
+
+[로컬 데모](http://127.0.0.1:8765/)에서 **데모로 시작하기**를 누릅니다. 생활비 통장에서 토니에게 5만 원을 보내며, 처음에는 시연용 6자리 PIN을 등록한 뒤 같은 PIN으로 승인합니다. AI 상담에서 같은 요청을 보내고 출금 계좌를 답하면 동일한 확인 화면으로 이어집니다. 브라우저를 새로고침하거나 로그아웃하면 시연 데이터가 초기화됩니다.
+
+데모 로직 테스트는 `node --test frontend/demo.test.mjs`로 실행합니다.
+
+### 백엔드
 
 Docker Desktop이 필요합니다. PostgreSQL(pgvector)은 컨테이너로 같이 뜹니다.
 
