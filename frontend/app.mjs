@@ -133,7 +133,7 @@ function campaignContent() {
   return '<div class="ui-campaign-copy"><small>' + (campaign ? "WELCOME" : "GRAND OPEN")
     + '</small><h2>' + (campaign ? "처음 만나는<br>나의 은행" : "새로운 금융의 시작<br>캡아메리카뱅크")
     + '</h2><a id="home-bank-intro" href="#products">은행 소개 보기 →</a></div>'
-    + '<img class="ui-campaign-art" src="./assets/event-bank.png" alt="" width="170" height="142">'
+    + '<img class="ui-campaign-art" src="./assets/event-bank.webp" alt="" width="170" height="142">'
     + '<div class="ui-campaign-controls">'
     + uiButton((campaign + 1) + " / 2", { action: "campaign", variant: "pill", ariaLabel: "이벤트 " + (campaign + 1) + " / 2, 다음 이벤트 보기", className: "ui-campaign-page" })
     + uiButton("", { action: "campaign-pause", variant: "pill", icon: campaignPaused ? "play" : "pause", ariaLabel: campaignPaused ? "이벤트 자동 넘김 재생" : "이벤트 자동 넘김 일시정지", pressed: campaignPaused }) + '</div>';
