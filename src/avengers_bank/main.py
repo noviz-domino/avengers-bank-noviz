@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from avengers_bank.core.database import engine
 from avengers_bank.core.exception_handlers import register_exception_handlers
@@ -38,7 +40,8 @@ mcp_app = mcp.streamable_http_app()  # session_manager는 이걸 만들 때 생�
 app = FastAPI(title="캡아메리카뱅크 (CapAmericaBank)", lifespan=lifespan, responses=error_responses(500))
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    # 5173: 팀 프론트 개발 서버, 8765: 모바일 데모 개발 서버(python -m http.server)
+    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173", "http://127.0.0.1:8765", "http://localhost:8765"],
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
@@ -63,3 +66,8 @@ async def get_root():
 # MCP(ADR 0014): Authorization 헤더의 사용자 토큰으로 위 REST API를 부르는 도구들.
 # mount 대신 경로 하나로 붙인다: mount는 /mcp를 /mcp/로 307 리다이렉트해서 따라가지 않는 클라이언트가 실패한다
 app.add_route("/mcp", mcp_app)
+
+# 모바일 웹 앱을 같은 서버의 /app에서 서빙한다 (같은 주소라 CORS·API 주소 설정이 필요 없음, 배포 단위 하나)
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+if FRONTEND_DIR.is_dir():
+    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
