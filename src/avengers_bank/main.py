@@ -40,8 +40,8 @@ mcp_app = mcp.streamable_http_app()  # session_manager는 이걸 만들 때 생�
 app = FastAPI(title="캡아메리카뱅크 (CapAmericaBank)", lifespan=lifespan, responses=error_responses(500))
 app.add_middleware(
     CORSMiddleware,
-    # 5173: 팀 프론트 개발 서버, 8765: 모바일 데모 개발 서버(python -m http.server)
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173", "http://127.0.0.1:8765", "http://localhost:8765"],
+    # 내 PC의 개발 서버(팀 프론트 5173, 모바일 http.server 등)만 허용. 배포 주소는 같은 출처(/app)라 필요 없음
+    allow_origin_regex=r"http://(127\.0\.0\.1|localhost):\d+",
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )

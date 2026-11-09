@@ -13,7 +13,7 @@
 - `frontend/api.mjs` 하나가 서버 호출을 맡는다: 공통 응답(`data`/`error.code`) 해석, access token 만료 시 refresh 한 번 후 재시도, 세션 만료 알림, 중복 방지 키.
 - 토큰은 `sessionStorage`에 둔다(탭을 닫으면 사라짐). 새로고침해도 로그인이 유지된다.
 - FastAPI가 `frontend/`를 `/app`에 정적으로 서빙한다. 같은 주소라 API 주소·CORS 설정이 필요 없고 배포 단위가 컨테이너 하나다.
-- 개발 중에는 `python -m http.server 8765`도 쓸 수 있게 CORS에 8765를 추가했다. 이때 `api.mjs`가 8000번을 부른다.
+- 개발 중에는 `python -m http.server <포트>`도 쓸 수 있게 CORS에 내 PC 주소(127.0.0.1·localhost의 모든 포트)를 허용한다. 이때 `api.mjs`가 8000번을 부른다.
 - 돈 이동은 서버의 승인 대기 → PIN 승인 흐름을 그대로 쓴다. 화면은 서버가 만든 승인 `summary`를 보여 주고, 완료는 서버 실행 성공 뒤에만 표시한다.
 
 ## 검토한 대안

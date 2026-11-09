@@ -1,5 +1,6 @@
-// 실제 백엔드 API 클라이언트. 서버가 /app으로 서빙하면 같은 주소, 개발 서버(8765)면 8000번을 부른다.
-const BASE = globalThis.location?.port === "8765" ? "http://127.0.0.1:8000" : "";
+// 실제 백엔드 API 클라이언트. 서버가 /app으로 서빙하면 같은 주소, 로컬 개발 서버(다른 포트)면 8000번을 부른다.
+const local = ["127.0.0.1", "localhost"].includes(globalThis.location?.hostname);
+const BASE = local && globalThis.location.port !== "8000" ? "http://127.0.0.1:8000" : "";
 const KEY = "capbank.tokens";
 
 const store = {
