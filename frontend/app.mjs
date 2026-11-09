@@ -219,8 +219,9 @@ function login() {
     + (notice ? '<p class="note" role="status">' + escape(notice) + "</p>" : "")
     + '<p class="error" role="alert">' + escape(error) + '</p>'
     + '<button class="primary"' + (busy ? " disabled" : "") + '>' + (busy ? "로그인 중…" : "로그인") + "</button>"
-    + button("demo-login", "데모 계정으로 시작하기", "outline") + '<p class="note">데모 계정은 시연용이에요.</p></form>'
-    + '<p class="link-line">' + button("signup", "회원가입", "") + "</p></main>";
+    + "</form>"
+    + '<div class="login-extra">' + button("demo-login", "데모 계정으로 시작하기", "outline")
+    + '<p class="note">데모 계정은 시연용이에요.</p>' + button("signup", "회원가입", "link") + "</div></main>";
 }
 
 function startTransfer(source, draft, from = currentPage()) {
