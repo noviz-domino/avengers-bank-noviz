@@ -7,6 +7,9 @@
 | 홈·계좌·이체·상담 화면 이동 | `frontend/app.mjs`의 `go`, `render` |
 | 상담 응답과 누락 정보 확인 | `frontend/demo.mjs`의 `replyTo` |
 | 이체 확인과 승인 | `frontend/demo.mjs`의 `transferError`, `approveTransfer` |
+| 카드 화면·상태 | `frontend/cards.mjs`의 `mountCards`, `cards-demo.mjs` |
+| 상품 목록·상세·금리 | `frontend/products.mjs`의 `renderProducts`, `products-data.mjs` |
+| 실제 브라우저 통합 검증 | `frontend/integration.browser.mjs`의 `verifyIntegration` |
 
 ## 사용 흐름
 
@@ -22,6 +25,18 @@ step("done");
 ```
 
 확인 버튼만으로 잔액을 바꾸지 않습니다. 승인 함수가 PIN과 이체 조건을 검사한 뒤 한 번에 잔액과 거래내역을 갱신합니다. 금액 초안은 직접 입력하거나 상담에서 받은 값이므로 승인 시에도 같은 조건을 확인합니다.
+
+## 카드·상품 통합과 검증
+
+공통 라우터는 `#cards`, `#products`, `#product/<id>`를 로그인 이후 허용합니다. 상품은 `renderProducts`로 공통 라우터에서 렌더링해 독립 페이지의 해시 리스너와 충돌하지 않게 했습니다. 상품 분류는 앱 상태에 보관합니다. 카드는 전용 컨테이너에 마운트하고 화면 교체 전에 반환된 정리 함수를 호출합니다. 카드 상태 배열은 앱에 보관해 메뉴 왕복 후에도 정지·분실 상태가 유지됩니다. 보기 방식과 선택 카드는 재진입 시 초기화합니다. 로그아웃은 계좌·카드·상품 상태를 모두 초기화합니다.
+
+`cards.html`·`products.html`은 독립 확인용으로 유지합니다. 통합 화면에서는 `embedded` 옵션으로 중복 데모 표시를 숨기고 공통 메뉴를 표시합니다. 새 패키지나 서버 변경은 없습니다.
+
+검증: 정적 서버로 앱을 연 뒤 브라우저 개발자 도구에서 아래를 실행합니다. 데모 상태를 초기화하며 로그인 보호·메뉴·카드 확인 대화상자·상태 유지·상품 필터·뒤로/앞으로·없는 상품·계좌 별칭·직접/상담 이체·로그아웃 초기화를 확인합니다. 모바일 320·390·480px에서 반복합니다.
+
+```javascript
+await (await import('/integration.browser.mjs')).verifyIntegration()
+```
 
 ## 면접 예상 질문
 

@@ -11,7 +11,7 @@
 .products-app .product-feature { position: relative; overflow: hidden; padding: 20px 16px 16px; background: #fcf6ec; border-radius: 20px; }
 .products-app .product-badge { display: inline-block; border-radius: 20px; padding: 4px 12px; background: #e3ebcc; color: #41552c; font-size: .85rem; font-weight: 750; }
 .products-app .product-feature h2 { margin-top: 8px; font-size: 1.05rem; }
-.products-app .product-headline { margin: 12px 0 20px; font-size: 1.3rem; font-weight: 850; letter-spacing: -.05em; }
+.products-app .product-headline { margin: 12px 0 20px; font-size: 1.3rem; font-weight: 850; letter-spacing: -.05em; word-break: keep-all; }
 .products-app .product-rates { display: flex; align-items: center; gap: 16px; margin-top: 20px; font-variant-numeric: tabular-nums; }
 .products-app .product-rates > div + div { padding-left: 16px; border-left: 1px solid #d9d5c9; }
 .products-app .product-rates small { color: var(--navy); font-size: .8rem; }

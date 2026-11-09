@@ -35,7 +35,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 | 자연어 입력 | `POST /chat`: 라우터 + 계좌·카드·상품 Agent, **대화 맥락 유지**(PostgreSQL), **정보가 부족하면 되묻기**, 이체·정지 해제는 승인 대기까지 |
 | RAG | `POST /rag/ask`, 상품 Agent의 `ask_bank_docs`: 상품 DB + 데모 약관, 조항 단위 청킹, 하이브리드 검색, 근거 인용, 근거 없으면 "자료 없음" |
 
-모바일 데모는 로그인·계좌 조회·이체·AI 상담 흐름을 제공합니다. 백엔드 API는 실행 후 `/docs`에서 확인할 수 있습니다.
+모바일 데모는 로그인·계좌 조회·이체·카드·상품·AI 상담 흐름을 제공합니다. 백엔드 API는 실행 후 `/docs`에서 확인할 수 있습니다.
 
 ### 도메인별
 
@@ -63,7 +63,9 @@ python -m http.server 8765 --bind 127.0.0.1 --directory frontend
 
 [로컬 데모](http://127.0.0.1:8765/)에서 **데모로 시작하기**를 누릅니다. 생활비 통장에서 토니에게 5만 원을 보내며, 처음에는 시연용 6자리 PIN을 등록한 뒤 같은 PIN으로 승인합니다. AI 상담에서 같은 요청을 보내고 출금 계좌를 답하면 동일한 확인 화면으로 이어집니다. 브라우저를 새로고침하거나 로그아웃하면 시연 데이터가 초기화됩니다.
 
-데모 로직 테스트는 `node --test frontend/demo.test.mjs`로 실행합니다.
+하단 공통 메뉴에서 카드와 상품을 엽니다. 카드의 보기 방식·선택은 진입할 때 초기화하지만 정지·분실 상태는 메뉴를 오가도 유지합니다. 상품 분류는 상세·목록·다른 메뉴를 오가도 유지합니다. 로그아웃·새로고침하면 모두 초기화합니다. 카드·계좌 내역은 서로 독립된 데모 데이터이며 실제 결제·상품 가입·서버 인증 API에는 연결하지 않습니다. 독립 화면 `/cards.html`, `/products.html`도 유지합니다.
+
+데모 로직 테스트는 `node --test frontend/demo.test.mjs frontend/cards.test.mjs frontend/products.test.mjs`로 실행합니다. 브라우저 통합 확인은 [모바일 데모 가이드](docs/guides/13-mobile-demo.md)를 봅니다.
 
 ### 백엔드
 

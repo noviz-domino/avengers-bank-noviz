@@ -31,8 +31,7 @@ function transactionRows(transactions) {
 }
 
 // Owns only the supplied root; the common app router can mount/unmount this at integration.
-export function mountCards(root) {
-  const cards = newCardsDemo();
+export function mountCards(root, { cards = newCardsDemo(), embedded = false } = {}) {
   let selectedId = cards[0].id;
   let view = "large";
   let page = "overview";
@@ -78,10 +77,10 @@ export function mountCards(root) {
 
   function render() {
     const card = selected();
-    root.innerHTML = `<div class="demo-label">카드 전용 데모 · 2026.11 · 실제 결제·API 연결 없음</div>
+    root.innerHTML = `${embedded ? "" : '<div class="demo-label">카드 전용 데모 · 2026.11 · 실제 결제·API 연결 없음</div>'}
       <header class="topbar"><div>${page === "overview" ? `<span class="brand">${shield}캡아메리카뱅크</span>` : button(page === "limit" ? "manage" : "overview", "←", "back", 'aria-label="뒤로 가기"') + '<span>내 카드</span>'}</div></header>
       <main>${page === "overview" ? '<div class="spread"><h1>카드</h1><span class="cards-demo-tag">내 지갑 한눈에</span></div>' + overview(card) : detail(card)}</main>
-      <footer class="cards-footer">시연 기준 ${demoMonth} · 카드 ${cards.length}장<br>공통 메뉴 연결은 통합 단계에서 제공해요.</footer>
+      <footer class="cards-footer">시연 기준 ${demoMonth} · 카드 ${cards.length}장<br>${embedded ? "실제 결제·API 연결 없음 · 로그아웃하면 초기화돼요." : "카드 전용 데모 · 실제 결제·API 연결 없음"}</footer>
       <dialog class="cards-dialog"><h2 id="cards-confirm-title">${confirmStatus === "LOST" ? "분실 신고할까요?" : "일시정지할까요?"}</h2><p>${card.name} · •••• ${card.last4}</p><p class="note">${confirmStatus === "LOST" ? "분실 신고 후에는 다시 사용할 수 없어요. 재발급이 필요해요." : "카드 사용을 잠시 멈춰요. 정지 해제는 PIN 승인이 필요해요."} 이 변경은 데모에만 적용돼요.</p><div class="cards-dialog-actions">${button("cancel", "취소", "outline")}${button("confirm", "데모에서 적용", "primary")}</div></dialog>`;
     if (confirmStatus) {
       const dialog = root.querySelector("dialog");

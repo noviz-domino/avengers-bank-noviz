@@ -128,14 +128,15 @@ main > * + * { margin-top: 20px; }
   bottom: 0;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   padding: 3px 12px max(5px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
   background: #fff;
 }
-.bottom-nav button { display: grid; place-items: center; min-height: 52px; border: 0; background: transparent; color: var(--muted); font-size: .8rem; }
+.bottom-nav button { display: grid; place-items: center; min-height: 52px; padding-inline: 2px; border: 0; background: transparent; color: var(--muted); font-size: .75rem; white-space: nowrap; }
 .bottom-nav span { font-size: 1.35rem; }
 .bottom-nav [aria-current="page"] { color: var(--blue); font-weight: 800; }
+.app > .cards-screen, .app > .products-app { flex: 1; }
 .primary {
   width: 100%;
   min-height: 49px;
