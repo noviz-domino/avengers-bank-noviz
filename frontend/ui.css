@@ -1,0 +1,132 @@
+:root {
+  --ui-cream: #fbf5e9;
+  --ui-white: #fff;
+  --ui-navy: #10233b;
+  --ui-blue: #235b91;
+  --ui-blue-soft: #eef5fc;
+  --ui-sage: #487657;
+  --ui-sage-soft: #eef6f0;
+  --ui-amber: #96611c;
+  --ui-amber-soft: #fcf3e3;
+  --ui-error: #a22938;
+  --ui-muted: #647083;
+  --ui-line: #edf0f3;
+  --ui-title-size: 26px;
+  --ui-section-size: 18px;
+  --ui-body-size: 15px;
+  --ui-small-size: 13px;
+  --ui-page-gutter: 24px;
+  --ui-space-xs: 4px;
+  --ui-space-sm: 8px;
+  --ui-space-md: 16px;
+  --ui-space-lg: 24px;
+  --ui-radius-sm: 10px;
+  --ui-radius: 16px;
+  --ui-shadow: 0 4px 18px #10233b0a;
+  --ui-touch: 44px;
+}
+[hidden] { display: none !important; }
+.ui-icon { display: block; width: 24px; height: 24px; flex: 0 0 24px; }
+.ui-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--ui-space-sm);
+  min-height: var(--ui-touch); min-width: var(--ui-touch); padding: 8px 16px;
+  border: 0; border-radius: var(--ui-radius-sm); background: transparent;
+  color: var(--ui-blue); font-size: var(--ui-body-size); font-weight: 700;
+  white-space: nowrap; flex-shrink: 0; text-decoration: none;
+}
+.ui-button--primary { background: var(--ui-blue); color: var(--ui-white); }
+.ui-button--outline { background: var(--ui-white); border: 1px solid var(--ui-blue); }
+.ui-button--quiet { background: transparent; }
+.ui-button--pill { background: #10233bb3; color: var(--ui-white); border-radius: 999px; padding-inline: 10px; font-size: var(--ui-small-size); }
+.ui-button:disabled { opacity: .5; }
+.ui-header { display: flex; align-items: center; gap: var(--ui-space-sm); min-height: 64px; padding: 8px var(--ui-page-gutter); background: var(--ui-white); }
+.ui-header-title { flex: 1; min-width: 0; font-size: var(--ui-section-size); font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
+.ui-header-actions { display: flex; align-items: center; }
+.ui-header .brand { font-size: 20px; letter-spacing: -.04em; }
+.ui-back { width: var(--ui-touch); height: var(--ui-touch); padding: 0; margin-left: -12px; color: var(--ui-navy); }
+.ui-page-title { color: var(--ui-navy); font-size: var(--ui-title-size); line-height: 1.35; letter-spacing: -.035em; word-break: keep-all; overflow-wrap: anywhere; }
+.ui-section-head { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space-sm); width: 100%; min-height: var(--ui-touch); padding: 0 12px; border-radius: var(--ui-radius-sm); }
+.ui-section-head h2, h2.ui-section-head { font-size: var(--ui-section-size); line-height: 1.4; }
+.ui-section-head h2 { display: flex; align-items: center; gap: var(--ui-space-sm); color: var(--ui-navy); }
+h2.ui-section-head > button { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--ui-space-sm); width: calc(100% + 24px); min-height: var(--ui-touch); margin-inline: -12px; padding: 8px 12px; border: 0; border-radius: inherit; background: transparent; text-align: left; }
+.ui-section-label { display: flex; align-items: center; gap: var(--ui-space-sm); color: var(--ui-navy); word-break: keep-all; }
+.ui-section-label > .ui-icon { color: var(--ui-blue); }
+.ui-tone-sage .ui-section-label > .ui-icon { color: var(--ui-sage); }
+.ui-section-label strong { font-size: var(--ui-section-size); }
+.ui-section-end { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: var(--ui-body-size); color: var(--ui-muted); white-space: nowrap; }
+.ui-section-end > .ui-icon { color: var(--ui-navy); width: 18px; flex-basis: 18px; }
+[aria-expanded="true"] .ui-section-end > .ui-icon { transform: rotate(180deg); }
+.ui-tone-blue { background: var(--ui-blue-soft); color: var(--ui-blue); }
+.ui-tone-sage { background: var(--ui-sage-soft); color: var(--ui-sage); }
+.ui-tone-amber { background: var(--ui-amber-soft); color: var(--ui-amber); }
+.ui-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--ui-space-sm); padding: 16px 0; border-bottom: 1px solid var(--ui-line); list-style: none; }
+.ui-row:has(> .ui-row-icon) { grid-template-columns: 28px minmax(0, 1fr) auto; }
+.ui-row-icon { display: grid; place-items: center; margin-top: 3px; background: transparent; }
+.ui-row-icon .ui-icon { width: 28px; height: 28px; }
+.ui-row-title { min-width: 0; text-align: left; }
+button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; background: transparent; }
+.ui-row-copy strong { display: block; font-size: 16px; line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; }
+.ui-row-copy small { display: block; margin-top: 2px; color: var(--ui-muted); font-size: var(--ui-small-size); line-height: 1.5; overflow-wrap: anywhere; }
+.ui-row-end { display: flex; flex-direction: column; align-items: flex-end; gap: var(--ui-space-sm); text-align: right; }
+.ui-row-end > strong { font-size: var(--ui-section-size); line-height: 1.5; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui-row-end .ui-button { padding: 6px 20px; }
+.ui-credit { color: var(--ui-blue); }
+.ui-card { padding: var(--ui-space-md); border-radius: var(--ui-radius); background: var(--ui-cream); box-shadow: var(--ui-shadow); }
+.ui-state { display: grid; justify-items: start; gap: var(--ui-space-md); padding: var(--ui-space-lg); color: var(--ui-muted); font-size: var(--ui-body-size); }
+.ui-state--error p, .ui-field .ui-field-error { color: var(--ui-error); }
+.ui-field { display: grid; gap: var(--ui-space-sm); font-size: var(--ui-body-size); }
+.ui-field + .ui-field { margin-top: var(--ui-space-md); }
+.ui-field input { min-height: var(--ui-touch); border: 1px solid #cbd5df; border-radius: var(--ui-radius-sm); padding: 10px 12px; background: #f7f9fb; color: var(--ui-navy); }
+.ui-field [aria-invalid="true"] { border-color: var(--ui-error); }
+.ui-field .ui-hint, .ui-field .ui-field-error { margin: 0; font-size: var(--ui-small-size); line-height: 1.5; }
+.ui-hint { color: var(--ui-muted); }
+.ui-tabs { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 8px 12px max(8px, env(safe-area-inset-bottom)); border-top: 1px solid var(--ui-line); background: var(--ui-white); }
+.ui-tab { display: grid; justify-items: center; align-content: center; gap: var(--ui-space-xs); min-width: 0; min-height: 52px; padding: 0; border: 0; background: transparent; color: var(--ui-muted); font-size: var(--ui-small-size); white-space: nowrap; }
+.ui-tab[aria-current="page"] { color: var(--ui-blue); font-weight: 800; }
+.ui-tab[aria-current="page"][data-action="home"] .ui-icon { fill: currentColor; }
+
+/* 홈만 새 값으로 맞춰, 2단계 이전의 화면별 CSS에는 영향을 주지 않는다. */
+.ui-home { padding: 0 var(--ui-page-gutter) 24px; color: var(--ui-navy); font-size: var(--ui-body-size); }
+.ui-home > * + * { margin-top: var(--ui-space-md); }
+.ui-home .ui-balance { margin-inline: calc(-1 * var(--ui-page-gutter)); padding: 8px var(--ui-page-gutter) 13px; background: #f4f5f6; }
+.ui-balance > div { display: flex; justify-content: space-between; align-items: center; }
+.ui-balance p { color: var(--ui-navy); font-size: var(--ui-section-size); font-weight: 800; }
+.ui-balance .ui-button { padding: 0; color: var(--ui-muted); }
+.ui-balance h1 { font-size: 36px; line-height: 1.3; letter-spacing: -.035em; font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
+.ui-campaign { position: relative; isolation: isolate; overflow: hidden; min-height: 144px; margin-block: 24px 16px; padding: 9px 16px; border-radius: var(--ui-radius); background: var(--ui-cream); }
+.ui-campaign-copy { position: relative; z-index: 1; max-width: 66%; pointer-events: none; }
+.ui-campaign small { font-size: var(--ui-small-size); font-weight: 800; color: var(--ui-navy); }
+.ui-campaign h2 { margin-top: 8px; font-size: 20px; line-height: 1.25; letter-spacing: -.04em; word-break: keep-all; }
+.ui-campaign a { display: inline-flex; align-items: center; min-height: var(--ui-touch); margin-top: 2px; color: var(--ui-navy); font-size: var(--ui-body-size); font-weight: 800; text-decoration: none; pointer-events: auto; }
+.ui-campaign-art { position: absolute; right: -4px; bottom: 4px; z-index: 0; width: 170px; height: 142px; object-fit: contain; }
+.ui-campaign-controls { position: absolute; right: 8px; bottom: 6px; z-index: 2; display: flex; border-radius: 999px; background: #10233bb3; color: white; }
+.ui-campaign-controls .ui-button { background: transparent; padding-inline: 6px; min-width: var(--ui-touch); }
+.ui-campaign-controls .ui-icon { width: 16px; height: 16px; flex-basis: 16px; }
+.ui-home ul { margin: 0; padding: 0; list-style: none; }
+.ui-home .account-group .ui-row { padding-block: 10px; }
+.ui-home .account-group .ui-row-end { gap: 0; }
+.ui-home .ui-section-head > .ui-button { padding: 0; color: var(--ui-amber); font-size: var(--ui-small-size); }
+.ui-home .ui-section-head h2 { white-space: nowrap; }
+.ui-home .ui-section-head h2 .ui-icon { color: var(--ui-amber); }
+.ui-home .ui-recent .ui-row { align-items: center; padding-block: 4px; }
+.ui-ai { background: #f3f5f6; }
+.ui-ai h2 { display: flex; align-items: center; gap: var(--ui-space-sm); font-size: var(--ui-section-size); word-break: keep-all; }
+.ui-ai h2 .ui-icon { width: 28px; height: 28px; }
+.ui-ai-prompt { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space-sm); width: 100%; margin-top: 12px; padding: 8px 12px; border: 0; border-radius: var(--ui-radius-sm); background: var(--ui-white); color: var(--ui-muted); font-size: var(--ui-body-size); font-weight: 500; text-align: left; white-space: normal; word-break: keep-all; }
+@media (max-width: 340px) {
+  :root { --ui-page-gutter: 16px; }
+  .ui-section-head { padding-inline: 8px; }
+  h2.ui-section-head > button { width: calc(100% + 16px); margin-inline: -8px; padding-inline: 8px; }
+  .ui-section-label strong { font-size: 16px; }
+  .ui-section-label { gap: 6px; }
+  .ui-section-end { gap: 2px; font-size: var(--ui-small-size); }
+  .ui-row:has(> .ui-row-icon) { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px; }
+  .ui-row-icon .ui-icon { width: 22px; height: 22px; }
+  .ui-row-copy strong { font-size: 14px; }
+  .ui-row-copy small { font-size: 12px; }
+  .ui-row-end > strong { font-size: 16px; }
+  .ui-balance h1 { font-size: 32px; }
+  .ui-campaign { padding-inline: 12px; }
+  .ui-campaign h2 { font-size: 18px; }
+  .ui-campaign-art { right: -10px; width: 145px; }
+}

@@ -61,10 +61,27 @@ export async function verifyIntegration(win = window) {
   await waitFor(() => /\d원/.test(q(".balance h1")?.textContent ?? ""), "홈 총자산");
   step("데모 로그인 후 홈에 총자산 표시");
   fits("홈");
+  const tabs = [...doc.querySelectorAll('.ui-tabs [data-action]')].map((tab) => tab.dataset.action);
+  if (tabs.join() !== "home,products,chat,cards,menu") throw new Error("하단 탭 순서가 시안과 다름");
+  q('[data-action="privacy"]').focus();
+  await action("privacy");
+  if (doc.activeElement.dataset.action !== "privacy" || doc.activeElement.getAttribute("aria-pressed") !== "true") throw new Error("잔액 숨김 후 포커스·상태를 유지해야 함");
+  await action("privacy");
+  q('[data-action="toggle-checking"]').focus();
+  await action("toggle-checking");
+  if (doc.activeElement.dataset.action !== "toggle-checking" || !q("#home-checking").hidden) throw new Error("계좌 접기 후 포커스·숨김을 유지해야 함");
+  await action("toggle-checking");
+  step("5개 하단 탭과 잔액 토글의 포커스·상태 유지");
 
   // 4. 계좌 상세 + 거래내역, 별칭 변경·복원
   const rows = await waitFor(() => (checkingRows().length >= 2 ? checkingRows() : false), "입출금 계좌 2개 이상");
   const [from, to] = rows;
+  if (!/^\d{3}-\*\*\*-\d{6}$/.test(to.num)) throw new Error("홈 계좌번호 가운데 자리를 가려야 함");
+  await click(`[data-action="account-${to.id}"]`);
+  to.num = (await waitSel(".hero > small")).textContent;
+  await action("home");
+  await waitFor(() => checkingRows().length >= 2, "홈 복귀");
+  step("홈 계좌번호 가림·상세의 전체 번호 확인");
   await click(`[data-action="account-${from.id}"]`);
   await waitFor(() => q(".rows li") || q(".empty"), "거래내역 목록");
   await waitText("잔액");
@@ -121,6 +138,12 @@ export async function verifyIntegration(win = window) {
   await waitSel('[data-card-action^="select-"]');
   step("카드 목록 표시");
   fits("카드");
+  await click('[data-card-action="issue"]');
+  await click('[name="product_id"][data-type="DEBIT"]');
+  const paymentDay = q('[data-credit-only]');
+  if (!paymentDay.hidden || win.getComputedStyle(paymentDay).display !== "none") throw new Error("체크카드는 결제일 입력칸을 숨겨야 함");
+  step("체크카드 발급의 결제일 입력칸을 실제로 숨김");
+  await click('[data-card-action="overview"]');
   await click('[data-card-action="view-list"]');
   (await waitSel('[data-card-action^="select-"]')).click();
   await click('[data-card-action="manage"]');

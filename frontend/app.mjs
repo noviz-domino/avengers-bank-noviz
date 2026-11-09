@@ -7,6 +7,7 @@ import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
 import { mountSearch } from "./search.mjs";
+import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus } from "./ui.mjs";
 
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
@@ -28,14 +29,13 @@ let privateBalance = false;
 let expanded = { checking: true, savings: false };
 let filter = "all";
 let campaign = 0;
+let campaignPaused = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let campaignTimer;
 let unmountChat;
 let transfer;
 let unmountCards;
 let unmountProducts;
 
-const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-})[char]);
 const button = (action, label, className = "") =>
   '<button type="button" class="' + className + '" data-action="' + action + '"'
   + (className === "back" ? ' aria-label="뒤로 가기"' : "") + '>' + label + "</button>";
@@ -121,14 +121,6 @@ function header(title, back = "", right = "") {
     + '</div><div>' + right + "</div></header>";
 }
 
-function nav(page) {
-  return '<nav class="bottom-nav" aria-label="주 메뉴">'
-    + [["home", "⌂", "홈"], ["account", "▤", "계좌"], ["start-transfer", "⇄", "이체"], ["cards", "▱", "카드"], ["products", "♧", "상품"], ["chat", "◌", "AI 상담"]]
-      .map(([action, icon, label]) => '<button type="button" data-action="' + action + '"'
-        + (page === action ? ' aria-current="page"' : "") + '><span aria-hidden="true">' + icon + '</span>' + label + '</button>').join("")
-    + "</nav>";
-}
-
 function transactions(rows) {
   if (!rows.length) return '<p class="empty">표시할 거래가 없어요.</p>';
   return '<ul class="rows">' + rows.map((tx) =>
@@ -137,38 +129,57 @@ function transactions(rows) {
     + (tx.amount > 0 ? "+" : "−") + money(Math.abs(tx.amount)) + "</strong></li>").join("") + "</ul>";
 }
 
-function home() {
-  if (!accounts) {
-    return header(brand, "", button("logout", "로그아웃", "quiet")) + '<main>'
-      + (accountsError ? '<p class="error" role="alert">' + escape(accountsError) + "</p>" + button("reload", "다시 불러오기", "outline")
-        : '<p class="status" role="status">계좌를 불러오고 있어요…</p>') + "</main>" + nav("home");
+function campaignContent() {
+  return '<div class="ui-campaign-copy"><small>' + (campaign ? "WELCOME" : "GRAND OPEN")
+    + '</small><h2>' + (campaign ? "처음 만나는<br>나의 은행" : "새로운 금융의 시작<br>캡아메리카뱅크")
+    + '</h2><a id="home-bank-intro" href="#products">은행 소개 보기 →</a></div>'
+    + '<img class="ui-campaign-art" src="./assets/event-bank.png" alt="" width="170" height="142">'
+    + '<div class="ui-campaign-controls">'
+    + uiButton((campaign + 1) + " / 2", { action: "campaign", variant: "pill", ariaLabel: "이벤트 " + (campaign + 1) + " / 2, 다음 이벤트 보기", className: "ui-campaign-page" })
+    + uiButton("", { action: "campaign-pause", variant: "pill", icon: campaignPaused ? "play" : "pause", ariaLabel: campaignPaused ? "이벤트 자동 넘김 재생" : "이벤트 자동 넘김 일시정지", pressed: campaignPaused }) + '</div>';
+}
+
+function updateCampaign() {
+  const slot = app.querySelector(".ui-campaign");
+  if (!slot) return;
+  const focus = restoreFocus(slot);
+  slot.innerHTML = campaignContent();
+  focus();
+}
+
+function syncCampaignTimer() {
+  clearInterval(campaignTimer);
+  if (currentPage() === "home" && accounts && !campaignPaused && !document.hidden) {
+    campaignTimer = setInterval(() => { campaign = 1 - campaign; updateCampaign(); }, 5000);
   }
-  const groups = [["checking", "입출금", "blue"], ["savings", "예금·적금", "green"]];
-  return header(brand, "", button("menu", "메뉴", "quiet") + button("logout", "로그아웃", "quiet")) + '<main>'
-    + '<section class="balance hero"><div class="spread"><p>내 총자산</p>'
-    + button("privacy", privateBalance ? "금액 보기" : "금액 숨기기", "quiet")
+}
+document.addEventListener("visibilitychange", syncCampaignTimer);
+
+function home() {
+  const head = uiHeader({ brandHtml: brand });
+  if (!accounts) return head + '<main class="ui-home">' + stateBlock(accountsError ? "error" : "loading", accountsError ? { message: accountsError, retryAction: "reload" } : {}) + '</main>' + nav("home");
+  const groups = [["checking", "입출금", "blue", "wallet"], ["savings", "예금·적금", "sage", "pig"]];
+  return head + '<main class="ui-home">'
+    + '<section class="balance ui-balance" aria-label="내 총자산"><div><p>내 총자산</p>'
+    + uiButton("", { action: "privacy", icon: privateBalance ? "eyeOff" : "eye", ariaLabel: privateBalance ? "잔액 보기" : "잔액 숨기기", pressed: privateBalance })
     + '</div><h1>' + (privateBalance ? hidden : money(total)) + '</h1></section>'
-    + '<section class="campaign"><div><small>' + (campaign ? "WELCOME" : "GRAND OPEN")
-    + '</small><h2>' + (campaign ? "처음 만나는<br>나의 은행" : "새로운 금융의 시작<br>캡아메리카뱅크") + '</h2></div>'
-    + '<span class="campaign-art">' + shield + '</span>'
-    + button("campaign", (campaign + 1) + " / 2 다음", "campaign-next") + '</section>'
-    + groups.map(([kind, label, tone]) => {
+    + '<section class="ui-campaign" aria-roledescription="캐러셀" aria-label="은행 이벤트">' + campaignContent() + '</section>'
+    + (accountsError ? stateBlock("error", { message: accountsError, retryAction: "reload" }) : "")
+    + groups.map(([kind, label, tone, glyph]) => {
       const list = accounts.filter((account) => kindOf(account) === kind);
       const sum = list.reduce((balance, account) => balance + account.balance, 0);
-      return '<section class="account-group"><button type="button" class="group-head ' + tone
-        + '" aria-expanded="' + expanded[kind] + '" data-action="toggle-' + kind + '"><strong>' + label
-        + " " + list.length + '개</strong><span>' + (privateBalance ? hidden : money(sum))
-        + (expanded[kind] ? " ⌃" : " ⌄") + "</span></button>"
-        + (expanded[kind] ? '<ul class="rows">' + list.map((account) =>
-          '<li>' + button("account-" + account.account_id, "<strong>" + escape(accountName(account)) + "</strong><small>"
-            + escape(account.account_num) + "</small>", "account-link")
-          + '<div class="right"><strong>' + (privateBalance ? hidden : money(account.balance)) + "</strong>"
-          + (kind === "checking" ? button("send-" + account.account_id, "이체", "outline") : "") + "</div></li>").join("") + "</ul>" : "")
-        + "</section>";
+      return '<section class="account-group">' + sectionHead({ title: label, count: list.length, total: privateBalance ? hidden : money(sum), icon: glyph, tone, action: "toggle-" + kind, expanded: expanded[kind], controls: "home-" + kind })
+        + '<div id="home-' + kind + '"' + (expanded[kind] ? "" : " hidden") + '>'
+        + (list.length ? '<ul>' + list.map((account) => listRow({ title: accountName(account), subtitle: maskAccountNumber(account.account_num), amount: privateBalance ? hidden : money(account.balance), action: "account-" + account.account_id, icon: glyph, tone,
+          buttonHtml: kind === "checking" ? uiButton("이체", { action: "send-" + account.account_id, variant: "outline" }) : "" })).join("") + '</ul>' : stateBlock("empty", { message: "아직 보유한 계좌가 없어요." })) + '</div></section>';
     }).join("")
-    + '<section><h2 class="group-head amber">최근 거래</h2>' + transactions(recent) + "</section>"
-    + '<section class="card spread"><div><h2>금융 업무를 물어보세요</h2><small>계좌, 상품, 이체를 대화로</small></div>'
-    + button("chat", "상담 시작", "outline") + "</section></main>" + nav("home");
+    + '<section class="ui-recent">' + sectionHead({ title: "최근 거래", icon: "clock", tone: "amber", rightHtml: uiButton("전체보기 ›", { action: "search" }) })
+    + (recent.length ? '<ul>' + recent.map((tx) => {
+      const account = accountById(tx.account_id);
+      return listRow({ title: txLabel(tx), subtitle: shortDate(tx.created_at) + " · " + (account ? accountName(account) : tx.category ?? "미분류"), amount: (tx.amount > 0 ? "+" : "−") + money(Math.abs(tx.amount)), credit: tx.amount > 0 });
+    }).join("") + '</ul>' : stateBlock("empty", { message: "아직 거래내역이 없어요." })) + '</section>'
+    + cardBox('<h2>' + icon("chat") + '금융 업무를 물어보세요</h2><button type="button" class="ui-button ui-ai-prompt" data-action="chat"><span>이번 달 카페에서 얼마 썼어?</span>' + icon("arrow") + '</button>', "ui-ai")
+    + '</main>' + nav("home");
 }
 
 function accountPage(manage) {
@@ -318,6 +329,8 @@ function transferPage() {
 const extCtx = { go, onSignedIn: () => go("home"), onLoggedOut: () => { reset(); go("login"); } };
 
 function render() {
+  const focus = restoreFocus(app);
+  const previousPage = app.dataset.page;
   unmountCards?.();
   unmountCards = undefined;
   unmountChat?.();
@@ -330,16 +343,19 @@ function render() {
     login, home, account: () => accountPage(false), manage: () => accountPage(true),
     chat: () => '<div class="chat-screen" id="chat-screen"></div>' + nav("chat"), transfer: transferPage,
     cards: () => '<div class="cards-screen" id="cards-screen"></div>' + nav("cards"),
-    signup: ext, menu: ext, search: ext,
+    signup: ext, menu: () => ext() + nav("menu"), search: ext,
     products: () => '<div class="products-app" id="products-screen"></div>' + nav("products"),
   }[page]();
   app.innerHTML = body;
+  app.dataset.page = page;
   if (page === "signup") mountSignup(app.querySelector("#ext-screen"), extCtx);
   if (page === "menu") mountMenu(app.querySelector("#ext-screen"), extCtx);
   if (page === "search") mountSearch(app.querySelector("#ext-screen"), extCtx);
   if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { embedded: true });
   if (page === "products") unmountProducts = mountProducts(app.querySelector("#products-screen"), location.hash.slice(1));
   if (page === "chat") unmountChat = mountChat(app.querySelector("#chat-screen"), { shield });
+  if (previousPage === page) focus();
+  syncCampaignTimer();
 }
 
 function formError(form, error) {
@@ -439,7 +455,8 @@ app.addEventListener("click", async (event) => {
       }
     case "submit-transfer": return submitTransfer();
     case "privacy": privateBalance = !privateBalance; return render();
-    case "campaign": campaign = 1 - campaign; return render();
+    case "campaign": campaign = 1 - campaign; updateCampaign(); return syncCampaignTimer();
+    case "campaign-pause": campaignPaused = !campaignPaused; updateCampaign(); return syncCampaignTimer();
     case "start-transfer": return startTransfer();
     case "transfer-close": return finishTransfer();
     case "transfer-back": {
