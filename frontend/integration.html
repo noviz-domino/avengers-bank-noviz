@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>integration</title>
+</head>
+<body>
+  <!-- tests/browser/run-integration.mjs가 여는 점검용 페이지. 열기 전에는 아무 일도 하지 않는다 -->
+  <iframe id="app" src="./index.html" width="320" height="800" style="border:0"></iframe>
+  <script type="module">
+    const frame = document.getElementById("app");
+    await new Promise((resolve) => (frame.contentDocument?.readyState === "complete" ? resolve() : frame.addEventListener("load", resolve)));
+    try {
+      const { verifyIntegration } = await import("./integration.browser.mjs");
+      const result = await verifyIntegration(frame.contentWindow);
+      document.title = "RESULT " + JSON.stringify(result);
+    } catch (error) {
+      document.title = "ERROR " + error.message;
+    }
+  </script>
+</body>
+</html>
