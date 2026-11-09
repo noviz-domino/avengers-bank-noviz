@@ -12,8 +12,8 @@
 | 이체 | `app.mjs`의 `submitTransfer`, `transferPage` / `approval.mjs`의 `openApproval` |
 | 화면용 순수 함수 | `frontend/format.mjs` (`normalizeAccountNum`, `parseAmount`, `txLabel`) + `format.test.mjs` |
 | 상담 응답(아직 데모 데이터) | `frontend/demo.mjs`의 `replyTo` |
-| 카드 화면·상태 | `frontend/cards.mjs`의 `mountCards`, `cards-demo.mjs` |
-| 상품 목록·상세·금리 | `frontend/products.mjs`의 `renderProducts`, `products-data.mjs` |
+| 카드 화면·상태 | `frontend/cards.mjs`의 `mountCards` (실제 API) |
+| 상품 목록·상세·가입 | `frontend/products.mjs`의 `mountProducts` (실제 API) |
 
 ## 요청 흐름
 
@@ -44,17 +44,34 @@ const result = action.status === "PENDING" ? await openApproval(action.action_id
 - **모든 서버 문자열은 `escape`**: 별칭·거래 메모처럼 사용자가 넣은 값이 HTML로 해석되지 않게 합니다.
 - **상담 화면은 아직 데모 데이터**: 상담은 별도 작업에서 실제 Agent로 바꿉니다. 상담의 “이체 내용 확인”은 데모 초안이라 실제 이체 화면의 첫 단계로만 연결합니다.
 
-## 카드·상품 통합과 검증
+## 카드·상품: 실제 API 연결
 
-공통 라우터는 `#cards`, `#products`, `#product/<id>`를 로그인 이후 허용합니다. 상품은 `renderProducts`로 공통 라우터에서 렌더링해 독립 페이지의 해시 리스너와 충돌하지 않게 했습니다. 상품 분류는 앱 상태에 보관합니다. 카드는 전용 컨테이너에 마운트하고 화면 교체 전에 반환된 정리 함수를 호출합니다. 카드 상태 배열은 앱에 보관해 메뉴 왕복 후에도 정지·분실 상태가 유지됩니다. 보기 방식과 선택 카드는 재진입 시 초기화합니다. 로그아웃은 계좌·카드·상품 상태를 모두 초기화합니다.
+> **카드와 상품 화면은 데모 데이터 없이 서버 API로 동작합니다. 정지·분실은 바로, 정지 해제와 예금 개설은 서버가 만든 승인 요청을 PIN으로 승인해야 반영됩니다.**
 
-`cards.html`·`products.html`은 독립 확인용으로 유지합니다. 통합 화면에서는 `embedded` 옵션으로 중복 데모 표시를 숨기고 공통 메뉴를 표시합니다. 새 패키지나 서버 변경은 없습니다.
+| 하는 일 | 코드 |
+|---|---|
+| 카드 목록·상세·사용내역·한도 | `frontend/cards.mjs`의 `loadAll`, `loadCard` (`GET /cards`, `/cards/{id}`, `/transactions`, `/limits`) |
+| 카드 발급 | `cards.mjs`의 `submitIssue` (`GET /products/cards`, `GET /accounts`, `POST /cards`) |
+| 정지·분실·정지 해제 | `cards.mjs`의 `changeStatus` (`POST /cards/{id}/suspend`, `/unsuspend` → `openApproval`) |
+| 상품 목록·상세·금리 | `frontend/products.mjs`의 `listView`, `detailView`, `openingRate` |
+| 가입 | `products.mjs`의 `submit` (입출금·적금 `POST /accounts`, 예금 `POST /accounts/deposits` → `openApproval`) |
 
-검증: 정적 서버로 앱을 연 뒤 브라우저 개발자 도구에서 아래를 실행합니다. 데모 상태를 초기화하며 로그인 보호·메뉴·카드 확인 대화상자·상태 유지·상품 필터·뒤로/앞으로·없는 상품·계좌 별칭·직접/상담 이체·로그아웃 초기화를 확인합니다. 모바일 320·390·480px에서 반복합니다.
+요청 흐름: 화면 진입 → `api()`로 목록 조회(로딩 표시) → 카드는 선택할 때마다 상세·내역·한도를 다시 조회 → 쓰기 요청 → 성공 메시지 또는 서버 오류 문구 표시. 정지 해제는 `202`로 받은 `action_id`를 공통 승인 창(`openApproval`)에 넘기고, 서버 실행이 끝난 뒤에만 "해제했어요"를 보여 줍니다.
 
 ```javascript
-await (await import('/integration.browser.mjs')).verifyIntegration()
+const { data } = await api(`/cards/${card.card_id}/unsuspend`, { method: "POST", body: { idempotency_key: idempotencyKey() } });
+const result = await openApproval(data.action_id);
+notice = result.status === "EXECUTED" ? "정지를 해제했어요." : ...;
 ```
+
+왜 이렇게 했나:
+- 정지는 안전한 쪽이라 바로 적용하고(확인 대화상자만), 푸는 것은 PIN으로 승인합니다. 분실은 되돌릴 수 없어 대화상자에 그대로 적습니다.
+- 금리는 서버가 문자열(`"3.50"`)로 줍니다. 화면은 0.01% 단위 정수로 바꿔 더하고(`hundredths`) 부동소수점 오차를 피합니다. 개설 시 적용 금리는 급여이체 우대를 빼고 우대 상한까지만 더합니다(서버 정책과 같음).
+- 입력 검사는 서버가 정본입니다. 화면은 `min`/`max` 힌트만 주고, 서버의 오류 문구(`AMOUNT_OUT_OF_RANGE` 등)를 그대로 보여 줍니다. 서버가 준 모든 문자열은 이스케이프합니다.
+- 월 이용금액은 한국 날짜 기준 이달의 `APPROVED` 건만 합산합니다. 할인 집계는 서버에 없어 만들지 않았습니다.
+- 데모 데이터(`cards-demo.mjs`, `products-data.mjs`)와 독립 페이지(`cards.html`, `products.html`)는 지웠습니다.
+
+검증: `node --test frontend/*.test.mjs`(순수 로직), 브라우저 320px에서 카드 발급 → 정지 → PIN 해제 → 분실, 상품 분류 → 상세 → 적금·입출금 가입, 오류 문구 확인.
 
 ## 면접 예상 질문
 
@@ -73,6 +90,14 @@ await (await import('/integration.browser.mjs')).verifyIntegration()
 **Q. 상담에서 바로 이체하지 않은 이유는요?**
 
 상담은 누락 정보를 물어본 뒤 초안을 만들어 줍니다. 사람이 받는 계좌와 금액을 보고 별도 화면에서 PIN을 입력합니다. 기존 백엔드의 상담과 거래 승인 경계를 화면 흐름으로도 지킵니다.
+
+**Q. 카드 정지는 바로 되는데 해제는 왜 PIN이 필요한가요?**
+
+정지는 도난·분실 때 빨리 막는 안전한 쪽이라 바로 적용합니다. 해제는 다시 돈을 쓸 수 있게 하는 쪽이라 서버가 승인 요청을 만들고 PIN을 받은 뒤 상태를 다시 확인하고 풉니다. 화면은 서버 실행 성공 뒤에만 완료를 알립니다.
+
+**Q. 금리를 문자열로 받아 정수로 바꾸는 이유는요?**
+
+0.1 + 0.2 같은 부동소수점 오차를 피하려고, 서버가 문자열로 준 금리를 0.01% 단위 정수로 바꿔 계산하고 표시할 때만 소수로 돌립니다.
 
 ## 회원가입·전체 메뉴·PIN 변경·거래 검색
 

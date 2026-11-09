@@ -71,3 +71,10 @@
   .cards-summary { padding: 16px 12px; }
   .cards-transactions li > strong { font-size: .83rem; }
 }
+.cards-issue { display: grid; gap: 14px; margin-top: 16px; }
+.cards-issue fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 10px; }
+.cards-issue legend { font-weight: 700; margin-bottom: 8px; }
+.cards-issue-option { display: flex; align-items: flex-start; gap: 10px; padding: 14px 12px; border: 1px solid #d7dfe6; border-radius: 15px; font-weight: 400; }
+.cards-issue-option:has(input:checked) { background: #eaf2f9; border-color: #6687a4; }
+.cards-issue-option input { width: auto; margin-top: 4px; }
+.cards-issue-option small { display: block; margin-top: 4px; line-height: 1.6; }

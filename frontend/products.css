@@ -64,3 +64,7 @@
   .products-app .product-rates > div + div { padding-left: 10px; }
   .products-app .product-rates strong { font-size: 2.2rem; }
 }
+.products-app .product-more { display: block; margin-top: 14px; padding: 12px; text-align: center; color: var(--muted); }
+.products-app .product-join { display: grid; gap: 4px; margin-top: 16px; }
+.products-app .product-join .outline { margin-top: 8px; }
+.products-app .product-detail-hero.deposit { background: #f3efe3; }

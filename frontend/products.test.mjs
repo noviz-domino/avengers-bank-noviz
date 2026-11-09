@@ -1,69 +1,46 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { products, maxRate, percent, listedProducts, onSale, term, amount } from "./products-data.mjs";
-import { renderProducts, mountProducts } from "./products.mjs";
+import { amount, detailView, listView, maxRate, openingRate, percent, term } from "./products.mjs";
 
-const today = "2026-11-09";
-test("최고금리와 가입 시 적용 가능한 우대를 구분한다", () => {
-  const stark = products.find((product) => product.id === "stark");
-  const hero = products.find((product) => product.id === "hero");
-  assert.equal(percent(maxRate(stark)), "4.50%");
-  assert.equal(percent(maxRate(stark, true)), "4.00%");
-  assert.equal(percent(maxRate(hero)), "3.50%");
-  assert.equal(percent(maxRate(hero, true)), "3.20%");
-  assert.match(renderProducts("product/stark", "all", today), /현재 가입 시 미적용/);
-  assert.match(renderProducts("product/stark", "all", today), /연 4.00%/);
+const stark = {
+  product_id: 4, type: "SAVINGS", name: "스타크 자유적금", base_rate: "3.50", max_preferential_rate: "1.00",
+  min_term_months: 12, max_term_months: 24, min_amount: 10000, max_amount: 1000000, min_age: null, sale_start: null, sale_end: null,
+  description: "<b>매달</b> 넣는 적금", conditions: "월 1만 원부터",
+  preferential_rates: [
+    { code: "SALARY_TRANSFER", description: "급여를 받으면", rate: "0.50" },
+    { code: "MARKETING_AGREED", description: "마케팅 동의", rate: "0.20" },
+    { code: "FIRST_PRODUCT", description: "첫 예·적금", rate: "0.30" },
+  ],
+};
+const checking = { product_id: 1, type: "CHECKING", name: "입출금통장", base_rate: "0.10", max_preferential_rate: "0.00", min_term_months: null, max_term_months: null, min_amount: null, max_amount: null, min_age: null, sale_start: null, sale_end: null };
+const loan = { ...checking, product_id: 6, type: "LOAN", name: "신용대출" };
+const special = { ...stark, product_id: 3, type: "DEPOSIT", name: "특판 예금", sale_start: "2026-11-01", sale_end: "2027-12-31", min_age: 19 };
+
+test("최고금리와 개설 시 적용 가능한 최고금리를 구분한다", () => {
+  assert.equal(maxRate(stark), "4.50%");
+  assert.equal(openingRate(stark), "4.00%"); // 급여이체 0.50 제외
+  assert.equal(openingRate({ ...stark, max_preferential_rate: "0.30" }), "3.80%"); // 우대 상한
+  assert.match(detailView(stark), /현재 가입 시 미적용/);
+  assert.match(detailView(stark), /연 4.00%/);
+  assert.equal(percent("0.1"), "0.10%");
 });
 
-test("분류별 목록과 고정 기간·금액·나이 조건을 표시한다", () => {
-  assert.equal(listedProducts("all", today).length, 5);
-  assert.deepEqual(listedProducts("deposit", today).map((product) => product.id), ["hero", "shield"]);
-  assert.deepEqual(listedProducts("checking", today).map((product) => product.id), ["checking"]);
-  assert.equal(listedProducts("savings", today).length, 2);
-  assert.doesNotMatch(renderProducts("products", "checking", today), /스타크 자유적금/);
-  assert.match(renderProducts("product/junior", "all", today), /만 19세 이상/);
-  const junior = products.find((product) => product.id === "junior");
-  assert.equal(term(junior), "12개월");
-  assert.equal(amount(junior), "월 1만 원~30만 원");
-  assert.match(renderProducts("products", "constructor", today), /전체 상품 5개/);
+test("기간·금액 문구와 분류별 목록, 대출 제외", () => {
+  assert.equal(term(stark), "12~24개월");
+  assert.equal(amount(stark), "월 1만 원~100만 원");
+  assert.equal(term(checking), "기간 제한 없음");
+  const all = [checking, stark, special, loan];
+  assert.match(listView(all, "all"), /전체 상품 3개/);
+  assert.doesNotMatch(listView(all, "all"), /신용대출/);
+  assert.match(listView(all, "CHECKING"), /입출금 상품 1개/);
+  assert.doesNotMatch(listView(all, "CHECKING"), /스타크 자유적금/);
+  assert.match(listView(all, "constructor"), /전체 상품 3개/);
+  assert.match(listView(all, "DEPOSIT"), /만 19세 이상/);
+  assert.match(listView(all, "DEPOSIT"), /판매 2026-11-01 ~ 2027-12-31/);
 });
 
-test("특판 시작·종료일은 포함하며 기간 밖 목록·상세는 차단한다", () => {
-  const shield = products.find((product) => product.id === "shield");
-  assert.equal(onSale(shield, "2026-10-31"), false);
-  assert.equal(onSale(shield, "2026-11-01"), true);
-  assert.equal(onSale(shield, "2027-12-31"), true);
-  assert.equal(onSale(shield, "2028-01-01"), false);
-  assert.doesNotMatch(renderProducts("products", "all", "2028-01-01"), /쉴드 특판 예금/);
-  assert.match(renderProducts("product/shield", "all", "2028-01-01"), /상품을 찾을 수 없어요/);
-  assert.match(renderProducts("product/%3Cscript%3E", "all", today), /상품을 찾을 수 없어요/);
-});
-
-test("분류를 유지해 목록·상세·뒤로 가기를 처리하고 이탈 시 리스너를 해제한다", () => {
-  const listeners = new Map();
-  const viewListeners = new Map();
-  let focused = false;
-  const view = {
-    location: { hash: "#products" }, scrollTo() {},
-    addEventListener: (name, fn) => viewListeners.set(name, fn),
-    removeEventListener: (name, fn) => { assert.equal(viewListeners.get(name), fn); viewListeners.delete(name); },
-  };
-  const root = {
-    ownerDocument: { defaultView: view }, innerHTML: "",
-    querySelector: () => ({ focus: () => { focused = true; } }),
-    addEventListener: (name, fn) => listeners.set(name, fn),
-    removeEventListener: (name, fn) => { assert.equal(listeners.get(name), fn); listeners.delete(name); },
-  };
-  const unmount = mountProducts(root);
-  listeners.get("click")({ target: { closest: () => ({ dataset: { productFilter: "checking" } }) } });
-  assert.match(root.innerHTML, /입출금 상품 1개/);
-  assert.equal(focused, true);
-  view.location.hash = "#product/checking";
-  viewListeners.get("hashchange")();
-  assert.match(root.innerHTML, /가입 조건/);
-  view.location.hash = "#products";
-  viewListeners.get("hashchange")();
-  assert.match(root.innerHTML, /입출금 상품 1개/);
-  unmount();
-  assert.equal(listeners.size + viewListeners.size, 0);
+test("서버 문자열은 이스케이프한다", () => {
+  assert.doesNotMatch(detailView(stark), /<b>매달/);
+  assert.match(detailView(stark), /&lt;b&gt;매달/);
+  assert.doesNotMatch(listView([{ ...stark, name: "<img src=x onerror=1>" }]), /<img/);
 });

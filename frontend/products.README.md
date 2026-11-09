@@ -1,37 +1,27 @@
-# 상품 목록·상세 데모
+# 상품 목록·상세·가입
 
 시안: `docs/design-drafts/15-products-option-1-selected.png`.
 
-레포 루트에서 Git Bash로 실행:
+공통 앱이 `#products`, `#product/<product_id>`에서 `mountProducts(root, route)`를 호출합니다. 해시가 바뀌면 앱이 다시 마운트하며, 선택한 분류는 모듈 변수에 두어 목록·상세를 오가도 유지합니다(새로고침하면 초기화). 스타일은 `products.css`(`.products-app` 범위).
+
+실제 API로 동작합니다.
+
+| 기능 | API |
+|---|---|
+| 목록(분류는 화면에서 거름, 대출 제외) | `GET /products/accounts` |
+| 상세(조건·우대금리·특판 기간) | `GET /products/accounts/{id}`, 판매 중이 아니면 `404 PRODUCT_NOT_FOUND` → "상품을 찾을 수 없어요" |
+| 입출금·적금 가입 | `POST /accounts` (적금: `term_months`, `monthly_payment`, `payment_day`) |
+| 예금 가입 | `POST /accounts/deposits` → `202` → `openApproval(action_id)` (PIN) |
+
+- 금리는 서버가 문자열이라 0.01% 단위 정수로 더합니다. "가입 시 적용 가능한 최고 금리"는 급여이체 우대를 빼고 우대 상한까지만 더합니다.
+- 입력 검사는 서버가 정본입니다. 화면은 `min`/`max` 힌트를 주고 서버 오류 문구(나이·기간·금액 조건, 잔액 부족 등)를 그대로 보여 줍니다. 성공하면 홈으로 가는 링크를 줍니다.
+- 로딩·오류(다시 시도) 상태가 있고 서버 문자열은 모두 이스케이프합니다.
+- 데모 데이터(`products-data.mjs`)와 독립 페이지(`products.html`)는 없앴습니다.
+
+## 검증
 
 ```bash
-python -m http.server 8765 --bind 127.0.0.1 --directory frontend
+node --test frontend/*.test.mjs
 ```
 
-`http://127.0.0.1:8765/products.html`로 접속한다. 직접 상세 진입은
-`products.html#product/stark`이며, 전체 / 입출금 / 예금 / 적금 분류와
-상세 → 목록 복귀, 브라우저 뒤로·앞으로 가기를 제공한다.
-
-- `products-data.mjs`: seed의 입출금·예금·적금 5개를 옮긴 데모 데이터. 대출·카드는 범위 밖.
-- `products.mjs`: 목록·상세 렌더링과 상품 내부 이동.
-- `products.css`: `.products-app` 범위 안에서만 적용되는 상품 스타일.
-- `products.html`: 공통 앱과 별개로 유지하는 독립 확인용 진입점.
-
-상품 조건은 `src/avengers_bank/seed.py`, 가입 시 급여이체 우대 제외 기준은
-`domains/accounts`와 `domains/rag/docs/deposit-terms.md`를 따른다.
-최고금리는 모든 우대 충족 시 수치이며, 상세에 가입 시 적용 가능한 최고금리를 따로 표시한다.
-특판은 한국 날짜 기준 판매 기간 안에서만 목록·상세에 노출한다.
-계좌 개설·가입·잔액 변경·API 호출은 실행하지 않는다.
-
-공통 앱은 `#products`, `#product/<id>`를 로그인 이후 허용한다.
-`products-app` 컨테이너에 `renderProducts(route, kind, undefined, true)`를 렌더링하며
-공통 라우터 하나가 해시 이동을 처리한다. 분류는 목록·상세·다른 메뉴를 오가도 유지하고
-로그아웃·새로고침하면 초기화한다. 독립 페이지는 기존 `mountProducts(root)`와
-반환된 리스너 정리 함수를 사용한다. 상품의 방패 마크는 공통 로고에 맞춰 둔 사본이다.
-원본은 `product-screen`의 미커밋 상품 파일 6개이며 원본 작업 트리는 수정하지 않았다.
-
-검증:
-
-```bash
-node --test frontend/demo.test.mjs frontend/products.test.mjs
-```
+수동 확인(서버 실행 중, 로그인 후): 분류별 목록 → 상세(없는 id 포함) → 적금·입출금 가입, 조건 위반 오류 문구, 예금 승인. 320px에서 가로 넘침을 확인합니다.

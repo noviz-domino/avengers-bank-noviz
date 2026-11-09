@@ -3,8 +3,7 @@ import { ApiError, api, idempotencyKey, isSignedIn, login as apiLogin, logout as
 import { openApproval } from "./approval.mjs";
 import { accountName, kindOf, normalizeAccountNum, parseAmount, shortDate, txLabel } from "./format.mjs";
 import { mountCards } from "./cards.mjs";
-import { newCardsDemo } from "./cards-demo.mjs";
-import { renderProducts } from "./products.mjs";
+import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
 import { mountSearch } from "./search.mjs";
@@ -40,9 +39,8 @@ let pending;
 let responding = false;
 let chatTimer;
 let transfer;
-let cards = newCardsDemo();
 let unmountCards;
-let productKind = "all";
+let unmountProducts;
 
 const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -129,8 +127,6 @@ function reset() {
   pending = undefined;
   responding = false;
   transfer = undefined;
-  cards = newCardsDemo();
-  productKind = "all";
 }
 
 function header(title, back = "", right = "") {
@@ -371,6 +367,8 @@ const extCtx = { go, onSignedIn: () => go("home"), onLoggedOut: () => { reset();
 function render() {
   unmountCards?.();
   unmountCards = undefined;
+  unmountProducts?.();
+  unmountProducts = undefined;
   const page = currentPage();
   const ext = () => '<div id="ext-screen"></div>';
   const body = {
@@ -378,13 +376,14 @@ function render() {
     chat: chatPage, transfer: transferPage,
     cards: () => '<div class="cards-screen" id="cards-screen"></div>' + nav("cards"),
     signup: ext, menu: ext, search: ext,
-    products: () => '<div class="products-app">' + renderProducts(location.hash.slice(1), productKind, undefined, true) + '</div>' + nav("products"),
+    products: () => '<div class="products-app" id="products-screen"></div>' + nav("products"),
   }[page]();
   app.innerHTML = (page === "login" ? "" : '<div class="demo-label">DEMO · 시연용 은행</div>') + body;
   if (page === "signup") mountSignup(app.querySelector("#ext-screen"), extCtx);
   if (page === "menu") mountMenu(app.querySelector("#ext-screen"), extCtx);
   if (page === "search") mountSearch(app.querySelector("#ext-screen"), extCtx);
-  if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { cards, embedded: true });
+  if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { embedded: true });
+  if (page === "products") unmountProducts = mountProducts(app.querySelector("#products-screen"), location.hash.slice(1));
   if (page === "chat" && chat.length) document.querySelector(".composer").scrollIntoView({ block: "nearest" });
 }
 
@@ -449,12 +448,6 @@ app.addEventListener("submit", async (event) => {
 app.addEventListener("click", async (event) => {
   const clicked = event.target.closest("button");
   if (!clicked) return;
-  if (clicked.dataset.productFilter) {
-    productKind = clicked.dataset.productFilter;
-    render();
-    app.querySelector('[data-product-filter="' + productKind + '"]')?.focus();
-    return;
-  }
   const { action, question, recipient } = clicked.dataset;
   if (question) return sendQuestion(question);
   if (recipient) {
