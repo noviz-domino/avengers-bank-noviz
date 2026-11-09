@@ -6,6 +6,8 @@
 
 이 대화에서 생성한 시안 43개를 선택 여부와 관계없이 모두 보관합니다. 파일 번호는 생성 순서이며, 화면별 선택 번호와 다릅니다. 원본 PNG를 복사했으며 이미지는 정적인 디자인 시안입니다.
 
+바로 다음 작업과 순서는 [NEXT_STEPS.md](NEXT_STEPS.md)를 참고합니다.
+
 ## 선택한 방향
 
 - 홈: 초기 1번을 바탕으로 수정. 최신 이미지: [14-home-compact-privacy-latest.png](14-home-compact-privacy-latest.png).
