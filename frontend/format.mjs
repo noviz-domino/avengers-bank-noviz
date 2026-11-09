@@ -24,3 +24,5 @@ const TYPE_LABEL = {
   INTERNAL_OUT: "내 계좌 이체", CARD_PAYMENT: "카드 결제", CARD_BILL: "카드 대금", INTEREST: "이자", REFUND: "환불",
 };
 export const txLabel = (tx) => tx.counterparty_name ?? tx.memo ?? TYPE_LABEL[tx.tx_type] ?? tx.tx_type;
+
+export const money = (amount) => `${amount.toLocaleString("ko-KR")}원`;
