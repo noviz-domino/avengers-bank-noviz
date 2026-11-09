@@ -36,13 +36,6 @@ svg { display: block; width: 100%; height: auto; }
   background: #fff;
   box-shadow: 0 0 50px #10233b14;
 }
-.demo-label {
-  padding: 7px 24px;
-  background: #f8f6f0;
-  color: var(--muted);
-  font-size: .7rem;
-  letter-spacing: .08em;
-}
 .topbar {
   display: flex;
   align-items: center;
@@ -193,6 +186,7 @@ dd { margin: 0; text-align: right; font-weight: 750; }
 .success-mark { border-radius: 100%; display: grid; place-items: center; width: 58px; height: 58px; background: #eaf3e9; color: #24633a; font-size: 1.65rem; }
 
 .chat { display: flex; flex-direction: column; }
+.chat-screen { display: contents; }
 .chat-art { width: 42px; flex-shrink: 0; transform: rotate(9deg); }
 .chat-feed > * + * { margin-top: 15px; }
 .question-group { border-bottom: 1px solid var(--line); padding: 14px 0 4px; }

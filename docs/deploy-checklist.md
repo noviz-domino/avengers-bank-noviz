@@ -1,0 +1,29 @@
+# 배포 체크리스트
+
+컨테이너 하나(FastAPI + 모바일 웹 `/app`)와 PostgreSQL(pgvector)로 배포합니다. 서빙 방식은 [ADR 0020](decisions/0020-mobile-app-real-api.md)을 봅니다. 아래 "배포 전"까지 끝난 상태이고, "배포할 때"부터 진행합니다.
+
+## 배포 전 (완료)
+
+- [x] `Dockerfile` 하나로 빌드. 시작할 때 `alembic upgrade head` → `seed` → `uvicorn` (상품·데모 사용자·이체 받는 사람이 없을 때만 넣음)
+- [x] 모바일 웹을 같은 서버의 `/app`에서 서빙: 같은 출처라 CORS·API 주소 설정 없음
+- [x] CORS는 내 PC 개발 서버(127.0.0.1·localhost)만 허용
+- [x] 필수 비밀 값이 없으면 서버가 뜨지 않음: `JWT_SECRET_KEY`는 32자 이상, `SYSTEM_API_KEY`는 비우면 시스템 API 꺼짐
+- [x] 테스트: `uv run pytest`(백엔드), `node --test frontend/*.test.mjs`(화면 로직), `node tests/browser/run-integration.mjs`(실제 백엔드 + 브라우저 전체 흐름)
+
+## 배포할 때
+
+1. **DB**: pgvector를 쓸 수 있는 PostgreSQL 17 (Neon, Supabase, Railway 등). 연결 문자열을 `postgresql+psycopg://...` 형식으로.
+2. **비밀 값**을 호스팅 설정에 넣기 (레포·이미지에 넣지 않음)
+   - `DATABASE_URL`, `JWT_SECRET_KEY`(새로 생성: `python -c "import secrets; print(secrets.token_urlsafe(48))"`)
+   - `GEMINI_API_KEY`(유료 키), 필요하면 `GEMINI_MODEL`
+   - `SYSTEM_API_KEY`(32자 이상): 아래 RAG 색인에 필요. 선택: `LANGFUSE_*`
+3. **컨테이너 배포** (Render, Railway, Fly.io, Cloud Run 등): 포트 8000, 헬스 체크 경로 `/`
+4. **RAG 색인**: 첫 배포 뒤 한 번 `POST /system/rag/reindex` (헤더 `X-System-Key`)
+5. **확인**: `https://<주소>/app/` → 데모 계정 로그인 → 이체(PIN 등록·승인) → AI 상담 한 번 → `/docs` 열림
+
+## 배포 뒤 점검
+
+- 실제 휴대폰에서: 키보드가 하단 고정 버튼을 가리지 않는지, 새로고침 후 로그인 유지
+- 데모 계정 비밀번호가 README에 공개돼 있음: 데모 데이터만 두고, 시작할 때마다 로그인 잠금을 풉니다(`seed`)
+- Gemini 요청 한도·비용: 채팅은 사용자별 분당 한도(429)가 있음. Langfuse로 지연·실패 확인
+- HTTPS 주소에서만 공개 (토큰을 `sessionStorage`에 두므로)

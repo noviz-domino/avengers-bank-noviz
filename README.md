@@ -35,7 +35,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 | 자연어 입력 | `POST /chat`: 라우터 + 계좌·카드·상품 Agent, **대화 맥락 유지**(PostgreSQL), **정보가 부족하면 되묻기**, 이체·정지 해제는 승인 대기까지 |
 | RAG | `POST /rag/ask`, 상품 Agent의 `ask_bank_docs`: 상품 DB + 데모 약관, 조항 단위 청킹, 하이브리드 검색, 근거 인용, 근거 없으면 "자료 없음" |
 
-모바일 데모는 로그인·계좌 조회·이체·카드·상품·AI 상담 흐름을 제공합니다. 백엔드 API는 실행 후 `/docs`에서 확인할 수 있습니다.
+모바일 웹 앱(`/app`)은 위 기능을 **실제 API**로 씁니다: 로그인·회원가입, 총자산·계좌·거래내역·검색, 이체(PIN 승인 창), 카드 발급·정지·해제, 상품 가입, AI 상담(실시간 스트리밍), 거래 PIN 변경. 백엔드 API는 실행 후 `/docs`에서 확인할 수 있습니다.
 
 ### 도메인별
 
@@ -55,17 +55,28 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 
 ## 2. 실행 방법
 
-### 모바일 데모
+### 모바일 앱
+
+백엔드를 띄우면(아래 "백엔드") 같은 서버가 모바일 웹 앱을 서빙합니다.
+
+- 앱: http://localhost:8000/app/ → **데모 계정으로 시작하기** (아이디 `demo`, 비밀번호 `demo-password-1234`)
+- 데모 계정의 거래 PIN은 처음 승인할 때 PIN 창에서 등록합니다(로그인 비밀번호 확인). 새 계정은 회원가입으로 만듭니다.
+- 이체·예금 개설·카드 정지 해제는 서버가 승인 대기를 만들고, 공통 PIN 창에서 승인한 뒤에만 완료로 표시합니다. AI 상담도 승인 대기까지만 만들고 PIN은 사람이 입력합니다.
+
+프론트만 고치며 볼 때는 정적 서버를 따로 띄워도 됩니다(내 PC의 다른 포트는 CORS 허용, API는 8000번을 부름).
 
 ```bash
-python -m http.server 8765 --bind 127.0.0.1 --directory frontend
+python -m http.server 8765 --bind 127.0.0.1 --directory frontend   # http://127.0.0.1:8765/
 ```
 
-[로컬 데모](http://127.0.0.1:8765/)에서 **데모로 시작하기**를 누릅니다. 생활비 통장에서 토니에게 5만 원을 보내며, 처음에는 시연용 6자리 PIN을 등록한 뒤 같은 PIN으로 승인합니다. AI 상담에서 같은 요청을 보내고 출금 계좌를 답하면 동일한 확인 화면으로 이어집니다. 브라우저를 새로고침하거나 로그아웃하면 시연 데이터가 초기화됩니다.
+테스트:
 
-하단 공통 메뉴에서 카드와 상품을 엽니다. 카드의 보기 방식·선택은 진입할 때 초기화하지만 정지·분실 상태는 메뉴를 오가도 유지합니다. 상품 분류는 상세·목록·다른 메뉴를 오가도 유지합니다. 로그아웃·새로고침하면 모두 초기화합니다. 카드·계좌 내역은 서로 독립된 데모 데이터이며 실제 결제·상품 가입·서버 인증 API에는 연결하지 않습니다. 독립 화면 `/cards.html`, `/products.html`도 유지합니다.
+```bash
+node --test frontend/*.test.mjs          # 화면 로직(순수 함수·SSE 파서)
+node tests/browser/run-integration.mjs   # 실제 백엔드 + 헤드리스 Chrome으로 전체 흐름 점검
+```
 
-데모 로직 테스트는 `node --test frontend/demo.test.mjs frontend/cards.test.mjs frontend/products.test.mjs`로 실행합니다. 브라우저 통합 확인은 [모바일 데모 가이드](docs/guides/13-mobile-demo.md)를 봅니다.
+자세한 흐름과 코드 위치는 [모바일 앱 코드 가이드](docs/guides/13-mobile-demo.md), 서빙·인증 결정은 [ADR 0020](docs/decisions/0020-mobile-app-real-api.md)을 봅니다.
 
 ### 백엔드
 
