@@ -5,6 +5,9 @@ import { accountName, kindOf, normalizeAccountNum, parseAmount, shortDate, txLab
 import { mountCards } from "./cards.mjs";
 import { newCardsDemo } from "./cards-demo.mjs";
 import { renderProducts } from "./products.mjs";
+import { mountSignup } from "./signup.mjs";
+import { mountMenu } from "./settings.mjs";
+import { mountSearch } from "./search.mjs";
 
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
@@ -14,7 +17,7 @@ const questions = [
   ["상품 안내", "스타크 적금 우대조건 알려줘", "예금과 적금은 어떻게 달라?"],
   ["이체", "토니에게 5만 원 보내고 싶어"],
 ];
-const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products"]);
+const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products", "signup", "menu", "search"]);
 const stepOrder = ["recipient", "amount", "review"];
 const hidden = "••••••";
 
@@ -50,7 +53,7 @@ const button = (action, label, className = "") =>
 const accountById = (id) => accounts?.find((account) => String(account.account_id) === String(id));
 const currentPage = () => {
   const route = location.hash.slice(1);
-  if (!isSignedIn()) return "login";
+  if (!isSignedIn()) return route === "signup" ? "signup" : "login";
   if (route.startsWith("product/")) return "products";
   if (!pages.has(route) || route === "login" || (route === "transfer" && !(transfer && accountById(transfer.source)))) return "home";
   if ((route === "account" || route === "manage") && !accountById(accountId)) return "home";
@@ -158,7 +161,7 @@ function home() {
         : '<p class="status" role="status">계좌를 불러오고 있어요…</p>') + "</main>" + nav("home");
   }
   const groups = [["checking", "입출금", "blue"], ["savings", "예금·적금", "green"]];
-  return header(brand, "", button("logout", "로그아웃", "quiet")) + '<main>'
+  return header(brand, "", button("menu", "메뉴", "quiet") + button("logout", "로그아웃", "quiet")) + '<main>'
     + '<section class="balance hero"><div class="spread"><p>내 총자산</p>'
     + button("privacy", privateBalance ? "금액 보기" : "금액 숨기기", "quiet")
     + '</div><h1>' + (privateBalance ? hidden : money(total)) + '</h1></section>'
@@ -233,7 +236,8 @@ function login() {
     + (notice ? '<p class="note" role="status">' + escape(notice) + "</p>" : "")
     + '<p class="error" role="alert">' + escape(error) + '</p>'
     + '<button class="primary"' + (busy ? " disabled" : "") + '>' + (busy ? "로그인 중…" : "로그인") + "</button>"
-    + button("demo-login", "데모 계정으로 시작하기", "outline") + "</form></main>";
+    + button("demo-login", "데모 계정으로 시작하기", "outline") + "</form>"
+    + '<p class="link-line">' + button("signup", "회원가입", "") + "</p></main>";
 }
 
 function startTransfer(source, draft, from = currentPage()) {
@@ -362,17 +366,24 @@ function sendQuestion(question) {
   }, 350);
 }
 
+const extCtx = { go, onSignedIn: () => go("home"), onLoggedOut: () => { reset(); go("login"); } };
+
 function render() {
   unmountCards?.();
   unmountCards = undefined;
   const page = currentPage();
+  const ext = () => '<div id="ext-screen"></div>';
   const body = {
     login, home, account: () => accountPage(false), manage: () => accountPage(true),
     chat: chatPage, transfer: transferPage,
     cards: () => '<div class="cards-screen" id="cards-screen"></div>' + nav("cards"),
+    signup: ext, menu: ext, search: ext,
     products: () => '<div class="products-app">' + renderProducts(location.hash.slice(1), productKind, undefined, true) + '</div>' + nav("products"),
   }[page]();
   app.innerHTML = (page === "login" ? "" : '<div class="demo-label">DEMO · 시연용 은행</div>') + body;
+  if (page === "signup") mountSignup(app.querySelector("#ext-screen"), extCtx);
+  if (page === "menu") mountMenu(app.querySelector("#ext-screen"), extCtx);
+  if (page === "search") mountSearch(app.querySelector("#ext-screen"), extCtx);
   if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { cards, embedded: true });
   if (page === "chat" && chat.length) document.querySelector(".composer").scrollIntoView({ block: "nearest" });
 }
