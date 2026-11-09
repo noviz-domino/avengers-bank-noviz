@@ -219,7 +219,7 @@ function login() {
     + (notice ? '<p class="note" role="status">' + escape(notice) + "</p>" : "")
     + '<p class="error" role="alert">' + escape(error) + '</p>'
     + '<button class="primary"' + (busy ? " disabled" : "") + '>' + (busy ? "로그인 중…" : "로그인") + "</button>"
-    + button("demo-login", "데모 계정으로 시작하기", "outline") + "</form>"
+    + button("demo-login", "데모 계정으로 시작하기", "outline") + '<p class="note">데모 계정은 시연용이에요.</p></form>'
     + '<p class="link-line">' + button("signup", "회원가입", "") + "</p></main>";
 }
 
@@ -332,7 +332,7 @@ function render() {
     signup: ext, menu: ext, search: ext,
     products: () => '<div class="products-app" id="products-screen"></div>' + nav("products"),
   }[page]();
-  app.innerHTML = (page === "login" ? "" : '<div class="demo-label">DEMO · 시연용 은행</div>') + body;
+  app.innerHTML = body;
   if (page === "signup") mountSignup(app.querySelector("#ext-screen"), extCtx);
   if (page === "menu") mountMenu(app.querySelector("#ext-screen"), extCtx);
   if (page === "search") mountSearch(app.querySelector("#ext-screen"), extCtx);

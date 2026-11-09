@@ -9,6 +9,7 @@ const questions = [
   ["상품 안내", "스타크 적금 우대조건 알려줘", "예금과 적금은 어떻게 달라?"],
   ["이체", "생활비 통장에서 비상금 통장으로 1,000원 보내줘"],
 ];
+const RATE_LIMIT_MESSAGE = "요청이 많아요. 잠시 후 다시 물어봐 주세요.";
 const NETWORK_MESSAGE = "서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.";
 
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -40,19 +41,23 @@ let sessionId;
 let responding = false;
 let progress = "";
 let draw = () => {};
+let controller; // 진행 중인 답변 요청. 새 대화·로그아웃 때 끊어 옛 답이 새 대화에 섞이지 않게 한다
 
 export function resetChat() {
+  controller?.abort();
+  controller = undefined;
   messages = [];
   sessionId = undefined;
   responding = false;
   progress = "";
 }
 
-async function post(message) {
+async function post(message, signal) {
   const send = () => fetch(apiBase() + "/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken() },
     body: JSON.stringify({ message, ...(sessionId ? { session_id: sessionId } : {}) }),
+    signal,
   });
   let response;
   try {
@@ -62,9 +67,10 @@ async function post(message) {
       response = await send();
     }
   } catch (error) {
-    if (error.status) throw error;
+    if (error.status || error.name === "AbortError") throw error;
     throw new Error(NETWORK_MESSAGE);
   }
+  if (response.status === 429) throw new Error(RATE_LIMIT_MESSAGE);
   if (!response.ok) {
     const json = await response.json().catch(() => null);
     throw new Error(json?.error?.message ?? "답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
@@ -85,8 +91,9 @@ async function ask(question) {
   responding = true;
   progress = "담당을 고르고 있어요…";
   draw();
+  const mine = (controller = new AbortController());
   try {
-    const response = await post(question);
+    const response = await post(question, mine.signal);
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -123,9 +130,11 @@ async function ask(question) {
       }
     }
   } catch (error) {
+    if (mine.signal.aborted) return; // 새 대화로 넘어간 뒤의 응답은 버린다
     if (!messages.includes(reply)) messages.push(reply);
     reply.text = (reply.text ? reply.text + "\n\n" : "") + (error.message || NETWORK_MESSAGE);
   }
+  if (mine.signal.aborted) return;
   responding = false;
   progress = "";
   draw();
