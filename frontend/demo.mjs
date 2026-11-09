@@ -98,7 +98,7 @@ export function replyTo(demo, question, pending) {
     return { text: "시연용 상품 안내에서는 자동이체 조건을 충족하면 우대금리를 적용하는 예시를 보여줘요.", source: "데모 안내 · 스타크 자유적금" };
   }
   if (/상품|금리|약관/.test(question)) return { text: "이 질문에 답할 상품 자료가 데모에 없어요." };
-  if (/카드/.test(question)) return { text: "카드 담당이 처리할 질문이에요. 이번 데모에서는 계좌·상품·이체 예시를 제공해요." };
+  if (/카드/.test(question)) return { text: "하단 카드 메뉴에서 보유 카드의 이용내역·혜택·한도를 확인하고, 데모 일시정지·분실 신고를 체험할 수 있어요." };
   if (/안녕|반가워/.test(question)) return { text: "안녕하세요! 계좌 잔액, 상품 안내, 이체를 물어보실 수 있어요." };
   return { text: "이 질문은 데모에서 처리하기 어려워요. 잔액, 상품, 이체 예시로 다시 물어보세요." };
 }

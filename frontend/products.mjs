@@ -7,7 +7,7 @@ const link = (product, label, className = "") => `<a class="${className}" href="
 const rateNote = (product) => product.bonuses.some((bonus) => !bonus.available)
   ? '<p class="product-rate-note">우대조건 모두 충족 시 · 세전<br>급여이체 우대는 현재 가입 시 미적용</p>'
   : '<p class="product-rate-note">' + (product.bonuses.length ? "우대조건 충족 시 · " : "") + '세전</p>';
-const header = (detail) => '<div class="demo-label">DEMO · 실제 가입과 자금 이동이 없는 시연 화면</div>'
+const header = (detail, embedded = false) => (embedded ? "" : '<div class="demo-label">DEMO · 실제 가입과 자금 이동이 없는 시연 화면</div>')
   + '<header class="topbar">' + (detail
     ? '<a class="product-back" href="#products" aria-label="상품 목록으로 돌아가기">← <span>상품 상세</span></a>'
     : '<span class="brand">' + shield + '캡아메리카뱅크</span>') + '</header>';
@@ -36,12 +36,12 @@ function row(product) {
     ${product.bonuses.length ? `<div class="product-row-note">${rateNote(product)}</div>` : ""}</li>`;
 }
 
-export function renderProducts(route = "", kind = "all", today = todayKst()) {
+export function renderProducts(route = "", kind = "all", today = todayKst(), embedded = false) {
   const id = route.startsWith("product/") ? route.slice(8) : null;
   if (id !== null) {
     const product = products.find((item) => item.id === id && onSale(item, today));
-    if (!product) return header(true) + '<main><h1 tabindex="-1">상품을 찾을 수 없어요</h1><p>판매가 끝났거나 존재하지 않는 상품이에요.</p><a href="#products" class="primary product-cta">상품 목록 보기</a></main>';
-    return header(true) + `<main><section class="product-detail-hero ${product.kind}">
+    if (!product) return header(true, embedded) + '<main><h1 tabindex="-1">상품을 찾을 수 없어요</h1><p>판매가 끝났거나 존재하지 않는 상품이에요.</p><a href="#products" class="primary product-cta">상품 목록 보기</a></main>';
+    return header(true, embedded) + `<main><section class="product-detail-hero ${product.kind}">
       <span class="product-badge">${kinds[product.kind]}</span><h1 tabindex="-1">${product.name}</h1><p>${product.description}</p>
       ${rateBlock(product)}</section>
       <section class="product-section"><h2>가입 조건</h2><dl><dt>가입 대상</dt><dd>${product.minAge ? `만 ${product.minAge}세 이상` : "누구나"}</dd>
@@ -61,7 +61,7 @@ export function renderProducts(route = "", kind = "all", today = todayKst()) {
   const visible = listedProducts(kind, today);
   const star = visible.find((product) => product.id === "stark");
   const others = visible.filter((product) => product !== star);
-  return header(false) + `<main><p class="product-eyebrow">상품</p><h1 tabindex="-1">목표를 담는 상품</h1>
+  return header(false, embedded) + `<main><p class="product-eyebrow">상품</p><h1 tabindex="-1">목표를 담는 상품</h1>
     <div class="segments product-filters" role="group" aria-label="상품 종류">${Object.entries(kinds).map(([value, label]) =>
       `<button type="button" data-product-filter="${value}" aria-pressed="${value === kind}">${label}</button>`).join("")}</div>
     <div aria-live="polite" class="product-results"><p class="product-count">${kinds[kind]} 상품 ${visible.length}개</p>
