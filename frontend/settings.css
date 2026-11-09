@@ -1,0 +1,21 @@
+/* 회원가입·전체 메뉴·거래 검색 화면 (signup.mjs, settings.mjs, search.mjs) */
+.ext-form, .ext-menu, .ext-search { padding-bottom: 24px; }
+.ext-form h1 { margin-bottom: 16px; }
+.ext-form .error { margin-top: 4px; }
+.ext-form label { margin-top: 12px; }
+.ext-form label.check { display: flex; align-items: center; gap: 10px; font-weight: 400; margin: 16px 0; }
+.ext-form label.check input { width: 22px; min-height: 22px; }
+.ext-menu > * + *, .ext-search > * + * { margin-top: 14px; }
+.ext-menu .card h2 { margin-bottom: 10px; }
+.ext-menu form .primary { margin-top: 14px; }
+.menu-list { padding: 4px 16px; }
+.menu-list button { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 48px; border: 0; background: transparent; text-align: left; }
+.menu-list button + button { border-top: 1px solid var(--line); }
+.ext-search .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.ext-search form > label:first-child { margin-top: 0; }
+.ext-search .two label + label { margin-top: 0; }
+.ext-search form .primary { margin-top: 14px; }
+.ext-search .sum { margin: 16px 0 6px; }
+.ext-search #more { width: 100%; margin-top: 12px; min-height: 44px; }
+.link-line { text-align: center; margin-top: 10px; }
+.link-line button { border: 0; background: transparent; color: var(--blue); font-weight: 700; text-decoration: underline; min-height: 44px; }
