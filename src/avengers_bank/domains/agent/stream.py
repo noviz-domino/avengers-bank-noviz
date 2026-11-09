@@ -18,7 +18,7 @@ from langgraph.types import Command
 from avengers_bank.domains.agent.graph import TOOLS
 
 AGENT_LABELS = {"account": "계좌 담당이 확인하고 있어요", "card": "카드 담당이 확인하고 있어요",
-                "product": "상품·약관 담당이 찾아보고 있어요"}
+                "product": "상품·약관 담당이 찾아보고 있어요", "budget": "예산 담당이 확인하고 있어요"}
 TOOL_LABELS = {
     "get_my_accounts": "계좌를 조회하고 있어요", "get_account": "계좌를 조회하고 있어요",
     "search_transactions": "거래내역을 찾고 있어요", "request_transfer": "이체 요청을 만들고 있어요",
@@ -28,6 +28,7 @@ TOOL_LABELS = {
     "get_card_limit": "카드 한도를 조회하고 있어요", "suspend_card": "카드를 정지하고 있어요",
     "request_unsuspend_card": "정지 해제 요청을 만들고 있어요", "search_products": "상품을 찾고 있어요",
     "get_product_detail": "상품 정보를 보고 있어요", "ask_bank_docs": "약관에서 근거를 찾고 있어요",
+    "get_budget": "예산을 확인하고 있어요", "check_budget": "예산에 주는 영향을 보고 있어요",
 }
 
 
