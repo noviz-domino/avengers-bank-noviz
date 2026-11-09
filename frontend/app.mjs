@@ -1,4 +1,5 @@
-import { approveTransfer, dailyLimit, money, newDemo, recipients, replyTo, transferError } from "./demo.mjs";
+import { approveTransfer, dailyLimit, money, newDemo, recipients, transferError } from "./demo.mjs";
+import { mountChat, resetChat } from "./chat.mjs";
 import { mountCards } from "./cards.mjs";
 import { newCardsDemo } from "./cards-demo.mjs";
 import { renderProducts } from "./products.mjs";
@@ -6,11 +7,6 @@ import { renderProducts } from "./products.mjs";
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const brand = '<span class="brand">' + shield + '캡아메리카뱅크</span>';
-const questions = [
-  ["계좌·거래", "내 계좌 잔액 알려줘", "이번 달 카페에서 얼마 썼어?"],
-  ["상품 안내", "스타크 적금 우대조건 알려줘", "예금과 적금은 어떻게 달라?"],
-  ["이체", "토니에게 5만 원 보내고 싶어"],
-];
 const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products"]);
 const stepOrder = ["recipient", "amount", "review"];
 const hidden = "••••••";
@@ -22,13 +18,10 @@ let privateBalance = false;
 let expanded = { checking: true, savings: false };
 let filter = "all";
 let campaign = 0;
-let chat = [];
-let pending;
-let responding = false;
-let chatTimer;
 let transfer;
 let cards = newCardsDemo();
 let unmountCards;
+let unmountChat;
 let productKind = "all";
 
 const escape = (value) => String(value).replace(/[&<>"']/g, (char) => ({
@@ -53,16 +46,13 @@ function go(route) {
 }
 
 function reset() {
-  clearTimeout(chatTimer);
   demo = newDemo();
   accountId = "living";
   privateBalance = false;
   expanded = { checking: true, savings: false };
   filter = "all";
   campaign = 0;
-  chat = [];
-  pending = undefined;
-  responding = false;
+  resetChat();
   transfer = undefined;
   cards = newCardsDemo();
   productKind = "all";
@@ -217,55 +207,21 @@ function transferPage() {
   return close + '<main class="transfer">' + content + "</main>";
 }
 
-function chatPage() {
-  const intro = '<section class="hero spread"><div><h2>무엇이 궁금하세요?</h2><p>은행 업무를 대화로 간편하게</p></div>'
-    + '<span class="chat-art">' + shield + '</span></section><section><h2>이런 질문을 할 수 있어요</h2>'
-    + questions.map(([group, ...examples]) => '<div class="question-group"><h3>' + group + "</h3>"
-      + examples.map((question) => '<button type="button" data-question="' + question + '">' + question
-        + '<span aria-hidden="true">›</span></button>').join("") + "</div>").join("") + "</section>";
-  return header("AI 상담", "home", button("new-chat", "새 대화", "quiet"))
-    + '<main class="chat"><div class="chat-feed" aria-live="polite">' + (chat.length ? chat.map((item, i) =>
-      '<article class="bubble ' + item.role + '"><small>' + (item.role === "user" ? "나" : "데모 상담") + "</small><p>"
-      + escape(item.text) + "</p>" + (item.source ? "<small>" + escape(item.source) + "</small>" : "")
-      + (item.draft ? button("chat-transfer-" + i, "이체 내용 확인", "outline") : "") + "</article>").join("") : intro)
-    + (responding ? '<p class="status" role="status">담당을 고르고 있어요…</p>' : "")
-    + '</div><form class="composer" data-form="chat"><p class="note">이체는 확인 후 별도 화면에서 PIN으로 승인해요.</p>'
-    + '<div><input name="question" aria-label="질문" placeholder="궁금한 내용을 입력하세요" maxlength="1000" required>'
-    + '<button class="primary" aria-label="보내기"' + (responding ? " disabled" : "") + '>↑</button></div></form></main>' + nav("chat");
-}
-
-function sendQuestion(question) {
-  if (!question || responding) return;
-  if (/[0-9]{6}/.test(question) && /pin|비밀번호/i.test(question)) {
-    chat.push({ role: "assistant", text: "PIN은 이체 승인 화면에 입력해 주세요." });
-    render();
-    return;
-  }
-  chat.push({ role: "user", text: question });
-  responding = true;
-  render();
-  chatTimer = setTimeout(() => {
-    const answer = replyTo(demo, question, pending);
-    pending = answer.pending;
-    chat.push({ role: "assistant", ...answer });
-    responding = false;
-    if (currentPage() === "chat") render();
-  }, 350);
-}
-
 function render() {
   unmountCards?.();
   unmountCards = undefined;
+  unmountChat?.();
+  unmountChat = undefined;
   const page = currentPage();
   const body = {
     login, home, account: () => accountPage(false), manage: () => accountPage(true),
-    chat: chatPage, transfer: transferPage,
+    chat: () => '<div class="chat-screen" id="chat-screen"></div>' + nav("chat"), transfer: transferPage,
     cards: () => '<div class="cards-screen" id="cards-screen"></div>' + nav("cards"),
     products: () => '<div class="products-app">' + renderProducts(location.hash.slice(1), productKind, undefined, true) + '</div>' + nav("products"),
   }[page]();
   app.innerHTML = (page === "login" ? "" : '<div class="demo-label">DEMO · 시연용 은행</div>') + body;
   if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { cards, embedded: true });
-  if (page === "chat" && chat.length) document.querySelector(".composer").scrollIntoView({ block: "nearest" });
+  if (page === "chat") unmountChat = mountChat(app.querySelector("#chat-screen"), { shield });
 }
 
 function formError(form, error) {
@@ -312,9 +268,6 @@ app.addEventListener("submit", (event) => {
       step("done");
       break;
     }
-    case "chat":
-      sendQuestion(data.get("question").trim());
-      break;
   }
 });
 
@@ -327,8 +280,7 @@ app.addEventListener("click", (event) => {
     app.querySelector('[data-product-filter="' + productKind + '"]')?.focus();
     return;
   }
-  const { action, question, recipient } = clicked.dataset;
-  if (question) return sendQuestion(question);
+  const { action, recipient } = clicked.dataset;
   if (recipient) {
     app.querySelector('[name="number"]').value = recipient;
     return;
@@ -349,12 +301,6 @@ app.addEventListener("click", (event) => {
     expanded[kind] = !expanded[kind];
     return render();
   }
-  if (action.startsWith("chat-transfer-")) {
-    const item = chat[Number(action.slice(14))];
-    const draft = item.draft;
-    delete item.draft;
-    return startTransfer(draft.source, draft, "chat");
-  }
   switch (action) {
     case "login": signedIn = true; return go("home");
     case "logout": signedIn = false; reset(); return go("login");
@@ -369,12 +315,6 @@ app.addEventListener("click", (event) => {
     case "to-pin":
       transfer.error = transferError(demo, transfer);
       return transfer.error ? render() : step(demo.pin ? "pin" : "register");
-    case "new-chat":
-      clearTimeout(chatTimer);
-      chat = [];
-      pending = undefined;
-      responding = false;
-      return render();
     default: return go(action);
   }
 });
