@@ -8,6 +8,7 @@
 | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | 폴더 구조, 계층 설명 | 폴더·계층 구조가 바뀔 때 |
 | [decisions/](decisions/README.md) | 설계 결정 기록(ADR): 왜 그렇게 바꿨는지 | 설계·DB를 바꿀 때마다 새로 |
 | [guides/](guides/README.md) | **코드 가이드(면접 대비)**: 기능별 요청 흐름, 코드 위치, 왜 그렇게 만들었나, 예상 질문 | 기능을 만들거나 바꿀 때 |
+| [deploy-checklist.md](deploy-checklist.md) | 배포 체크리스트: 배포 전 완료 항목, 배포 순서, 배포 뒤 점검 | 배포 방식·비밀 값이 바뀔 때 |
 | [retrospective.md](retrospective.md) | 회고: 배운 점, 어려웠던 점과 해결 과정, 남은 한계 | 마일스톤마다 |
 
 기획서의 원본은 팀 FigJam 보드이고, `planning/`에 옮겨 두었습니다. 둘이 다르면 레포 문서가 기준입니다.

@@ -9,6 +9,7 @@
 """
 
 import asyncio
+import secrets
 import sys
 from datetime import date
 from decimal import Decimal
@@ -33,6 +34,7 @@ from avengers_bank.domains.users.models import User
 
 # 데모 화면 확인용 로그인 정보 (실제 비밀이 아님). README "데모 계정"과 같다
 DEMO_LOGIN_ID, DEMO_PASSWORD = "demo", "demo-password-1234"
+RECIPIENT_LOGIN_ID = "tony"  # 시연에서 "다른 사람에게 이체"를 받는 사람. 비밀번호는 무작위라 로그인할 수 없다
 
 SALARY = ("SALARY_TRANSFER", "이 은행 입출금 계좌로 급여를 받으면")
 MARKETING = ("MARKETING_AGREED", "마케팅 정보 수신에 동의하면")
@@ -178,6 +180,28 @@ async def seed_demo_user(db: AsyncSession) -> bool:
     return True
 
 
+async def seed_recipient(db: AsyncSession) -> str | None:
+    """이체 시연용 받는 사람(토니 스타크)과 입출금 계좌 하나. 데모 사용자 seed 뒤에 실행한다. 새로 만들면 계좌번호를 돌려준다"""
+    async with db.begin():
+        if await db.scalar(select(User).where(User.login_id == RECIPIENT_LOGIN_ID)) is not None:
+            return None
+        user = User(
+            login_id=RECIPIENT_LOGIN_ID, hashed_password=hash_password(secrets.token_urlsafe(24)), name="토니 스타크",
+            phone="010-0000-0001", birth_date=date(1990, 5, 29), marketing_agreed=False,
+        )
+        db.add(user)
+        await db.flush()
+        product = await db.scalar(select(AccountProduct).where(AccountProduct.type == "CHECKING", AccountProduct.product_code == 1))
+        prefix = f"{BANK_CODE}-{TYPE_CODES['CHECKING']}01-"
+        acc = Account(
+            user_id=user.user_id, product_id=product.product_id, account_type="CHECKING", status="ACTIVE",
+            account_num=make_account_num("CHECKING", 1, await account_repository.last_serial(db, prefix) + 1),
+            balance=0, per_transfer_limit=DEFAULT_PER_TRANSFER_LIMIT, daily_transfer_limit=DEFAULT_DAILY_TRANSFER_LIMIT,
+        )
+        db.add(acc)
+    return acc.account_num
+
+
 async def backfill_categories(db: AsyncSession) -> int:
     """카테고리 기능 전에 쌓인 거래(카테고리 NULL)를 규칙으로 채운다. 이미 있는 값은 건드리지 않는다"""
     async with db.begin():
@@ -196,6 +220,9 @@ async def main() -> None:
         async with SessionLocal() as db:
             if await seed_demo_user(db):
                 print(f"데모 사용자를 만들었습니다: {DEMO_LOGIN_ID}")
+        async with SessionLocal() as db:
+            if account_num := await seed_recipient(db):
+                print(f"이체 받는 사람(토니 스타크)을 만들었습니다: {account_num}")
         async with SessionLocal() as db:
             if filled := await backfill_categories(db):
                 print(f"카테고리가 없던 거래 {filled}건을 채웠습니다.")
