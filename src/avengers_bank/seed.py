@@ -202,6 +202,18 @@ async def seed_recipient(db: AsyncSession) -> str | None:
     return acc.account_num
 
 
+async def seed_demo_card(db: AsyncSession) -> None:
+    """데모 사용자의 체크카드 한 장(생활비 통장 결제). 카드 화면이 비지 않게. 발급 규칙은 서비스를 그대로 쓴다"""
+    from avengers_bank.domains.cards.schemas import CardIssue
+    from avengers_bank.domains.cards.service import card_service
+
+    user = await db.scalar(select(User).where(User.login_id == DEMO_LOGIN_ID))
+    product = await db.scalar(select(CardProduct).where(CardProduct.type == "DEBIT"))
+    account = await db.scalar(select(Account).where(Account.user_id == user.user_id, Account.nickname == "생활비"))
+    await db.commit()  # 위 조회가 연 트랜잭션을 닫아야 서비스가 자기 트랜잭션을 연다
+    await card_service.issue(db, user.user_id, CardIssue(product_id=product.product_id, linked_account_id=account.account_id))
+
+
 async def backfill_categories(db: AsyncSession) -> int:
     """카테고리 기능 전에 쌓인 거래(카테고리 NULL)를 규칙으로 채운다. 이미 있는 값은 건드리지 않는다"""
     async with db.begin():
@@ -220,6 +232,8 @@ async def main() -> None:
         async with SessionLocal() as db:
             if await seed_demo_user(db):
                 print(f"데모 사용자를 만들었습니다: {DEMO_LOGIN_ID}")
+                async with SessionLocal() as card_db:
+                    await seed_demo_card(card_db)
         async with SessionLocal() as db:
             if account_num := await seed_recipient(db):
                 print(f"이체 받는 사람(토니 스타크)을 만들었습니다: {account_num}")

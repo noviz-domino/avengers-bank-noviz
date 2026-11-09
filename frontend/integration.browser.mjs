@@ -92,6 +92,9 @@ export async function verifyIntegration(win = window) {
   await action("submit-transfer");
   const dialog = await waitSel("dialog.approval[open]");
   step("이체 요청 후 PIN 승인 창이 열림");
+  // DB를 막 초기화했으면 PIN이 없어서 창이 비밀번호를 받고 PIN을 등록한다
+  const password = dialog.querySelector('[name="password"]');
+  if (password) password.value = "demo-password-1234";
   dialog.querySelector('[name="pin"]').value = "123456";
   dialog.querySelector("form").requestSubmit();
   await waitText("이체를 마쳤어요");

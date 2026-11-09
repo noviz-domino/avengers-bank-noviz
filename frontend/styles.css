@@ -36,13 +36,6 @@ svg { display: block; width: 100%; height: auto; }
   background: #fff;
   box-shadow: 0 0 50px #10233b14;
 }
-.demo-label {
-  padding: 7px 24px;
-  background: #f8f6f0;
-  color: var(--muted);
-  font-size: .7rem;
-  letter-spacing: .08em;
-}
 .topbar {
   display: flex;
   align-items: center;
