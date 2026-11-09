@@ -19,6 +19,8 @@ avengers-bank/
 ├── frontend/               # 모바일 웹 앱 (빌드 없는 HTML·CSS·ES 모듈). 서버가 /app으로 서빙 (ADR 0020)
 │   ├── app.mjs             # 화면 이동·로그인·홈·계좌·이체
 │   ├── api.mjs, approval.mjs # API 클라이언트(토큰 갱신·오류 코드), 공통 PIN 승인 창
+│   ├── ui.mjs, ui.css, ui.README.md # 디자인 값, 공통 UI 부품·사용법 (홈·하단 탭부터 이관)
+│   ├── assets/event-bank.webp # 홈 이벤트 배너 그림
 │   ├── cards.mjs, products.mjs, chat.mjs # 카드, 상품·가입, AI 상담(SSE)
 │   ├── signup.mjs, settings.mjs, search.mjs # 회원가입, 메뉴·PIN 변경, 거래 검색
 │   └── *.test.mjs, integration.browser.mjs # 순수 함수 테스트(node --test), 실제 브라우저 통합 점검
