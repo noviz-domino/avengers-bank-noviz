@@ -4,8 +4,8 @@
 
 ## 찍는 방법 (다음 버전도 같은 조건으로)
 
-- 화면 크기 375×812 (모바일), 데모 계정(`demo`)으로 로그인한 상태
-- 화면 순서와 파일 이름은 고정: `01-login` → `02-home-top` → `03-home-bottom` → `04-products` → `05-ai-chat` → `06-cards-large` → `07-cards-list` → `08-menu`
+- 화면 크기 **384×760**: 갤럭시 S23+(CSS 384×832)에서 위 상태바와 아래 내비게이션바를 뺀 크기 (v4부터. v3까지는 375×812), 데모 계정(`demo`)으로 로그인한 상태
+- 화면 순서와 파일 이름은 고정: `01-login` → `02-home-top` → `03-home-bottom` → `04-products` → `05-ai-chat` → `06-cards-large` → `07-cards-list` → `08-menu` → `09-accounts`(v4부터) → `10-products-list` → `11-event-opening` → `12-event-welcome` → `13-card-search` → `14-notifications` → `15-notifications-notice` → `16-budget-essentials`(v4부터)
 - 폴더 이름: `v<번호>-<날짜>-<한 단어 설명>`
 - 금액·거래내역은 찍은 날의 데모 데이터라 버전마다 다를 수 있습니다. 파일마다 해상도가 다른 것(375 또는 750px 폭)은 캡처 도구 차이이며 같은 화면 크기입니다.
 
@@ -15,7 +15,8 @@
 |---|---|---|---|
 | [v1](v1-2026-11-11-before/) | 2026-11-11 | 개편 직전 상태 (main `7b36f5c`). 시안 14·15·20·21·23·25번을 따라 구현한 화면 | [ADR 0021](../../decisions/0021-ui-components.md) |
 | [v2](v2-2026-11-11-compact/) | 2026-11-11 | 여백 줄이기, AI 상담 채팅형 개편, 로그인 화면 다시 디자인 | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
-| [v3](v3-2026-11-11-login-review/) | 2026-11-11 | 로그인 화면 리뷰 반영 (로그인 화면만 다시 찍음) | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
+| [v3](v3-2026-11-11-login-review/) | 2026-11-11 | 로그인 화면 리뷰 반영. 02~08은 v4 직전 상태(main `0bd196a`)를 375×812로 찍음 | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
+| [v4](v4-2026-11-11-layout-tabs/) | 2026-11-11 | 좌우 여백 1.5배·위 여백, 하단 탭 시트(홈·계좌·카드·상품·AI 상담), 전체 메뉴는 머리글 오른쪽 위, 계좌 탭 새 화면(09). 384×760(갤럭시 S23+ 기준)으로 찍음 | [ADR 0029](../../decisions/0029-layout-gutter-tabs-menu.md) |
 
 ## v1 → v2 화면별 비교
 
@@ -37,6 +38,26 @@
 | ![v2](v2-2026-11-11-compact/01-login.jpg) | ![v3](v3-2026-11-11-login-review/01-login.jpg) | 위쪽 은행명을 14px → 19px로 키움. 입력칸·로그인 버튼 양옆 여백을 늘리고 완전히 둥글게(알약). "아이디·비밀번호"는 칸 안의 흐린 안내 글로 넣고 입력 글자는 가운데 정렬. 간편 로그인은 흐린 구분선 가운데에 "간편 로그인" 표시, 그 아래 가운데에 둥근 정사각형 버튼 두 개, 버튼 안에 로고(위)와 Google·NAVER(아래)를 함께 넣음(공통 부품 `socialButton`) |
 
 리뷰 중에 만든 **간편 로그인 가로 버튼 두 줄 안**(로고 + "구글 간편로그인")은 고르지 않아 보관합니다: [캡처](login-options-2026-11-11/social-wide-buttons.jpg), [코드](login-options-2026-11-11/archived-code/social-wide-buttons.mjs), [스타일](login-options-2026-11-11/archived-code/social-wide-buttons.css)
+
+## v3 → v4 화면별 비교 (레이아웃·하단 탭)
+
+v3는 375×812, v4는 384×760이라 폭이 9px 다릅니다. 여백 비교는 폭 차이를 감안해서 봐 주세요. 02·14·15·16번은 브라우저 패널 높이가 모자라 384×760 화면을 약 0.9배로 축소해 찍었습니다(348×688).
+
+| 화면 | v3 (전) | v4 (후) | 바뀐 점 |
+|---|---|---|---|
+| 로그인 | ![v3](v3-2026-11-11-login-review/01-login.jpg) | ![v4](v4-2026-11-11-layout-tabs/01-login.png) | 바뀐 점 없음(기준 크기로 다시 찍음) |
+| 홈 (위) | ![v3](v3-2026-11-11-login-review/02-home-top.png) | ![v4](v4-2026-11-11-layout-tabs/02-home-top.png) | 왼쪽 위는 로고 + "OOO님", 오른쪽 위는 알림·전체 메뉴(돋보기는 계좌·카드 탭으로 옮김). 좌우 여백 24→36px, 머리글 위 여백. 계좌번호는 한 줄로 |
+| 홈 (아래) | ![v3](v3-2026-11-11-login-review/03-home-bottom.png) | ![v4](v4-2026-11-11-layout-tabs/03-home-bottom.png) | 하단 탭이 위 모서리 둥근 시트로. 순서 홈·계좌·카드·상품·AI 상담 |
+| 상품 | ![v3](v3-2026-11-11-login-review/04-products.png) | ![v4](v4-2026-11-11-layout-tabs/04-products.png) | 여백·전체 메뉴 버튼. 목록은 상품명 17px·금리 25px로 키우고 설명·"연(세전)"·"기본 연"은 12·11px로 줄임 ([목록 부분](v4-2026-11-11-layout-tabs/10-products-list.png)) |
+| AI 상담 | ![v3](v3-2026-11-11-login-review/05-ai-chat.png) | ![v4](v4-2026-11-11-layout-tabs/05-ai-chat.png) | 여백·전체 메뉴 버튼 |
+| 카드 (크게) | ![v3](v3-2026-11-11-login-review/06-cards-large.png) | ![v4](v4-2026-11-11-layout-tabs/06-cards-large.png) | 여백·전체 메뉴 버튼. 처음엔 쓸 수 있는 카드부터 보여 줌(분실 0017은 왼쪽 칸에 기록으로 남음, seed가 0033 발급, ADR 0030) |
+| 카드 (목록) | ![v3](v3-2026-11-11-login-review/07-cards-list.png) | ![v4](v4-2026-11-11-layout-tabs/07-cards-list.png) | 여백·전체 메뉴 버튼 |
+| 전체 메뉴 | ![v3](v3-2026-11-11-login-review/08-menu.png) | ![v4](v4-2026-11-11-layout-tabs/08-menu.png) | 하단 탭 대신 뒤로 버튼(열기 전 화면으로). 맨 위에 메뉴 검색, 바로가기 8칸(계좌 검색·카드 검색 추가) |
+| 계좌 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/09-accounts.png) | 계좌 합계, 입출금·예금적금 묶음, 새 계좌 만들기 |
+| 알림 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/14-notifications.png) ![v4](v4-2026-11-11-layout-tabs/15-notifications-notice.png) | 홈 머리글 종 버튼. 하위 메뉴 입출금내역·카드내역·혜택(광고)·공지사항 |
+| 예산 생활비 | 하루 금액만 | ![v4](v4-2026-11-11-layout-tabs/16-budget-essentials.png) | 업종마다 금액 + 주기(매일·주 N회·월 N회), ADR 0024 |
+| 카드 검색 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/13-card-search.png) | 카드 탭 머리글 돋보기. 가맹점·카드·카테고리·기간, 합계는 취소 제외 |
+| 이벤트 상세 (새 화면) | 배너가 상품 목록으로만 감 | ![v4](v4-2026-11-11-layout-tabs/11-event-opening.png) ![v4](v4-2026-11-11-layout-tabs/12-event-welcome.png) | 홈 배너를 누르면 설명 페이지. 신규가입 이벤트는 추천 상품(서버 정보)과 "바로 가입하기" |
 
 ## 로그인 화면 시안 비교 (2026-11-11) — **B 선택**
 

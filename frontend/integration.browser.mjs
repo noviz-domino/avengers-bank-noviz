@@ -65,7 +65,8 @@ export async function verifyIntegration(win = window) {
   step("데모 로그인 후 홈에 총자산 표시");
   fits("홈");
   const tabs = [...doc.querySelectorAll('.ui-tabs [data-action]')].map((tab) => tab.dataset.action);
-  if (tabs.join() !== "home,products,chat,cards,menu") throw new Error("하단 탭 순서가 시안과 다름");
+  if (tabs.join() !== "home,accounts,cards,products,chat") throw new Error("하단 탭 순서가 ADR 0029와 다름");
+  if (!q(".ui-header [data-action=\"menu\"]")) throw new Error("머리글에 전체 메뉴 버튼이 없음");
   q('[data-action="privacy"]').focus();
   await action("privacy");
   if (doc.activeElement.dataset.action !== "privacy" || doc.activeElement.getAttribute("aria-pressed") !== "true") throw new Error("잔액 숨김 후 포커스·상태를 유지해야 함");
@@ -82,7 +83,7 @@ export async function verifyIntegration(win = window) {
   if (!/^\d{3}-\*\*\*-\d{6}$/.test(to.num)) throw new Error("홈 계좌번호 가운데 자리를 가려야 함");
   await click(`[data-action="account-${to.id}"]`);
   to.num = (await waitSel(".hero > small")).textContent;
-  await action("home");
+  await action("back"); // 열기 전 화면(홈)으로
   await waitFor(() => checkingRows().length >= 2, "홈 복귀");
   step("홈 계좌번호 가림·상세의 전체 번호 확인");
   await click(`[data-action="account-${from.id}"]`);
@@ -100,7 +101,7 @@ export async function verifyIntegration(win = window) {
   await submit('[data-form="rename"]', { alias: original });
   await waitFor(() => q("h1")?.textContent === original, "별칭 복원");
   step("별칭 복원");
-  await action("home");
+  await action("back"); // 관리 → 상세로 돌아온 뒤, 상세의 뒤로는 홈
   await waitFor(() => checkingRows().length >= 2, "홈 복귀");
 
   // 5. 이체 1,000원 (내 입출금 계좌 사이) + PIN 승인 창
@@ -189,7 +190,8 @@ export async function verifyIntegration(win = window) {
   await waitText("입금 합계");
   step("거래 검색 결과에 합계 표시");
   fits("거래 검색");
-  await click('[data-act="to-menu"]');
+  await click('[data-action="back"]'); // 열기 전 화면(전체 메뉴)으로
+  await waitText("내 정보");
   await action("budget");
   await waitSel(".budget-page");
   await waitFor(() => q('[data-form="budget"]') || q('[data-action="budget-edit"]'), "예산 신청 또는 조회");
@@ -218,8 +220,7 @@ export async function verifyIntegration(win = window) {
     await waitSel('[data-form="budget"]');
     step("예산 해지는 PIN 승인 후에만 반영");
   } else step("기존 예산의 계산 내역 표시");
-  await action("budget-home");
-  await action("menu");
+  await action("budget-home"); // 예산은 메뉴에서 열었으니 뒤로는 전체 메뉴
   await waitText("demo");
   await click('[data-act="to-logout"]');
   await waitSel('[data-form="login"]');

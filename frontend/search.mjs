@@ -1,6 +1,7 @@
-// 거래내역 검색 화면 (#search): GET /transactions 조건 검색 + 조건 전체 합계
+// 계좌 검색 화면 (#search, 계좌 탭 머리글): GET /transactions 조건 검색 + 조건 전체 합계. 카드 사용내역은 card-search.mjs
 import { api } from "./api.mjs";
-import { esc, topbar, won } from "./ext-ui.mjs";
+import { esc, won } from "./ext-ui.mjs";
+import { header } from "./ui.mjs";
 
 export const CATEGORIES = ["식사", "카페·간식", "외식·술자리", "교통", "쇼핑", "의료", "주거·통신", "여가", "이체", "저축·내 계좌", "수입", "대출", "카드 대금", "기타"];
 
@@ -28,7 +29,8 @@ const rowHtml = (t) => '<li><div><strong>' + esc(t.counterparty_name || t.memo |
 
 /** ctx: { go } */
 export function mountSearch(container, ctx) {
-  container.innerHTML = topbar("거래내역 검색", "to-menu", true) + '<main class="ext-search"><form id="search-form" novalidate>'
+  // 뒤로는 열기 전 화면으로 (홈·메뉴 어디서 왔든). 메뉴로 고정하면 메뉴의 뒤로와 서로 오가며 갇힌다
+  container.innerHTML = header({ title: "계좌 검색", back: "back", heading: true }) + '<main class="ext-search"><form id="search-form" novalidate>'
     + '<label>검색어<input name="keyword" maxlength="50" placeholder="메모·상대방 이름"></label>'
     + '<div class="two"><label>시작일<input name="from_date" type="date"></label><label>종료일<input name="to_date" type="date"></label></div>'
     + '<div class="two"><label>구분<select name="direction"><option value="">전체</option><option value="IN">입금</option><option value="OUT">출금</option></select></label>'
@@ -36,7 +38,6 @@ export function mountSearch(container, ctx) {
     + '<div class="two"><label>최소 금액<input name="min_amount" inputmode="numeric" placeholder="0"></label><label>최대 금액<input name="max_amount" inputmode="numeric"></label></div>'
     + '<p class="error" id="e-form" role="alert"></p><button class="primary">검색</button></form>'
     + '<section id="result" aria-live="polite"></section></main>';
-  container.querySelector('[data-act="to-menu"]').addEventListener("click", () => ctx.go("menu"));
   const form = container.querySelector("#search-form");
   const result = container.querySelector("#result");
   const err = container.querySelector("#e-form");

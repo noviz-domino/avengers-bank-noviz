@@ -25,7 +25,7 @@ FIXED = [(600_000, 10), (150_000, 15), (100_000, 27), (150_000, 28), (500_000, 3
 
 def example(today: date, spent: int) -> calc.Budget:
     return calc.compute(payday=25, today=today, monthly_income=3_000_000, spent=spent, fixed=FIXED,
-                        essentials_daily=19_000, goal_saving=calc.goal_monthly(1_500_000, 6))
+                        essentials={"식사": 19_000}, goal_saving=calc.goal_monthly(1_500_000, 6))
 
 
 # ---------- 순수 계산 ----------
@@ -87,13 +87,33 @@ def test_change_details_displays_all_proposed_values_and_removals():
         always_allow_categories=["의료", "쇼핑"],
     ))
     assert text.splitlines() == [
-        "월 수입: 700,000원", "필수 생활비: 식사 하루 5,000원", "고정 지출: 월세 100,000원 (매월 31일)",
+        "월 수입: 700,000원", "생활비: 식사 매일 5,000원", "고정 지출: 월세 100,000원 (매월 31일)",
         "목표: 여행 1,000,000원 / 3개월 (주기마다 333,334원 저축)", "항상 통과 업종: 의료, 쇼핑",
     ]
     assert change_details(BudgetUpdate(goal=None, essentials={}, fixed_expenses=[], always_allow_categories=[])) == (
-        "필수 생활비: 없음\n고정 지출: 없음\n목표: 삭제\n항상 통과 업종: 없음"
+        "생활비: 없음\n고정 지출: 없음\n목표: 삭제\n항상 통과 업종: 없음"
     )
     assert change_details(BudgetUpdate()) == ""
+
+
+def test_essentials_by_frequency():
+    # 매일 항목은 남은 일수 × 금액, 주·월 항목은 이번 주기 계획액 - 그 업종에서 이미 쓴 돈 (0 아래로 안 감)
+    days_left, days_total = 14, 31
+    essentials = {"식사": {"amount": 15_000, "per": "day", "times": 1},
+                  "외식·술자리": {"amount": 30_000, "per": "week", "times": 2},
+                  "의료": {"amount": 20_000, "per": "month", "times": 1},
+                  "쇼핑": {"amount": 50_000, "per": "month", "times": 1}}
+    assert calc.planned_for_cycle(essentials["외식·술자리"], days_total) == 265_715  # 30,000 × 2 × 31 ÷ 7 올림
+    spent = {"외식·술자리": 100_000, "쇼핑": 80_000, "식사": 999_999}
+    assert calc.essential_reserve(essentials, spent, days_left, days_total) == (
+        15_000 * 14          # 식사: 이미 쓴 돈과 상관없이 남은 날만큼
+        + 265_715 - 100_000  # 외식: 계획 - 쓴 돈
+        + 20_000             # 의료: 아직 안 씀
+        + 0                  # 쇼핑: 계획(5만)보다 더 써서 더 남기지 않음
+    )
+    assert calc.essential(5_000) == {"amount": 5_000, "per": "day", "times": 1}  # 예전 저장값(하루 금액)도 읽음
+    assert calc.monthly_equivalent({"amount": 1_000, "per": "day"}) == 30_000
+    assert calc.monthly_equivalent({"amount": 30_000, "per": "month", "times": 1}) == 30_000
 
 
 # ---------- API ----------
@@ -171,6 +191,24 @@ async def test_enroll_and_summary(bank):
     assert (await client.get("/budget", headers=peter)).json()["data"] == {"enrolled": False}  # 남의 예산은 안 보임
     bad = await enroll(client, peter, essentials={"술값": 1000})
     assert bad.status_code == 422  # 서버의 카테고리 목록에 없는 이름
+    for wrong in [{"식사": {"amount": 1000, "per": "day", "times": 2}}, {"외식·술자리": {"amount": 1000, "per": "week", "times": 8}},
+                  {"의료": {"amount": 1000, "per": "year"}}, {"의료": {"amount": -1, "per": "month"}}]:
+        assert (await enroll(client, peter, essentials=wrong)).status_code == 422, wrong
+
+
+async def test_enroll_with_weekly_and_monthly_essentials(bank):
+    # 가끔 쓰는 생활비는 주·월 횟수로 받는다. 응답은 항상 {"amount", "per", "times"} 형식
+    client, tony, *_ = bank
+    s = (await enroll(client, tony, essentials={"식사": 10_000, "의료": {"amount": 20_000, "per": "month", "times": 1},
+                                                "외식·술자리": {"amount": 30_000, "per": "week", "times": 2}})).json()["data"]
+    assert s["essentials"]["식사"] == {"amount": 10_000, "per": "day", "times": 1}
+    assert s["essentials"]["외식·술자리"] == {"amount": 30_000, "per": "week", "times": 2}
+    days_total, days_left = s["cycle"]["days_total"], s["cycle"]["days_left"]
+    assert s["essential_reserve"] == 10_000 * days_left + -(-30_000 * 2 * days_total // 7) + 20_000
+
+    # 매일 1만 → 월 1회 1만은 덜 남기는 쪽이라 PIN 승인 대기
+    res = await client.patch("/budget", json={"essentials": {"식사": {"amount": 10_000, "per": "month", "times": 1}}}, headers=tony)
+    assert res.status_code == 202 and "식사 월 1회 × 10,000원" in res.json()["data"]["summary"]
 
 
 async def test_spending_counts_by_kind(bank):

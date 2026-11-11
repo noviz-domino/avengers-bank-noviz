@@ -14,6 +14,19 @@
 .menu-shortcuts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ui-space-sm); }
 .menu-shortcuts button { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 72px; padding: 8px 2px; border: 0; border-radius: var(--ui-radius-sm); background: var(--ui-surface); color: var(--ui-navy); font-size: var(--ui-small-size); font-weight: 700; word-break: keep-all; }
 .menu-shortcuts .ui-icon { color: var(--ui-blue); }
+/* 메뉴 검색: 입력하면 바로가기 대신 맞는 메뉴 목록 */
+.menu-search { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 16px; border-radius: 999px; background: var(--ui-surface); color: var(--ui-muted); }
+.menu-search .ui-icon { width: 18px; height: 18px; flex: none; }
+.menu-search input { flex: 1; min-width: 0; min-height: 46px; padding: 0; border: 0; background: transparent; font-size: 15px; }
+.menu-search input:focus-visible { outline: none; }
+.menu-search:focus-within { box-shadow: 0 0 0 2px #b4c0ce; }
+.menu-search-results { margin: 0; padding: 0; list-style: none; }
+.menu-search-results button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 0 4px; border: 0; border-bottom: 1px solid var(--ui-line); background: transparent; color: var(--ui-navy); font-size: 15px; font-weight: 700; text-align: left; }
+.menu-search-results button span { flex: 1; }
+.menu-search-results .ui-icon { color: var(--ui-blue); }
+.menu-search-results .ui-icon:last-child { width: 14px; height: 14px; color: var(--ui-muted); }
+.menu-search-results .note { padding: 12px 4px; }
+.ext-search .canceled { color: var(--ui-muted); text-decoration: line-through; }
 .menu-logout { display: flex; align-items: center; justify-content: center; gap: var(--ui-space-sm); width: 100%; min-height: 48px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius-sm); background: var(--ui-white); color: var(--ui-muted); font-weight: 700; }
 .menu-logout .ui-icon { width: 20px; height: 20px; flex-basis: 20px; }
 .menu-version { text-align: center; }

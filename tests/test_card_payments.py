@@ -281,3 +281,28 @@ async def test_others_card_and_tx_are_404(bank):
     wrong_card = await cancel(client, me, credit, tx)  # 다른 카드의 사용내역
     assert wrong_card.status_code == 404 and wrong_card.json()["error"]["code"] == "CARD_TX_NOT_FOUND"
     assert await balance(checking["account_id"]) == 1_988_000
+
+
+async def test_search_card_transactions_across_my_cards(bank):
+    # 카드 탭의 카드 검색: 내 모든 카드에서 가맹점·카테고리·기간으로 찾고, 합계는 승인 건만 (취소 제외)
+    client, me, _, debit, credit = bank
+    coffee = (await pay(client, me, debit, 5_000, "search-01", "스타벅스 강남점")).json()["data"]
+    await pay(client, me, credit, 30_000, "search-02", "스타벅스 역삼점")
+    await pay(client, me, credit, 9_000, "search-03", "GS25 편의점")
+    await cancel(client, me, debit, coffee)
+
+    found = (await client.get("/cards/transactions", params={"keyword": "스타벅스"}, headers=me)).json()["data"]
+    assert [t["merchant_name"] for t in found["transactions"]] == ["스타벅스 역삼점", "스타벅스 강남점"]  # 최근 것부터
+    assert found["count"] == 2 and found["total_amount"] == 30_000  # 취소한 5,000원은 합계에서 빠짐
+
+    only_credit = (await client.get("/cards/transactions", params={"card_id": credit["card_id"]}, headers=me)).json()["data"]
+    assert only_credit["count"] == 2 and only_credit["total_amount"] == 39_000
+
+    other = await user(client, "spidey", "피터")
+    assert (await client.get("/cards/transactions", headers=other)).json()["data"]["count"] == 0  # 남의 카드는 안 보임
+    assert (await client.get("/cards/transactions", params={"card_id": credit["card_id"]}, headers=other)).json()["data"]["count"] == 0
+
+    bad = await client.get("/cards/transactions", params={"from_date": "2026-11-12", "to_date": "2026-11-01"}, headers=me)
+    assert bad.status_code == 422
+    typo = await client.get("/cards/transactions", params={"keywrd": "x"}, headers=me)
+    assert typo.status_code == 422  # 오타 조건을 조용히 무시하지 않음

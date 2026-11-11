@@ -171,7 +171,7 @@ const GREETING = "안녕하세요, 캡아메리카뱅크 AI 상담이에요.\n�
 
 /** 상담 화면을 root에 그린다. 하단 메뉴는 app.mjs가 붙인다. 정리 함수를 돌려준다 */
 export function mountChat(root, { shield = "" } = {}) {
-  root.innerHTML = header({ title: "AI 상담", heading: true, rightHtml: '<button type="button" class="ui-button ui-button--quiet" data-chat-new>' + icon("plus") + "새 대화</button>" })
+  root.innerHTML = header({ title: "AI 상담", heading: true, menu: true, rightHtml: '<button type="button" class="ui-button ui-button--quiet" data-chat-new>' + icon("plus") + "새 대화</button>" })
     + '<main class="chat"><div class="chat-feed" aria-live="polite"></div>'
     + '<form class="composer" data-form="chat"><div><input name="question" aria-label="질문" placeholder="예: 이번 달 카페에서 얼마 썼어?" maxlength="1000" autocomplete="off" required>'
     + '<button class="ui-button ui-button--primary primary" aria-label="보내기">' + icon("send") + "</button></div></form></main>";

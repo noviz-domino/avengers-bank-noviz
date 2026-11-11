@@ -28,6 +28,7 @@ const paths = {
   single: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18"/>',
   list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   send: '<path d="M12 19V5m-6 6 6-6 6 6"/>',
+  bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4Z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M3 13h18M12 9v12M12 9C8 9 6 4 9 4s3 5 3 5Zm0 0c4 0 6-5 3-5s-3 5-3 5Z"/>',
   shield: '<path d="M12 3 20 6v6c0 5-3 8-8 10-5-2-8-5-8-10V6Z"/><path d="m9 12 2 2 4-4"/>',
   target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12h.01"/>',
@@ -59,9 +60,10 @@ export function carouselPager(page, count, { previous, next }) {
 }
 
 // heading: 탭 화면처럼 상단바 제목이 곧 페이지 제목일 때 h1로 그린다 (본문에 pageTitle을 또 두지 않는다)
-export function header({ title = "", brandHtml = "", back, rightHtml = "", heading = false } = {}) {
+// menu: true면 오른쪽 끝에 전체 메뉴 버튼을 둔다 (탭 화면 공통 레이아웃. 전체 메뉴는 하단 탭에서 뺐다)
+export function header({ title = "", brandHtml = "", back, rightHtml = "", heading = false, menu = false } = {}) {
   const tag = heading ? "h1" : "div";
-  return `<header class="ui-header">${back ? button("", { action: back, icon: "back", ariaLabel: "뒤로 가기", className: "ui-back" }) : ""}<${tag} class="ui-header-title">${brandHtml || esc(title)}</${tag}><div class="ui-header-actions">${rightHtml}</div></header>`;
+  return `<header class="ui-header">${back ? button("", { action: back, icon: "back", ariaLabel: "뒤로 가기", className: "ui-back" }) : ""}<${tag} class="ui-header-title">${brandHtml || esc(title)}</${tag}><div class="ui-header-actions">${rightHtml}${menu ? button("", { action: "menu", icon: "menu", ariaLabel: "전체 메뉴" }) : ""}</div></header>`;
 }
 // 아이콘만 있는 둘 중 하나 고르기. options: [[값, 아이콘, 읽어 줄 이름]], attr은 화면 모듈의 액션 속성 이름
 export function iconToggle(options, { label, current, prefix = "", attr = "data-action" }) {
@@ -99,8 +101,8 @@ export function maskAccountNumber(number) {
 }
 
 export function bottomTabs(page) {
-  return '<nav class="ui-tabs" aria-label="주 메뉴">' + [["home", "홈"], ["products", "상품"], ["chat", "AI 상담"], ["cards", "카드"], ["menu", "전체"]].map(([action, label]) =>
-    `<button type="button" class="ui-tab" data-action="${action}"${page === action ? ' aria-current="page"' : ""}>${icon(action)}<span>${label}</span></button>`).join("") + "</nav>";
+  return '<nav class="ui-tabs" aria-label="주 메뉴">' + [["home", "홈", "home"], ["accounts", "계좌", "wallet"], ["cards", "카드", "cards"], ["products", "상품", "products"], ["chat", "AI 상담", "chat"]].map(([action, label, glyph]) =>
+    `<button type="button" class="ui-tab" data-action="${action}"${page === action ? ' aria-current="page"' : ""}>${icon(glyph)}<span>${label}</span></button>`).join("") + "</nav>";
 }
 
 // 다시 그리기 직전에 호출하고, 같은 화면의 새 DOM을 만든 뒤 반환 함수를 실행한다.

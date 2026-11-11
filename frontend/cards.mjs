@@ -1,6 +1,6 @@
 import { api, idempotencyKey } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
-import { esc as escape, header, stateBlock, restoreFocus, maskAccountNumber, iconToggle, icon as uiIcon } from "./ui.mjs";
+import { esc as escape, header, stateBlock, restoreFocus, maskAccountNumber, iconToggle, icon as uiIcon, button as uiButton } from "./ui.mjs";
 
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff8e9" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const icons = {
@@ -79,7 +79,8 @@ export function mountCards(root, { embedded = false } = {}) {
         api("/accounts").then((r) => r.data.accounts),
         api("/products/cards").then((r) => r.data).catch(() => []), // 혜택 문구만 못 불러와도 화면은 연다
       ]);
-      selectedId = cards.find((card) => card.card_id === selectedId)?.card_id ?? cards[0]?.card_id;
+      // 처음 열 때는 쓸 수 있는 카드(분실 아님)를 먼저 보여 준다. 분실 카드는 목록에 기록으로 남는다
+      selectedId = cards.find((card) => card.card_id === selectedId)?.card_id ?? (cards.find((card) => card.status !== "LOST") ?? cards[0])?.card_id;
     } catch (e) { error = message(e); }
     loading = false;
     if (!alive) return;
@@ -180,8 +181,12 @@ export function mountCards(root, { embedded = false } = {}) {
     const back = page === "limit" ? "manage" : "overview";
     const tools = card && !loading && !error && page === "overview"
       ? iconToggle([["large", "single", "카드 크게 보기"], ["list", "list", "카드 목록으로 보기"]], { label: "카드 보기 방식", current: view, prefix: "view-", attr: "data-card-action" })
-        + button("issue", uiIcon("plus") + "발급", "quiet") : "";
-    root.innerHTML = `${header(page === "overview" || (!card && page !== "issue") ? { title: "카드", heading: true, rightHtml: tools } : { title: titles[page], heading: true, back }).replace('data-action=', 'data-card-action=')}
+        // 머리글에 버튼이 5개라 발급은 아이콘만 (읽어 줄 이름은 "카드 발급")
+        + button("issue", uiIcon("plus"), "quiet", 'aria-label="카드 발급" title="카드 발급"') : "";
+    root.innerHTML = `${page === "overview" || (!card && page !== "issue")
+      // 카드 검색·전체 메뉴 버튼은 data-action 그대로 앱 라우팅으로
+      ? header({ title: "카드", heading: true, rightHtml: tools + uiButton("", { action: "card-search", icon: "search", ariaLabel: "카드 검색" }), menu: true })
+      : header({ title: titles[page], heading: true, back }).replace('data-action=', 'data-card-action=')}
       ${body()}
       <dialog class="cards-dialog" aria-labelledby="cards-confirm-title">${confirmStatus && card ? `<h2 id="cards-confirm-title">${confirmStatus === "LOST" ? "분실 신고할까요?" : "일시정지할까요?"}</h2><p>${escape(cardName(card))} · •••• ${escape(last4(card))}</p><p class="note">${confirmStatus === "LOST" ? "분실 신고 후에는 다시 사용할 수 없어요. 되돌릴 수 없고 새 카드를 발급받아야 해요." : "카드 사용을 잠시 멈춰요. 정지 해제는 PIN 승인이 필요해요."}</p><div class="cards-dialog-actions">${button("cancel", "취소", "outline")}${button("confirm", confirmStatus === "LOST" ? "분실 신고" : "일시정지", "primary")}</div>` : ""}</dialog>`;
     focus();

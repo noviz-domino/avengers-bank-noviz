@@ -28,6 +28,8 @@ from avengers_bank.domains.cards.schemas import (
     CardBillRunResponse,
     CardIssue,
     CardLimitsResponse,
+    CardTxFilter,
+    CardTxSearchResponse,
     CardPayment,
     CardResponse,
     CardTransactionResponse,
@@ -60,6 +62,10 @@ def not_found() -> NotFoundException:
     return NotFoundException(message="카드를 찾을 수 없습니다.", code="CARD_NOT_FOUND")  # 남의 카드도 404 (ADR 0008)
 
 
+# X-Requested-By(WEB·AGENT·MCP) → 감사 기록의 actor (WEB은 사용자가 직접 누른 것)
+REQUESTER_ACTOR = {"WEB": "USER", "AGENT": "AGENT", "MCP": "MCP"}
+
+
 async def run_unsuspend_card(db: AsyncSession, action: PendingAction) -> None:
     """승인된 정지 해제 (approvals EXECUTORS). 그사이 분실 신고됐으면 풀지 않는다"""
     found = await card_repository.find_by_id(db, action.payload["card_id"], lock=True)
@@ -69,6 +75,10 @@ async def run_unsuspend_card(db: AsyncSession, action: PendingAction) -> None:
     if card.status != "SUSPENDED":
         raise TransferRejected("CARD_NOT_SUSPENDED", "정지된 카드가 아닙니다.")
     card.status = "ACTIVE"
+    await audit_repository.record(  # 푼 사람은 PIN을 넣은 사용자. 요청을 누가 만들었는지는 detail에
+        db, user_id=card.user_id, actor="USER", action="CARD_UNSUSPENDED", target=str(card.card_id),
+        detail={"action_id": str(action.action_id), "requested_by": action.requested_by},
+    )
 
 
 def budget_confirmation_required(action: PendingAction) -> ApiException:
@@ -160,8 +170,8 @@ class CardService:
             raise not_found()
         return response(*found)
 
-    async def suspend(self, db: AsyncSession, user_id: int, card_id: int, reason: str) -> CardResponse:
-        """정지·분실 신고는 안전해지는 쪽이라 바로 (ADR 0004). 분실은 되돌릴 수 없다"""
+    async def suspend(self, db: AsyncSession, user_id: int, card_id: int, reason: str, requested_by: str = "WEB") -> CardResponse:
+        """정지·분실 신고는 안전해지는 쪽이라 바로 (ADR 0004). 분실은 되돌릴 수 없어서 누가 어느 입구로 했는지 남긴다"""
         async with db.begin():
             found = await card_repository.find_by_id(db, card_id, lock=True)
             if found is None or found[0].user_id != user_id:
@@ -169,6 +179,10 @@ class CardService:
             card = found[0]
             if card.status == "LOST":
                 raise ConflictException(message="분실 신고된 카드입니다. 재발급해 주세요.", code="CARD_LOST")
+            await audit_repository.record(
+                db, user_id=user_id, actor=REQUESTER_ACTOR.get(requested_by, "USER"), action="CARD_" + reason,
+                target=str(card_id), detail={"from": card.status, "requested_by": requested_by},
+            )
             card.status = reason
         return response(*found)
 
@@ -461,6 +475,14 @@ class CardService:
         await self._my_card(db, user_id, card_id)
         since = kst_midnight_utc(payment_date) if payment_date else None
         return await card_repository.find_txs(db, card_id, since, since + timedelta(days=1) if since else None)
+
+    async def search_txs(self, db: AsyncSession, user_id: int, f: CardTxFilter) -> CardTxSearchResponse:
+        """카드 탭의 카드 검색. 남의 카드 번호를 넣어도 내 카드 조건(user_id)으로만 찾으므로 결과가 비어 있다"""
+        since = kst_midnight_utc(f.from_date) if f.from_date else None
+        before = kst_midnight_utc(f.to_date) + timedelta(days=1) if f.to_date else None
+        rows, total, count = await card_repository.search_txs(
+            db, user_id, card_id=f.card_id, keyword=f.keyword, category=f.category, since=since, before=before)
+        return CardTxSearchResponse(transactions=rows, total_amount=total, count=count)
 
     async def limits(self, db: AsyncSession, user_id: int, card_id: int) -> CardLimitsResponse:
         card = await self._my_card(db, user_id, card_id)

@@ -43,7 +43,7 @@ class BudgetProfile(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"), primary_key=True)
     monthly_income: Mapped[int] = mapped_column(BigInteger, nullable=False)
     payday: Mapped[int] = mapped_column(SmallInteger, nullable=False)  # 주기 시작일 1~28 (모든 달에 있는 날)
-    essentials: Mapped[dict] = mapped_column(JSON, nullable=False)  # 필수 생활비 하루 금액 {"식사": 15000}
+    essentials: Mapped[dict] = mapped_column(JSON, nullable=False)  # 생활비 {"식사": {"amount": 15000, "per": "day", "times": 1}}. 예전 값(하루 금액 정수)은 calc.essential이 매일로 읽음
     always_allow: Mapped[list] = mapped_column(JSON, nullable=False)  # 항상 통과 업종 (카드 결제만) ["의료"]
     goal_name: Mapped[str | None] = mapped_column(String(50))
     goal_target_amount: Mapped[int | None] = mapped_column(BigInteger)

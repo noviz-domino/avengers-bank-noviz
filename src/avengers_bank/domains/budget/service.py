@@ -86,7 +86,7 @@ async def calculate(db: AsyncSession, profile: BudgetProfile, today: date | None
     budget = calc.compute(
         payday=profile.payday, today=today, monthly_income=profile.monthly_income, spent=sum(by_category.values()),
         fixed=[(f.amount, f.day) for f in await fixed_expenses(db, profile.user_id)],
-        essentials_daily=sum(profile.essentials.values()), goal_saving=profile.goal_monthly_amount or 0,
+        essentials=profile.essentials, spent_by_category=by_category, goal_saving=profile.goal_monthly_amount or 0,
     )
     return budget, by_category
 
@@ -129,8 +129,11 @@ def weakening_changes(profile: BudgetProfile, fixed: list[FixedExpense], data: B
     weak = []
     if data.monthly_income is not None and data.monthly_income > profile.monthly_income:
         weak.append("월 수입 높이기")
-    if data.essentials is not None and any(data.essentials.get(k, 0) < v for k, v in profile.essentials.items()):
-        weak.append("필수 생활비 낮추기·빼기")
+    if data.essentials is not None:
+        # 업종마다 한 달(30일) 계획액으로 비교: 줄이거나 빼거나, 매일 → 월 1회처럼 덜 남기게 바꾸면 약하게
+        new = {k: calc.monthly_equivalent(v.model_dump()) for k, v in data.essentials.items()}
+        if any(new.get(k, 0) < calc.monthly_equivalent(v) for k, v in profile.essentials.items()):
+            weak.append("생활비 낮추기·빼기")
     if data.fixed_expenses is not None:
         new = {f.name: (f.amount, f.day) for f in data.fixed_expenses}
         # 이름으로 맞춰 본다: 빠지거나, 금액이 줄거나, 날짜가 바뀌면(이미 지난 날로 옮기면 안 낸 돈이 줄어서) 약하게
@@ -154,7 +157,7 @@ def apply_goal(profile: BudgetProfile, goal) -> None:
 async def configuration(db: AsyncSession, profile: BudgetProfile) -> dict:
     return {
         "monthly_income": profile.monthly_income, "payday": profile.payday,
-        "essentials": profile.essentials, "always_allow_categories": profile.always_allow,
+        "essentials": {k: calc.essential(v) for k, v in profile.essentials.items()}, "always_allow_categories": profile.always_allow,
         "goal": {"name": profile.goal_name, "target_amount": profile.goal_target_amount,
                  "months": profile.goal_months} if profile.goal_name else None,
         "fixed_expenses": [{"name": f.name, "amount": f.amount, "day": f.day}
@@ -166,7 +169,7 @@ async def apply_update(db: AsyncSession, profile: BudgetProfile, data: BudgetUpd
     if data.monthly_income is not None:
         profile.monthly_income = data.monthly_income
     if data.essentials is not None:
-        profile.essentials = dict(data.essentials)
+        profile.essentials = {k: v.model_dump() for k, v in data.essentials.items()}
     if data.always_allow_categories is not None:
         profile.always_allow = list(dict.fromkeys(data.always_allow_categories))
     if data.fixed_expenses is not None:
@@ -175,14 +178,21 @@ async def apply_update(db: AsyncSession, profile: BudgetProfile, data: BudgetUpd
         apply_goal(profile, data.goal)
 
 
+def essential_text(e) -> str:
+    """승인 화면용 표현. 예: 매일 15,000원 / 주 2회 × 30,000원 / 월 1회 × 20,000원"""
+    if e.per == "day":
+        return f"매일 {e.amount:,}원"
+    return f"{'주' if e.per == 'week' else '월'} {e.times}회 × {e.amount:,}원"
+
+
 def change_details(data: BudgetUpdate) -> str:
     """승인 화면에 실제 반영할 전체 값을 사람이 읽을 수 있게 표시한다."""
     lines = []
     if data.monthly_income is not None:
         lines.append(f"월 수입: {data.monthly_income:,}원")
     if data.essentials is not None:
-        items = ", ".join(f"{name} 하루 {amount:,}원" for name, amount in data.essentials.items())
-        lines.append(f"필수 생활비: {items or '없음'}")
+        items = ", ".join(f"{name} {essential_text(e)}" for name, e in data.essentials.items())
+        lines.append(f"생활비: {items or '없음'}")
     if data.fixed_expenses is not None:
         items = ", ".join(f"{f.name} {f.amount:,}원 (매월 {f.day}일)" for f in data.fixed_expenses)
         lines.append(f"고정 지출: {items or '없음'}")
@@ -219,7 +229,7 @@ class BudgetService:
                 profile = BudgetProfile(user_id=user_id)
                 db.add(profile)
             profile.monthly_income, profile.payday, profile.active = data.monthly_income, data.payday, True
-            profile.essentials = dict(data.essentials)
+            profile.essentials = {k: v.model_dump() for k, v in data.essentials.items()}
             profile.always_allow = list(dict.fromkeys(data.always_allow_categories))
             apply_goal(profile, data.goal)
             await self._replace_fixed(db, user_id, data.fixed_expenses)
@@ -311,7 +321,7 @@ class BudgetService:
                             for f in await fixed_expenses(db, profile.user_id)],
             goal=GoalOut(name=profile.goal_name, target_amount=profile.goal_target_amount, months=profile.goal_months,
                          monthly_amount=profile.goal_monthly_amount) if profile.goal_name else None,
-            essentials=profile.essentials, always_allow_categories=profile.always_allow,
+            essentials={k: calc.essential(v) for k, v in profile.essentials.items()}, always_allow_categories=profile.always_allow,
         )
 
 

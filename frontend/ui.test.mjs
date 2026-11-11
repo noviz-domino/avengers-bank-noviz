@@ -28,11 +28,17 @@ test("입력 오류와 힌트를 입력칸에 연결한다", () => {
   assert.doesNotMatch(field({ id: "name", label: "이름" }), /aria-describedby/);
 });
 
-test("하단 탭은 홈·상품·AI 상담·카드·전체의 고정 목적지 5개다", () => {
-  const html = bottomTabs("menu");
-  assert.deepEqual([...html.matchAll(/data-action="([^"]+)"/g)].map((match) => match[1]), ["home", "products", "chat", "cards", "menu"]);
+test("하단 탭은 홈·계좌·카드·상품·AI 상담 순서의 고정 목적지 5개다 (전체 메뉴는 머리글)", () => {
+  const html = bottomTabs("accounts");
+  assert.deepEqual([...html.matchAll(/data-action="([^"]+)"/g)].map((match) => match[1]), ["home", "accounts", "cards", "products", "chat"]);
   assert.equal((html.match(/aria-current="page"/g) ?? []).length, 1);
-  assert.match(html, /data-action="menu" aria-current="page"/);
+  assert.match(html, /data-action="accounts" aria-current="page"/);
+});
+
+test("머리글은 menu: true일 때만 오른쪽 끝에 전체 메뉴 버튼을 둔다", () => {
+  assert.doesNotMatch(header({ title: "이체" }), /data-action="menu"/);
+  const html = header({ title: "카드", rightHtml: button("발급", { action: "issue" }), menu: true });
+  assert.match(html, /data-action="issue".*data-action="menu" aria-label="전체 메뉴"/);
 });
 
 test("다시 그린 버튼에 포커스를 되돌리고, 사라진 버튼에는 아무 일도 하지 않는다", () => {

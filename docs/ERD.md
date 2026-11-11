@@ -115,7 +115,7 @@ erDiagram
         int log_id PK
         int user_id FK "NULL"
         string actor "USER AGENT MCP SYSTEM"
-        string action "LOGIN_FAILED PIN_FAILED PIN_SET"
+        string action "LOGIN_FAILED PIN_FAILED PIN_SET CARD_SUSPENDED CARD_LOST CARD_UNSUSPENDED ..."
         string target "NULL, 대상 id"
         json detail "NULL"
         string ip "NULL"

@@ -30,7 +30,7 @@ const link = (product, label, className = "") => `<a class="${className}" href="
 const rateNote = (product) => '<p class="product-rate-note">' + (Number(product.max_preferential_rate) ? "우대조건 충족 시 · " : "") + "세전</p>";
 const header = (detail) => detail
   ? uiHeader({ brandHtml: `<a class="product-back" href="#products" aria-label="상품 목록으로 돌아가기">${icon("back")}<span>상품 상세</span></a>` })
-  : uiHeader({ title: "상품", heading: true });
+  : uiHeader({ title: "상품", heading: true, menu: true });
 
 function rateBlock(product) {
   const bonus = Number(product.max_preferential_rate) > 0;
@@ -135,12 +135,12 @@ const message = (e) => e?.message ?? "요청을 처리하지 못했어요.";
 
 let kind = "all"; // 목록·상세를 오가도 분류를 유지한다
 
-// 상품 화면. route는 location.hash.slice(1) ("products" 또는 "product/<id>")이고, 이동은 호출한 쪽이 다시 mount한다.
+// 상품 화면. route는 location.hash.slice(1) ("products", "product/<id>", 바로 가입 "product/<id>/join")이고, 이동은 호출한 쪽이 다시 mount한다.
 export function mountProducts(root, route = "") {
   let alive = true;
   let product; // 상세 상품
   let list; // 목록 (분류를 바꿔도 다시 받지 않는다)
-  const id = route.startsWith("product/") ? route.slice(8) : null;
+  const [, id = null, autoJoin] = route.match(/^product\/([^/]+)(\/join)?$/) ?? [];
   const set = (html) => { if (alive) { root.innerHTML = html; const title = root.querySelector("h1"); title?.setAttribute("tabindex", "-1"); title?.focus({ preventScroll: true }); } };
 
   async function load() {
@@ -149,6 +149,7 @@ export function mountProducts(root, route = "") {
       if (id === null) { list = (await api("/products/accounts")).data; return set(listView(list, kind)); }
       product = (await api("/products/accounts/" + encodeURIComponent(id))).data;
       set(detailView(product));
+      if (autoJoin) join(); // 이벤트의 "바로 가입하기"는 상세를 거치지 않고 가입 화면부터
     } catch (e) {
       set(id !== null && e.code === "PRODUCT_NOT_FOUND" ? notFound() : errorView(message(e)));
     }
@@ -195,7 +196,8 @@ export function mountProducts(root, route = "") {
 
   function handleClick(event) {
     const target = event.target.closest("button");
-    if (!target || !root.contains(target)) return;
+    // 머리글의 전체 메뉴처럼 data-action 버튼은 앱 라우팅에 넘긴다
+    if (!target || !root.contains(target) || target.dataset.action) return;
     event.stopPropagation();
     const filter = target.dataset.productFilter;
     if (filter !== undefined && Object.hasOwn(kinds, filter)) {
