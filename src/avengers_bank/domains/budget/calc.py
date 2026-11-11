@@ -1,7 +1,12 @@
 """예산 계산 (budget.md 규칙 1·3·4, ADR 0024). DB를 모르는 순수 함수라 숫자만 넣어 단위 테스트한다.
 
-자유 사용 가능액 = 이번 주기 수입 - 쓴 돈 - 아직 안 낸 고정 지출 - 남은 날의 필수 생활비 - 목표 저축
+자유 사용 가능액 = 이번 주기 수입 - 쓴 돈 - 아직 안 낸 고정 지출 - 남겨 둘 생활비 - 목표 저축
 모든 금액은 정수(원)다.
+
+생활비는 업종마다 "금액 + 주기"로 받는다 (2026-11-12, ADR 0024 보완):
+- 매일(day): 식사·교통처럼 매일 쓰는 돈 → 남은 일수(오늘 포함) × 금액
+- 주 N회(week)·월 N회(month): 외식·쇼핑·의료처럼 가끔 쓰는 돈 → 이번 주기 계획액 - 이번 주기에 그 업종에서 이미 쓴 돈 (0 아래로는 안 감)
+  주 N회의 주기 계획액 = 금액 × N × 주기 일수 ÷ 7 (올림), 월 N회 = 금액 × N (주기가 한 달이라)
 """
 
 import calendar
@@ -33,6 +38,43 @@ def goal_monthly(target_amount: int, months: int) -> int:
     return -(-target_amount // months)  # 올림: 마지막 달에 모자라지 않게
 
 
+PERIODS = ("day", "week", "month")
+
+
+def essential(value) -> dict:
+    """저장된 생활비 한 항목을 {"amount", "per", "times"}로. 예전 값(하루 금액 정수)은 매일로 읽는다"""
+    if isinstance(value, int):
+        return {"amount": value, "per": "day", "times": 1}
+    return {"amount": int(value["amount"]), "per": value.get("per", "day"), "times": int(value.get("times", 1))}
+
+
+def planned_for_cycle(item: dict, days_total: int) -> int:
+    """이번 주기(days_total일)에 쓸 계획액"""
+    e = essential(item)
+    if e["per"] == "day":
+        return e["amount"] * days_total
+    if e["per"] == "week":
+        return -(-e["amount"] * e["times"] * days_total // 7)  # 올림: 모자라지 않게
+    return e["amount"] * e["times"]
+
+
+def essential_reserve(essentials: dict, spent_by_category: dict[str, int], days_left: int, days_total: int) -> int:
+    """남겨 둘 생활비. 매일 항목은 남은 일수만큼, 주·월 항목은 계획액에서 이미 쓴 만큼 뺀다"""
+    total = 0
+    for name, item in essentials.items():
+        e = essential(item)
+        if e["per"] == "day":
+            total += e["amount"] * days_left
+        else:
+            total += max(0, planned_for_cycle(e, days_total) - spent_by_category.get(name, 0))
+    return total
+
+
+def monthly_equivalent(item: dict) -> int:
+    """설정끼리 비교용(완화 판정): 30일 주기 기준 계획액"""
+    return planned_for_cycle(item, 30)
+
+
 @dataclass(frozen=True)
 class Budget:
     start: date
@@ -54,16 +96,19 @@ class Budget:
 
 def compute(
     *, payday: int, today: date, monthly_income: int, spent: int, fixed: list[tuple[int, int]],
-    essentials_daily: int, goal_saving: int,
+    essentials: dict, goal_saving: int, spent_by_category: dict[str, int] | None = None,
 ) -> Budget:
-    """fixed: [(금액, 나가는 날)], essentials_daily: 카테고리별 하루 필수 생활비의 합"""
+    """fixed: [(금액, 나가는 날)], essentials: {업종: {"amount", "per", "times"}} (예전 정수 값은 매일),
+    spent_by_category: 이번 주기 업종별 지출 (주·월 항목에서 이미 쓴 돈을 빼는 데 씀)"""
     start, end = cycle_bounds(payday, today)
     days_left = (end - today).days + 1
+    days_total = (end - start).days + 1
     unpaid = sum(amount for amount, day in fixed if not fixed_paid(payday, today, day))
-    reserve = essentials_daily * days_left  # shortcut: 신청 때 값 그대로. 지난 주기 중앙값(규칙 4)은 소비 분석 PR에서
+    # shortcut: 신청 때 값 그대로. 지난 주기 중앙값(규칙 4)은 소비 분석 PR에서
+    reserve = essential_reserve(essentials, spent_by_category or {}, days_left, days_total)
     before_saving = monthly_income - spent - unpaid - reserve
     return Budget(
-        start=start, end=end, days_total=(end - start).days + 1, days_left=days_left,
+        start=start, end=end, days_total=days_total, days_left=days_left,
         monthly_income=monthly_income, spent=spent, unpaid_fixed=unpaid, essential_reserve=reserve,
         goal_saving=goal_saving, free_before_saving=before_saving, free_to_spend=before_saving - goal_saving,
     )

@@ -27,8 +27,31 @@ class GoalIn(BaseModel):
     months: int = Field(ge=1, le=60)
 
 
+class EssentialIn(BaseModel):
+    """생활비 한 업종: 금액과 쓰는 주기. 매일 쓰면 per=day, 가끔이면 주·월 몇 번인지 (예: 외식 주 2회 × 3만 원)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount: int = Field(ge=0, le=10_000_000)  # 한 번(매일이면 하루)에 쓰는 돈
+    per: Literal["day", "week", "month"] = "day"
+    times: int = Field(default=1, ge=1, le=31)  # 주·월에 몇 번
+
+    @model_validator(mode="after")
+    def _times(self):
+        if self.per == "day" and self.times != 1:
+            raise ValueError("매일 쓰는 생활비는 횟수가 1이어야 합니다")
+        if self.per == "week" and self.times > 7:
+            raise ValueError("주 단위 횟수는 1~7번")
+        return self
+
+    @model_validator(mode="before")
+    @classmethod
+    def _plain_number(cls, value):
+        return {"amount": value} if isinstance(value, int) else value  # 예전 형식(하루 금액 숫자)도 받는다
+
+
 class BudgetEssentials(BaseModel):
-    essentials: dict[str, int] | None = None  # 카테고리별 하루 필수 생활비 {"식사": 15000, "교통": 4000}
+    essentials: dict[str, EssentialIn] | None = None  # 업종별 생활비 {"식사": {"amount": 15000}, "외식": {"amount": 30000, "per": "week", "times": 2}}
 
     @model_validator(mode="after")
     def _unique_fixed_names(self):
@@ -42,8 +65,6 @@ class BudgetEssentials(BaseModel):
     def _essentials(cls, v):
         if v is not None:
             known_categories(v)
-            if any(amount < 0 or amount > 10_000_000 for amount in v.values()):
-                raise ValueError("하루 필수 생활비는 0원 ~ 1,000만 원")
         return v
 
 
@@ -54,7 +75,7 @@ class BudgetEnroll(BudgetEssentials):
 
     monthly_income: Won
     payday: int = Field(ge=1, le=28)
-    essentials: dict[str, int] = Field(default_factory=dict)
+    essentials: dict[str, EssentialIn] = Field(default_factory=dict)
     fixed_expenses: list[FixedExpenseIn] = Field(default_factory=list, max_length=30)
     goal: GoalIn | None = None
     always_allow_categories: list[str] = Field(default_factory=lambda: ["의료"], max_length=len(CATEGORIES))
@@ -121,7 +142,7 @@ class BudgetSummary(BaseModel):
     monthly_income: int
     spent: int  # 이번 주기에 쓴 돈 (체크·이체·신용카드, 같은 주기 환불은 뺌)
     unpaid_fixed: int
-    essential_reserve: int  # 남은 날(오늘 포함) × 하루 필수 생활비
+    essential_reserve: int  # 남겨 둘 생활비: 매일 항목은 남은 일수 × 금액, 주·월 항목은 계획액 - 이미 쓴 돈
     goal_saving: int
     free_before_saving: int  # 생활비만 보면
     free_to_spend: int  # 저축까지 지키면: 결제 검사 기준
@@ -129,7 +150,7 @@ class BudgetSummary(BaseModel):
     by_category: list[CategoryAmount]  # 이번 주기 업종별 지출, 많은 순
     fixed_expenses: list[FixedExpenseOut]
     goal: GoalOut | None
-    essentials: dict[str, int]
+    essentials: dict[str, EssentialIn]
     always_allow_categories: list[str]
 
 

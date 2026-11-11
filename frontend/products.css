@@ -26,11 +26,12 @@
 .products-app .product-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto 8px; gap: 8px; align-items: center; min-height: 58px; }
 .products-app .product-icon { display: grid; place-items: center; width: 36px; height: 42px; border-radius: 12px; font-size: 1.6rem; color: #527086; background: var(--ui-blue-soft); }
 .products-app .product-icon.savings { background: var(--ui-sage-soft); color: #637b51; }
-.products-app .product-row-info strong { display: block; font-size: var(--ui-body-size); line-height: 1.5; overflow-wrap: anywhere; }
-.products-app .product-row-info small { font-size: var(--ui-small-size); margin-top: 3px; }
+/* 목록은 상품명과 금리를 키우고 나머지 설명은 줄여 위계를 분명하게 (2026-11-11) */
+.products-app .product-row-info strong { display: block; font-size: 17px; font-weight: 800; line-height: 1.45; letter-spacing: -.02em; word-break: keep-all; overflow-wrap: anywhere; }
+.products-app .product-row-info small { font-size: 12px; margin-top: 3px; }
 .products-app .product-row-rate { text-align: right; white-space: nowrap; }
-.products-app .product-row-rate b { font-size: 1.4rem; color: var(--ui-blue); }
-.products-app .product-row-rate small { font-size: .64rem; }
+.products-app .product-row-rate b { display: block; font-size: 25px; line-height: 1.25; letter-spacing: -.03em; color: var(--ui-blue); }
+.products-app .product-row-rate small { font-size: 11px; }
 .products-app .product-chevron { font-size: 1.4rem; color: var(--ui-muted); }
 .products-app .product-special { display: inline-block; padding: 1px 6px; border-radius: 5px; background: var(--ui-amber); color: white; font-size: .68rem; }
 .products-app .product-row-note { margin-left: 44px; }
@@ -69,7 +70,7 @@
 .products-app .product-filters button { min-width: var(--ui-touch); font-size: var(--ui-body-size); }
 .products-app .product-rates { flex-wrap: wrap; }
 .products-app .product-row-info, .products-app .product-bonuses li > span { min-width: 0; }
-.products-app .product-row-rate small, .products-app .product-row-info small, .products-app .product-footer-note { font-size: var(--ui-small-size); }
+.products-app .product-footer-note { font-size: var(--ui-small-size); }
 .products-app .product-icon .ui-icon { width: 28px; height: 28px; }
 .products-app .product-source { display: grid; gap: var(--ui-space-sm); border: 0; padding: 0; margin: 0; min-width: 0; }
 .products-app .product-source legend { font-weight: 700; margin-bottom: var(--ui-space-sm); }

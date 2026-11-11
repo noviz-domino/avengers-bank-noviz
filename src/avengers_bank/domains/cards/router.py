@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,8 @@ from avengers_bank.domains.cards.schemas import (
     CardResponse,
     CardSuspend,
     CardTransactionResponse,
+    CardTxFilter,
+    CardTxSearchResponse,
     MerchantPayment,
     PendingRefundResponse,
     PhoneLocation,
@@ -92,15 +94,22 @@ async def record_phone_activity(db: DB, me: Me):
     return SuccessResponse[None](data=None)
 
 
+# "/{card_id}"보다 먼저 둔다: 뒤에 두면 "transactions"를 카드 번호로 읽으려다 422가 난다
+@router.get("/transactions", response_model=SuccessResponse[CardTxSearchResponse])
+async def search_card_transactions(f: Annotated[CardTxFilter, Query()], db: DB, me: Me):
+    """카드 검색: 내 모든 카드(또는 card_id)의 사용내역을 가맹점·카테고리·기간(한국 날짜)으로. 합계는 승인 건만"""
+    return SuccessResponse[CardTxSearchResponse](data=await card_service.search_txs(db, me.user_id, f))
+
+
 @router.get("/{card_id}", response_model=SuccessResponse[CardResponse], responses=error_responses(404))
 async def get_my_card(card_id: int, db: DB, me: Me):
     return SuccessResponse[CardResponse](data=await card_service.get_mine(db, me.user_id, card_id))
 
 
 @router.post("/{card_id}/suspend", response_model=SuccessResponse[CardResponse], responses=error_responses(404, 409))
-async def suspend_card(card_id: int, data: CardSuspend, db: DB, me: Me):
-    """정지·분실 신고: 바로 적용 (안전해지는 쪽은 승인 없이, ADR 0004)"""
-    return SuccessResponse[CardResponse](data=await card_service.suspend(db, me.user_id, card_id, data.reason))
+async def suspend_card(card_id: int, data: CardSuspend, db: DB, me: Me, requested_by: RequestedBy):
+    """정지·분실 신고: 바로 적용 (안전해지는 쪽은 승인 없이, ADR 0004). 감사 기록(audit_logs)에 남는다"""
+    return SuccessResponse[CardResponse](data=await card_service.suspend(db, me.user_id, card_id, data.reason, requested_by))
 
 
 @router.post("/{card_id}/unsuspend", response_model=SuccessResponse[ActionResponse],

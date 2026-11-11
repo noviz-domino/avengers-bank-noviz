@@ -54,14 +54,13 @@
 .cards-screen .cards-manage-row + .cards-manage-row { margin-top: 0; }
 .cards-screen button:disabled { cursor: default; }
 .cards-danger { color: var(--ui-error); }
-.cards-footer { border-top: 1px solid var(--ui-line); padding: 18px 24px max(18px, env(safe-area-inset-bottom)); font-size: var(--ui-small-size); line-height: 1.8; text-align: center; color: var(--ui-muted); }
+.cards-footer { border-top: 1px solid var(--ui-line); padding: 18px var(--ui-page-gutter) max(18px, env(safe-area-inset-bottom)); font-size: var(--ui-small-size); line-height: 1.8; text-align: center; color: var(--ui-muted); }
 .cards-dialog { width: min(90vw, 380px); border: 0; border-radius: 18px; padding: 24px; color: var(--ui-navy); box-shadow: 0 20px 80px #10233b50; }
 .cards-dialog::backdrop { background: #10233b70; }
 .cards-dialog p { margin-top: 16px; }
 .cards-dialog-actions { display: flex; gap: 10px; margin-top: 24px; }
 .cards-dialog-actions .outline { min-width: 80px; }
 @media (max-width: 350px) {
-  .cards-screen main { padding-inline: 16px; }
   .cards-screen .topbar { font-size: 1rem; }
   .cards-art-mini { flex-basis: 68px; }
   .cards-summary { padding: 16px 12px; }

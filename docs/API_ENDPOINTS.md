@@ -10,7 +10,7 @@
 
 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|
-| POST | `/budget` | 🔒 | 수입·월급날·고정 지출·하루 생활비·목표로 신청 (201) |
+| POST | `/budget` | 🔒 | 수입·월급날·고정 지출·생활비·목표로 신청 (201). 생활비는 업종마다 `{"amount", "per": "day"\|"week"\|"month", "times"}`(예: 외식 주 2회 × 3만 원), 숫자 하나만 보내면 매일 (ADR 0024) |
 | GET | `/budget` | 🔒 | 이번 주기 계산 내역. 미신청은 `200 {data: {enrolled: false}}` |
 | GET | `/budget/check?amount=300000` | 🔒 | 지출 영향 조회. amount 양의 정수, category 선택. 미신청 404 |
 | PATCH | `/budget` | 🔒 | 강화는 200 계산 내역. 완화는 202 `BUDGET_UPDATE` 승인 대기, PIN 후 반영. 수입·생활비·고정 지출·목표·항상 통과 업종 변경 |
@@ -268,7 +268,8 @@
 | ✅ | GET | `/products/cards?type=` | | 판매 중인 카드 상품 (CREDIT·DEBIT) |
 | ✅ | POST | `/cards` | 🔒 | 발급 (`product_id`, `linked_account_id`=내 입출금 계좌, 신용은 `payment_day` 1~28, 기본 14) |
 | ✅ | GET | `/cards`, `/cards/{card_id}` | 🔒 | 내 카드 목록·상세 |
-| ✅ | POST | `/cards/{card_id}/suspend` | 🔒 | 정지(`reason: SUSPENDED`) 또는 분실 신고(`LOST`). **바로** 적용. 분실은 되돌릴 수 없음 |
+| ✅ | GET | `/cards/transactions` | 🔒 | 카드 검색: 내 모든 카드(또는 `card_id`)의 사용내역을 `keyword`(가맹점)·`category`·`from_date`·`to_date`(한국 날짜)로. 최근 100건 + 조건 전체의 승인 합계(`total_amount`, 취소 제외)·건수(`count`). 모르는 조건은 422 (ADR 0029) |
+| ✅ | POST | `/cards/{card_id}/suspend` | 🔒 | 정지(`reason: SUSPENDED`) 또는 분실 신고(`LOST`). **바로** 적용. 분실은 되돌릴 수 없음. `X-Requested-By`와 함께 감사 기록(`CARD_SUSPENDED`·`CARD_LOST`)에 남음 (ADR 0030) |
 | ✅ | POST | `/cards/{card_id}/unsuspend` | 🔒 | 정지 해제 요청 → `202` 승인 대기(`UNSUSPEND_CARD`). PIN 승인 때 상태를 다시 보고 풂 |
 | ✅ | POST | `/cards/{card_id}/payments` | 🔒 | **가맹점 결제 흉내**(`merchant_name`, `amount`, `idempotency_key`). PIN 없이 바로 `201`. 체크는 결제 계좌에서 출금, 신용은 사용 기록(`UNBILLED`). 같은 요청 번호면 처음 결과 `200`. Agent 도구에 없음 ([ADR 0010](decisions/0010-card-payments.md)). 결제 보호를 켠 사용자는 `409 MERCHANT_CHANNEL_REQUIRED` (가맹점 경로 `POST /system/card-payments/{card_id}`만) |
 | ✅ | GET | `/cards/{card_id}/transactions?payment_date=` | 🔒 | 사용내역 (최근 순). `payment_date`(한국 날짜)를 주면 그날 승인된 거래만 |
@@ -350,7 +351,7 @@ MCP(Model Context Protocol) 서버. 도구 18개가 아래 REST API를 사용자
 
 ### 요청한 곳 (`X-Requested-By`)
 
-승인 대기를 만드는 API(`POST /transfers`, `POST /accounts/deposits`, `POST /cards/{id}/unsuspend`)는 `X-Requested-By: WEB | AGENT | MCP` 헤더를 받아 `requested_by`에 남깁니다(없으면 `WEB`). `SYSTEM`은 헤더로 보낼 수 없고, 가맹점 결제가 보호 규칙에 걸렸을 때 서버가 직접 씁니다. 승인 화면이 "AI가 만든 요청"이라고 보여 주는 **정보용**이고, 보안은 PIN 승인이 맡습니다.
+승인 대기를 만드는 API(`POST /transfers`, `POST /accounts/deposits`, `POST /cards/{id}/unsuspend`)와 카드 정지·분실(`POST /cards/{id}/suspend`, 감사 기록용)은 `X-Requested-By: WEB | AGENT | MCP` 헤더를 받아 `requested_by`에 남깁니다(없으면 `WEB`). `SYSTEM`은 헤더로 보낼 수 없고, 가맹점 결제가 보호 규칙에 걸렸을 때 서버가 직접 씁니다. 승인 화면이 "AI가 만든 요청"이라고 보여 주는 **정보용**이고, 보안은 PIN 승인이 맡습니다.
 
 ## rag: 상품·약관 질문 (`domains/rag`)
 

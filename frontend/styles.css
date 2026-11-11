@@ -54,7 +54,7 @@ svg { display: block; width: 100%; height: auto; }
 .back, .quiet { border: 0; background: transparent; min-height: 44px; }
 .back { min-width: 36px; padding: 0 6px; font-size: 1.45rem; }
 .quiet { padding: 0 7px; font-size: .84rem; color: var(--blue); font-weight: 700; }
-main { flex: 1; padding: 22px 24px 28px; }
+main { flex: 1; padding: 22px var(--ui-page-gutter) 28px; }
 main > * + * { margin-top: 20px; }
 .benefit-panel { margin-top: 16px; }
 .benefit-panel > * + *, .benefit-panel article > * + * { margin-top: 10px; }
@@ -186,7 +186,6 @@ h1[tabindex="-1"]:focus { outline: none; }
 .transfer .card.spread .right { flex: 0 0 auto; }
 
 @media (max-width: 350px) {
-  main { padding-inline: 16px; }
   .topbar { padding-inline: 12px; }
   .rows strong { font-size: .82rem; }
 }

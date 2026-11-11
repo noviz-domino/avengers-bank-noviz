@@ -5,7 +5,9 @@ from sqlalchemy.exc import IntegrityError
 from avengers_bank.core.database import SessionLocal
 from avengers_bank.domains.cards.card_number import is_valid, make_card_num, mask
 from avengers_bank.domains.cards.models import Card, CardProduct
-from avengers_bank.seed import seed_card_products, seed_products
+from avengers_bank.domains.audit.models import AuditLog
+from avengers_bank.domains.users.models import User
+from avengers_bank.seed import DEMO_LOGIN_ID, seed_card_products, seed_demo_card, seed_demo_user, seed_products
 from tests.test_transfers import PIN, open_account, user
 
 pytestmark = pytest.mark.anyio
@@ -119,3 +121,45 @@ async def test_db_rejects_debit_with_credit_terms(bank):
                     card_type="DEBIT", card_num=make_card_num("DEBIT", 1, 99), daily_limit=1, credit_limit=10, status="ACTIVE"))
         with pytest.raises(IntegrityError):
             await db.commit()
+
+
+async def test_card_status_changes_are_audited(bank):
+    # 분실은 되돌릴 수 없어서 누가 어느 입구(화면·AI·MCP)로 바꿨는지 남긴다
+    client, me, checking = bank
+    card = (await issue(client, me, checking)).json()["data"]
+    url = f"/cards/{card['card_id']}"
+    await client.post(f"{url}/suspend", json={}, headers=me)
+    action = (await client.post(f"{url}/unsuspend", json={"idempotency_key": "audit-unsuspend"}, headers=me)).json()["data"]
+    await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
+    await client.post(f"{url}/suspend", json={"reason": "LOST"}, headers={**me, "X-Requested-By": "MCP"})
+
+    async with SessionLocal() as db:
+        logs = (await db.scalars(select(AuditLog).where(AuditLog.target == str(card["card_id"])).order_by(AuditLog.log_id))).all()
+    assert [(log.action, log.actor) for log in logs] == [
+        ("CARD_SUSPENDED", "USER"), ("CARD_UNSUSPENDED", "USER"), ("CARD_LOST", "MCP")]
+    assert logs[0].detail == {"from": "ACTIVE", "requested_by": "WEB"}
+    assert logs[2].detail == {"from": "ACTIVE", "requested_by": "MCP"}
+
+
+async def test_seed_gives_demo_user_a_usable_card_again(client):
+    # 데모 비밀번호는 공개돼 있어 누구나 분실 신고할 수 있다. 시작할 때마다 쓸 수 있는 카드를 한 장 보장한다
+    for step in (seed_products, seed_card_products, seed_demo_user):
+        async with SessionLocal() as db:
+            await step(db)
+
+    async def demo_cards():
+        async with SessionLocal() as db:
+            return (await db.scalars(select(Card).join(User, User.user_id == Card.user_id).where(User.login_id == DEMO_LOGIN_ID).order_by(Card.card_id))).all()
+
+    async with SessionLocal() as db:
+        assert await seed_demo_card(db) is True
+    async with SessionLocal() as db:
+        assert await seed_demo_card(db) is False  # 이미 쓸 수 있는 카드가 있으면 그대로
+    async with SessionLocal() as db:
+        first = (await db.scalars(select(Card))).one()
+        first.status = "LOST"
+        await db.commit()
+    async with SessionLocal() as db:
+        assert await seed_demo_card(db) is True
+    statuses = [card.status for card in await demo_cards()]
+    assert statuses == ["LOST", "ACTIVE"]  # 분실 카드는 기록으로 남기고 새 카드를 발급

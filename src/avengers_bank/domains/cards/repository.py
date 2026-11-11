@@ -61,6 +61,30 @@ class CardRepository:
             query = query.where(CardTransaction.approved_at < before)
         return list(await db.scalars(query.order_by(CardTransaction.card_tx_id.desc())))
 
+    async def search_txs(
+        self, db: AsyncSession, user_id: int, *, card_id: int | None, keyword: str | None, category: str | None,
+        since: datetime | None, before: datetime | None, limit: int = 100,
+    ) -> tuple[list[CardTransaction], int, int]:
+        """내 카드들의 사용내역 검색: (최근 limit건, 승인 합계, 전체 건수). 합계·건수는 조건 전체 기준"""
+        where = [Card.user_id == user_id]
+        if card_id is not None:
+            where.append(CardTransaction.card_id == card_id)
+        if keyword:
+            where.append(CardTransaction.merchant_name.contains(keyword, autoescape=True))
+        if category:
+            where.append(CardTransaction.category == category)
+        if since is not None:
+            where.append(CardTransaction.approved_at >= since)
+        if before is not None:
+            where.append(CardTransaction.approved_at < before)
+        base = select(CardTransaction).join(Card, Card.card_id == CardTransaction.card_id).where(*where)
+        rows = list(await db.scalars(base.order_by(CardTransaction.card_tx_id.desc()).limit(limit)))
+        total, count = (await db.execute(select(
+            func.coalesce(func.sum(CardTransaction.amount).filter(CardTransaction.status == "APPROVED"), 0),
+            func.count(),
+        ).select_from(CardTransaction).join(Card, Card.card_id == CardTransaction.card_id).where(*where))).one()
+        return rows, total, count
+
     async def spent_since(self, db: AsyncSession, card_id: int, since: datetime) -> int:
         """취소하지 않은 사용액 합계 (1일 한도). 누적액은 저장하지 않고 계산한다 (ERD 규칙 11)"""
         return await db.scalar(select(func.coalesce(func.sum(CardTransaction.amount), 0)).where(

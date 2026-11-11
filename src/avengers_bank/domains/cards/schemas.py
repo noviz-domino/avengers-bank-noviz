@@ -117,6 +117,30 @@ class CardTransactionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CardTxFilter(BaseModel):
+    """카드 사용내역 검색 조건 (GET /cards/transactions). 날짜는 한국 날짜"""
+
+    model_config = ConfigDict(extra="forbid")  # 오타 조건을 조용히 무시하면 거르지 않은 합계가 나간다
+
+    card_id: int | None = None  # 없으면 내 모든 카드
+    keyword: str | None = Field(default=None, min_length=1, max_length=50)  # 가맹점 이름
+    category: str | None = Field(default=None, max_length=20)
+    from_date: date | None = None
+    to_date: date | None = None
+
+    @model_validator(mode="after")
+    def check_range(self):
+        if self.from_date and self.to_date and self.from_date > self.to_date:
+            raise ValueError("from_date가 to_date보다 늦습니다.")
+        return self
+
+
+class CardTxSearchResponse(BaseModel):
+    transactions: list[CardTransactionResponse]  # 최근 것부터 최대 100건
+    total_amount: int  # 조건에 맞는 승인 금액 합계 (취소 제외, 건수 제한과 상관없이 전체)
+    count: int  # 조건에 맞는 전체 건수
+
+
 class CardLimitsResponse(BaseModel):
     daily_limit: int
     daily_used: int  # 오늘(한국 날짜) 쓴 금액, 취소 제외

@@ -11,6 +11,7 @@
 | 카드 상품 목록 | `GET /products/cards?type=` | `cards/router.py` `products_router` |
 | 발급 | `POST /cards` | `cards/service.py` `issue` |
 | 내 카드·상세 | `GET /cards`, `/cards/{id}` | `cards/service.py` `list_mine`, `get_mine` |
+| 카드 검색 (카드 탭 돋보기) | `GET /cards/transactions` | `cards/service.py` `search_txs`, `repository.py` `search_txs`, 화면 `frontend/card-search.mjs` |
 | 정지·분실 신고 (바로) | `POST /cards/{id}/suspend` | `cards/service.py` `suspend` |
 | 정지 해제 (승인) | `POST /cards/{id}/unsuspend` → `/approvals/{id}/approve` | `cards/service.py` `request_unsuspend`, 실행기 `run_unsuspend_card` |
 | 카드번호 | — | `cards/card_number.py` |
@@ -43,6 +44,8 @@ stateDiagram-v2
 
 - **안전해지는 쪽(정지·분실)은 바로, 위험해지는 쪽(해제)은 승인**: 이체·예산 설정과 같은 원칙입니다(ADR 0004, 0007).
 - 해제 승인을 기다리는 동안 분실 신고가 되면, 승인해도 풀리지 않습니다(실행기가 상태를 다시 봄 → `FAILED`).
+- **상태가 바뀔 때마다 감사 기록**(ADR 0030): `CARD_SUSPENDED`·`CARD_LOST`(입구 `requested_by`와 이전 상태), 해제 실행 때 `CARD_UNSUSPENDED`. 분실은 되돌릴 수 없어서 "누가 어디서"를 남깁니다.
+- **공개 데모 카드**: 데모 비밀번호가 공개라 누구나 분실 신고할 수 있습니다. 서버 시작 seed(`seed_demo_card`)가 분실 아닌 카드가 없으면 새로 발급하고, 카드 화면은 쓸 수 있는 카드부터 보여 줍니다.
 
 ## 한 테이블에 신용·체크
 
@@ -64,6 +67,12 @@ A. 보안이 아니라 **입력 오류 검출**입니다. 한 자리를 잘못 �
 
 **Q. 분실 신고를 왜 승인 없이 바로 하나요? 다른 사람이 내 카드를 정지할 수 있지 않나요?**
 A. 로그인한 본인(또는 본인 토큰을 가진 Agent)만 할 수 있고, 최악의 경우 카드가 정지되는 것이라 돈이 나가지 않습니다. 반대로 승인을 요구하면 PIN을 입력하는 동안 잃어버린 카드가 결제될 수 있습니다. 그래서 "안전해지는 쪽은 바로"입니다. 대신 해제는 PIN이 필요해서, 토큰만 가진 사람이 정지를 풀고 결제할 수는 없습니다.
+
+**Q. 계좌 검색이 있는데 카드 검색을 왜 따로 만들었나요?**
+A. 신용카드 결제는 결제할 때 계좌에서 돈이 나가지 않아 계좌 장부에 건마다 남지 않습니다(결제일에 "카드 대금" 한 줄). 그래서 계좌 검색으로는 "스타벅스에서 신용카드로 쓴 것"을 찾을 수 없습니다. 카드 검색은 카드 사용내역(`card_transactions`)을 내 카드 조건(`Card.user_id`)으로 조인해서 찾고, 합계는 취소를 뺀 승인 건만 셉니다. `/{card_id}`보다 먼저 등록해야 `transactions`를 카드 번호로 읽으려다 422가 나지 않습니다.
+
+**Q. 데모 카드가 어느새 분실 상태였는데, 원인을 어떻게 찾나요?**
+A. 처음엔 찾을 수 없었습니다. 카드 상태 변경이 감사 기록에 없었기 때문입니다. 그래서 정지·분실·해제를 `audit_logs`에 남기고 어느 입구(화면·AI·MCP)였는지 `requested_by`도 함께 적게 했습니다(ADR 0030). 되돌릴 수 없는 상태 변경은 돈이 움직이지 않아도 기록 대상이라는 교훈입니다.
 
 **Q. 분실 신고와 정지가 동시에 들어오면 어떻게 되나요?**
 A. 둘 다 카드 행을 `SELECT … FOR UPDATE`로 잠그고 상태를 읽습니다. 그래서 하나씩 처리됩니다. 분실이 먼저 끝나면 뒤의 정지는 잠금이 풀린 뒤 `LOST`를 보고 `409`를 냅니다. 잠그지 않으면 둘 다 `ACTIVE`를 읽고, 늦게 끝난 정지가 분실을 덮어씁니다. 그러면 PIN 승인으로 분실 카드를 다시 쓸 수 있게 됩니다. 정지 해제 실행기(`run_unsuspend_card`)도 같은 이유로 잠급니다.

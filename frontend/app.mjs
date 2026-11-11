@@ -8,13 +8,16 @@ import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
 import { mountSearch } from "./search.mjs";
+import { mountEvent } from "./events.mjs";
+import { mountCardSearch } from "./card-search.mjs";
+import { mountNotifications } from "./notifications.mjs";
 import { loginView } from "./login.mjs";
 import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, pageTitle, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus, carouselPager } from "./ui.mjs";
 
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const brand = '<span class="brand">' + shield + '캡아메리카뱅크</span>';
-const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products", "signup", "menu", "search", "budget"]);
+const pages = new Set(["login", "home", "accounts", "account", "manage", "chat", "transfer", "cards", "products", "signup", "menu", "search", "card-search", "notifications", "budget"]);
 const stepOrder = ["recipient", "amount", "review"];
 const hidden = "••••••";
 
@@ -38,7 +41,10 @@ let transfer;
 let unmountCards;
 let unmountProducts;
 let unmountBudget;
+let unmountEvent;
 let budget;
+let userName = ""; // 홈 머리글의 "OOO님"
+let unmountNotifications;
 
 const button = (action, label, className = "") => uiButton(label, { action, variant: className === "primary" ? "primary" : className === "outline" ? "outline" : "quiet", className });
 const accountById = (id) => accounts?.find((account) => String(account.account_id) === String(id));
@@ -46,6 +52,7 @@ const currentPage = () => {
   const route = location.hash.slice(1);
   if (!isSignedIn()) return route === "signup" ? "signup" : "login";
   if (route.startsWith("product/")) return "products";
+  if (route.startsWith("event/")) return "event";
   if (!pages.has(route) || route === "login" || (route === "transfer" && !(transfer && accountById(transfer.source)))) return "home";
   if ((route === "account" || route === "manage") && !accountById(accountId)) return "home";
   return route;
@@ -54,7 +61,8 @@ const currentPage = () => {
 // 서버 목록·상세를 불러온다. 실패해도 화면은 남기고 오류 문구만 보여 준다
 async function loadAccounts() {
   try {
-    const [list, latest] = await Promise.all([api("/accounts"), api("/transactions?limit=3")]);
+    const [list, latest, me] = await Promise.all([api("/accounts"), api("/transactions?limit=3"), api("/users/me").catch(() => null)]);
+    if (me) userName = me.data.name;
     ({ accounts, total_balance: total } = list.data);
     recent = latest.data.transactions;
     accountsError = "";
@@ -84,13 +92,17 @@ async function loadTransactions(more = false) {
   render();
 }
 
+function loadDetail(id) {
+  api("/accounts/" + id).then(({ data }) => { if (id === accountId) { detail = data; render(); } }).catch(() => {});
+}
+
 async function openAccount(id) {
   accountId = id;
   detail = undefined;
   filter = "all";
   manageState = { closing: false, error: "", busy: false };
   go("account");
-  api("/accounts/" + id).then(({ data }) => { if (id === accountId) { detail = data; render(); } }).catch(() => {});
+  loadDetail(id);
   loadTransactions();
 }
 
@@ -109,6 +121,7 @@ function reset() {
   accounts = detail = accountId = undefined;
   total = 0;
   budget = undefined;
+  userName = "";
   accountsError = "";
   recent = [];
   txs = { rows: [], next: null, loading: false, error: "" };
@@ -149,7 +162,7 @@ function campaignContent() {
   const [image, alt] = campaign
     ? ["banner-welcome.webp", "첫 만남을 위한 특별한 환영. 신규가입 이벤트 둘러보기"]
     : ["banner-opening.webp", "새로운 금융의 시작, 캡아메리카뱅크. 은행 소개 보기"];
-  return '<a id="home-bank-intro" href="#products"><img src="./assets/' + image
+  return '<a id="home-bank-intro" href="#event/' + (campaign ? "welcome" : "opening") + '"><img src="./assets/' + image
     + '" alt="' + escape(alt) + '" width="1989" height="791"></a>'
     + carouselPager(campaign + 1, 2, { previous: "campaign-prev", next: "campaign" })
     + '<div class="ui-carousel-controls ui-campaign-playback">'
@@ -172,10 +185,36 @@ function syncCampaignTimer() {
 }
 document.addEventListener("visibilitychange", syncCampaignTimer);
 
+// 입출금·예금적금 묶음 (홈과 계좌 탭이 같이 쓴다)
+function accountGroups() {
+  return [["checking", "입출금", "blue", "wallet"], ["savings", "예금·적금", "sage", "pig"]].map(([kind, label, tone, glyph]) => {
+    const list = accounts.filter((account) => kindOf(account) === kind);
+    const sum = list.reduce((balance, account) => balance + account.balance, 0);
+    return '<section class="account-group">' + sectionHead({ title: label, count: list.length, total: privateBalance ? hidden : money(sum), icon: glyph, tone, action: "toggle-" + kind, expanded: expanded[kind], controls: "home-" + kind })
+      + '<div id="home-' + kind + '"' + (expanded[kind] ? "" : " hidden") + '>'
+      + (list.length ? '<ul>' + list.map((account) => listRow({ title: accountName(account), subtitle: maskAccountNumber(account.account_num), amount: privateBalance ? hidden : money(account.balance), action: "account-" + account.account_id, icon: glyph, tone,
+        buttonHtml: kind === "checking" ? uiButton("이체", { action: "send-" + account.account_id, variant: "outline" }) : "" })).join("") + '</ul>' : stateBlock("empty", { message: "아직 보유한 계좌가 없어요." })) + '</div></section>';
+  }).join("");
+}
+
+// 계좌 탭: 내 계좌 전체와 합계. 새 계좌는 상품에서 가입한다
+function accountsPage() {
+  const head = uiHeader({ title: "계좌", heading: true, menu: true, rightHtml: uiButton("", { action: "search", icon: "search", ariaLabel: "계좌 검색" }) });
+  if (!accounts) return head + '<main class="ui-home">' + stateBlock(accountsError ? "error" : "loading", accountsError ? { message: accountsError, retryAction: "reload" } : {}) + '</main>' + nav("accounts");
+  return head + '<main class="ui-home ui-accounts">'
+    + '<section class="ui-balance" aria-label="계좌 합계"><div><p>계좌 ' + accounts.length + '개 합계</p>'
+    + uiButton("", { action: "privacy", icon: privateBalance ? "eyeOff" : "eye", ariaLabel: privateBalance ? "잔액 보기" : "잔액 숨기기", pressed: privateBalance })
+    + '</div><strong class="ui-balance-total">' + (privateBalance ? hidden : money(total)) + '</strong></section>'
+    + accountGroups()
+    + uiButton("새 계좌 만들기", { action: "products", variant: "outline", icon: "plus", className: "ui-accounts-new" })
+    + '</main>' + nav("accounts");
+}
+
 function home() {
-  const head = uiHeader({ brandHtml: brand, rightHtml: uiButton("", { action: "search", icon: "search", ariaLabel: "거래내역 검색" }) });
+  // 왼쪽 위는 은행 로고와 "OOO님", 오른쪽 위는 알림·전체 메뉴. 검색은 계좌·카드 탭 머리글에 있다
+  const greeting = '<span class="brand ui-greeting">' + shield + (userName ? "<span>" + escape(userName) + "님</span>" : "") + "</span>";
+  const head = uiHeader({ brandHtml: greeting, menu: true, rightHtml: uiButton("", { action: "notifications", icon: "bell", ariaLabel: "알림" }) });
   if (!accounts) return head + '<main class="ui-home">' + stateBlock(accountsError ? "error" : "loading", accountsError ? { message: accountsError, retryAction: "reload" } : {}) + '</main>' + nav("home");
-  const groups = [["checking", "입출금", "blue", "wallet"], ["savings", "예금·적금", "sage", "pig"]];
   return head + '<main class="ui-home">'
     + '<section class="balance ui-balance" aria-label="내 총자산"><div><p>내 총자산</p>'
     + uiButton("", { action: "privacy", icon: privateBalance ? "eyeOff" : "eye", ariaLabel: privateBalance ? "잔액 보기" : "잔액 숨기기", pressed: privateBalance })
@@ -185,14 +224,7 @@ function home() {
     + icon("chevron") + '</button>'
     + '<section class="ui-campaign" aria-roledescription="캐러셀" aria-label="은행 이벤트">' + campaignContent() + '</section>'
     + (accountsError ? stateBlock("error", { message: accountsError, retryAction: "reload" }) : "")
-    + groups.map(([kind, label, tone, glyph]) => {
-      const list = accounts.filter((account) => kindOf(account) === kind);
-      const sum = list.reduce((balance, account) => balance + account.balance, 0);
-      return '<section class="account-group">' + sectionHead({ title: label, count: list.length, total: privateBalance ? hidden : money(sum), icon: glyph, tone, action: "toggle-" + kind, expanded: expanded[kind], controls: "home-" + kind })
-        + '<div id="home-' + kind + '"' + (expanded[kind] ? "" : " hidden") + '>'
-        + (list.length ? '<ul>' + list.map((account) => listRow({ title: accountName(account), subtitle: maskAccountNumber(account.account_num), amount: privateBalance ? hidden : money(account.balance), action: "account-" + account.account_id, icon: glyph, tone,
-          buttonHtml: kind === "checking" ? uiButton("이체", { action: "send-" + account.account_id, variant: "outline" }) : "" })).join("") + '</ul>' : stateBlock("empty", { message: "아직 보유한 계좌가 없어요." })) + '</div></section>';
-    }).join("")
+    + accountGroups()
     + '<section class="ui-recent">' + sectionHead({ title: "최근 거래", icon: "clock", tone: "amber", rightHtml: uiButton("전체보기 ›", { action: "search" }) })
     + (recent.length ? '<ul>' + recent.map((tx) => {
       const account = accountById(tx.account_id);
@@ -211,7 +243,7 @@ function accountPage(manage) {
   const terms = detail?.terms;
   if (manage) {
     const { closing, error, busy } = manageState;
-    return header("계좌 관리", "account") + '<main><section class="card"><h1>' + escape(name)
+    return header("계좌 관리", "back") + '<main><section class="card"><h1>' + escape(name)
       + '</h1><dl><dt>계좌번호</dt><dd>' + escape(account.account_num) + '</dd><dt>상품</dt><dd>'
       + escape(account.product_name) + '</dd><dt>개설일</dt><dd>' + escape(account.opened_at?.slice(0, 10)) + '</dd>'
       + (checking && detail ? '<dt>1회 이체 한도</dt><dd>' + (detail.per_transfer_limit == null ? '제한 없음' : money(detail.per_transfer_limit)) + '</dd><dt>1일 이체 한도</dt><dd>' + (detail.daily_transfer_limit == null ? '제한 없음' : money(detail.daily_transfer_limit)) + '</dd>' : '') + '</dl>'
@@ -228,7 +260,7 @@ function accountPage(manage) {
       + (closing ? '<p class="error" role="alert">' + escape(error) + "</p>" : "") + "</section></main>";
   }
   const rows = txs.rows.filter((tx) => filter === "all" || (filter === "in" ? tx.amount > 0 : tx.amount < 0));
-  return header("계좌 상세", "home", button("manage", "관리", "quiet")) + '<main>'
+  return header("계좌 상세", "back", button("manage", "관리", "quiet")) + '<main>'
     + '<section class="hero"><div class="spread"><h1>' + escape(name) + '</h1>'
     + uiButton('', { action: 'privacy', icon: privateBalance ? 'eyeOff' : 'eye', ariaLabel: privateBalance ? '금액 보기' : '금액 숨기기', pressed: privateBalance }) + "</div>"
     + '<p>' + escape(account.product_name) + '</p><small>' + escape(account.account_num) + '</small><div class="spread balance-line"><span>잔액</span><strong>'
@@ -410,13 +442,17 @@ function render() {
   unmountProducts = undefined;
   unmountBudget?.();
   unmountBudget = undefined;
+  unmountEvent?.();
+  unmountEvent = undefined;
+  unmountNotifications?.();
+  unmountNotifications = undefined;
   const page = currentPage();
   const ext = () => '<div id="ext-screen"></div>';
   const body = {
-    login, home, account: () => accountPage(false), manage: () => accountPage(true),
+    login, home, accounts: accountsPage, account: () => accountPage(false), manage: () => accountPage(true),
     chat: () => '<div class="chat-screen" id="chat-screen"></div>' + nav("chat"), transfer: transferPage,
     cards: () => '<div class="cards-screen" id="cards-screen"></div>' + nav("cards"),
-    budget: ext, signup: ext, menu: () => ext() + nav("menu"), search: ext,
+    budget: ext, signup: ext, menu: ext, search: ext, "card-search": ext, notifications: ext, event: ext,
     products: () => '<div class="products-app" id="products-screen"></div>' + nav("products"),
   }[page]();
   app.innerHTML = body;
@@ -425,6 +461,9 @@ function render() {
   if (page === "signup") mountSignup(app.querySelector("#ext-screen"), extCtx);
   if (page === "menu") mountMenu(app.querySelector("#ext-screen"), extCtx);
   if (page === "search") mountSearch(app.querySelector("#ext-screen"), extCtx);
+  if (page === "card-search") mountCardSearch(app.querySelector("#ext-screen"));
+  if (page === "notifications") unmountNotifications = mountNotifications(app.querySelector("#ext-screen"));
+  if (page === "event") unmountEvent = mountEvent(app.querySelector("#ext-screen"), location.hash.slice(7));
   if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { embedded: true });
   if (page === "products") unmountProducts = mountProducts(app.querySelector("#products-screen"), location.hash.slice(1));
   if (page === "chat") unmountChat = mountChat(app.querySelector("#chat-screen"), { shield });
@@ -463,7 +502,9 @@ app.addEventListener("submit", async (event) => {
         manageState.busy = false;
         loadAccounts();
         detail = undefined;
-        return openAccount(accountId);
+        // 앞으로 쌓지 않고 관리 화면을 닫아 상세로 돌아간다 (뒤로가 관리 화면으로 되돌아가지 않게)
+        history.back();
+        return loadDetail(accountId);
       } catch (error) {
         manageState.busy = false;
         manageState.error = error.message;
@@ -536,6 +577,8 @@ app.addEventListener("click", async (event) => {
     case "campaign": campaign = 1 - campaign; updateCampaign(); return syncCampaignTimer();
     case "campaign-pause": campaignPaused = !campaignPaused; updateCampaign(); return syncCampaignTimer();
     case "start-transfer": return startTransfer();
+    // 전체 메뉴·이벤트 상세처럼 하단 탭 없는 화면의 뒤로: 열기 전 화면으로 돌아간다
+    case "back": return history.length > 1 ? history.back() : go("home");
     case "transfer-close": return finishTransfer();
     case "transfer-back": {
       const previous = { amount: "recipient", review: "amount" }[transfer.step];
@@ -558,7 +601,7 @@ app.addEventListener("change", (event) => {
 window.addEventListener("hashchange", () => {
   if (location.hash !== "#transfer" && transfer) { cancelTransferAction(); transfer = undefined; }
   render();
-  if (location.hash === "#home" && isSignedIn()) loadAccounts();
+  if ((location.hash === "#home" || location.hash === "#accounts") && isSignedIn()) loadAccounts();
   const heading = app.querySelector("h1");
   heading?.setAttribute("tabindex", "-1");
   heading?.focus({ preventScroll: true });

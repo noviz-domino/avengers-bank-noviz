@@ -13,7 +13,7 @@
 | 최근 거래 / 옅은 배경 | `--ui-amber`, `--ui-amber-soft` | `#96611c` / `#fcf3e3` |
 | 오류 / 보조 글자 / 구분선 | `--ui-error`, `--ui-muted`, `--ui-line` | `#a22938` / `#647083` / `#e6eaef` |
 | 페이지 / 섹션 / 본문 / 보조 | `--ui-title-size`, `--ui-section-size`, `--ui-body-size`, `--ui-small-size` | 26 / 18 / 15 / 13px |
-| 좌우 여백 | `--ui-page-gutter` | 24px, 340px 이하 16px |
+| 좌우 여백 | `--ui-page-gutter` | 36px, 340px 이하 24px ([ADR 0029](../docs/decisions/0029-layout-gutter-tabs-menu.md)). 공통 `main`·홈·카드·상품·상담이 모두 이 값을 써요 |
 | 여백 단위 | `--ui-space-xs`, `--ui-space-sm`, `--ui-space-md`, `--ui-space-lg` | 4 / 8 / 16 / 24px |
 | 작은 / 큰 모서리 | `--ui-radius-sm`, `--ui-radius` | 10 / 16px |
 | 그림자 | `--ui-shadow` | `0 4px 18px #10233b0a` |
@@ -46,7 +46,7 @@
 | `button(label, {action, variant='quiet', icon, ariaLabel, pressed, className=''})` | `primary` / `outline` / `quiet` / `pill`. 아이콘만 있는 버튼은 `ariaLabel` 필수예요 |
 | `socialButton(provider, {action='social-soon'})` | `google` / `naver`. 84×76px 둥근 정사각형 안에 로고(위)와 `Google`·`NAVER`(아래)를 함께 넣어 글자까지 누르는 영역이에요. 읽어 주는 이름은 "Google 간편로그인"이에요. 여러 개는 가운데 정렬한 한 줄에 둬요 |
 | `carouselPager(page, count, {previous, next})` | 홈·상품 배너 공용 넘김 표시. 이전·다음 액션과 현재 페이지를 표시해요 |
-| `header({title='', brandHtml='', back, rightHtml='', heading=false})` | 52px 머리글. `back`은 뒤로 가기 버튼의 액션, 버튼은 44×44px이에요. `heading: true`면 제목을 `h1`으로 그려요 (탭 화면처럼 머리글 제목이 곧 페이지 제목일 때. 본문에 `pageTitle`을 또 두지 않아요) |
+| `header({title='', brandHtml='', back, rightHtml='', heading=false, menu=false})` | 52px 머리글(위 여백 16px). `menu: true`면 오른쪽 끝에 전체 메뉴 버튼(`data-action="menu"`)을 둬요. 하단 탭이 있는 화면 5개에 붙여요. `back`은 뒤로 가기 버튼의 액션, 버튼은 44×44px이에요. `heading: true`면 제목을 `h1`으로 그려요 (탭 화면처럼 머리글 제목이 곧 페이지 제목일 때. 본문에 `pageTitle`을 또 두지 않아요) |
 | `iconToggle(options, {label, current, prefix='', attr='data-action'})` | 아이콘만 있는 보기 전환. `options`는 `[값, 아이콘, 읽어 줄 이름]` 배열, 액션 값은 `prefix + 값`이에요. 카드 화면의 크게/목록 전환에 써요 |
 | `pageTitle(title)` | 26px `h1`, 긴 제목을 어절 단위로 줄바꿈해요 |
 | `sectionHead({title, count, total='', icon, tone='blue', action, expanded, controls, rightHtml=''})` | `blue` / `sage` / `amber`. 액션이 있으면 접기 버튼을 만들고 `aria-expanded`·`aria-controls`를 연결해요 |
@@ -55,7 +55,10 @@
 | `stateBlock(kind, {message, retryAction}={})` | `loading` / `empty` / `error`, 같은 24px 여백. `retryAction`은 44px 다시 시도 버튼이에요 |
 | `field({id, label, name=id, type='text', value='', hint='', error='', required=false, autocomplete})` | 고유 `id` 필수. label·힌트·오류를 `for`·`aria-describedby`·`aria-invalid`로 연결해요 |
 | `maskAccountNumber(number)` | 하이픈 유무와 관계없이 12자리 계좌번호를 `110-***-000001`로 표시해요. 잘못된 형식은 `***`로 숨겨요 |
-| `bottomTabs(page)` | `home` / `products` / `chat` / `cards` / `menu` 순서예요. `page`와 일치하면 현재 탭으로 표시해요 |
+| 알림 `.ui-notify-*` (`notifications.mjs`) | 홈 머리글 종 버튼. 하위 메뉴 4개(`TABS`)는 한 줄 4칸, 공지는 `NOTICES`(서비스에 대한 사실만) |
+| 검색 위치 | 홈에는 검색이 없어요. 계좌 탭 머리글 → 계좌 검색(`search.mjs`), 카드 탭 머리글 → 카드 검색(`card-search.mjs`), 전체 메뉴 맨 위 → 메뉴 검색(`settings.mjs`의 `MENUS`·`findMenus`) |
+| 이벤트 상세 `.ui-event-*` (`events.mjs`) | 홈 배너의 설명 페이지. 배너 내용은 `events` 객체에 두고, 금융 조건은 서버 상품 정보로만 보여 줘요 |
+| `bottomTabs(page)` | `home` / `accounts` / `cards` / `products` / `chat`(홈·계좌·카드·상품·AI 상담) 순서예요. 위 모서리가 둥근 시트 모양이에요. 전체 메뉴는 탭이 아니라 머리글 버튼이에요. `page`와 일치하면 현재 탭으로 표시해요 |
 | `restoreFocus(root)` | 다시 그리기 전에 호출해 복원 함수를 받아요. 다시 그린 뒤 호출하면 같은 `data-action` → `id` → `name` 순서의 요소에 포커스·선택 영역을 복원해요 |
 
 ### 머리글·제목·버튼·상태
