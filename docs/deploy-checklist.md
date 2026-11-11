@@ -27,7 +27,14 @@
 - 주소: `https://<DUCKDNS_SUBDOMAIN>.duckdns.org/app/`, HTTPS는 Caddy가 자동 발급 ([ADR 0025](decisions/0025-https-caddy-duckdns.md))
 - 보안 그룹 인바운드는 TCP 80·443만. 서버 관리는 SSM Session Manager (SSH 안 씀)
 - 비밀 값은 서버 `/opt/avengers-bank/.env`(root 600)에만 둠. 앱 폴더의 `.env`는 그 파일을 가리키는 링크
-- **main에 머지된 커밋만 배포**하고, 배포한 커밋 해시를 서버 `app/REVISION`에 남김 (서버에 git이 없어서 어느 버전인지 알 수 있게)
+- 서버의 `/opt/avengers-bank/app`은 이 레포를 `git clone`한 폴더. **main에 머지된 커밋만 배포**하고, 지금 버전은 `git -C /opt/avengers-bank/app log -1`로 확인
+- 배포 (SSM으로 서버에서 root로 실행):
+  ```bash
+  cd /opt/avengers-bank/app
+  git fetch origin && git checkout --detach origin/main
+  docker compose -p avengers-bank -f compose.yaml -f compose.prod.yaml up -d --build
+  ```
+- 마이그레이션이 있는 커밋을 되돌릴 때는 코드보다 먼저 `alembic downgrade`로 DB를 내림 (서버 DB가 코드보다 새 버전이면 앱이 뜨지 않음)
 - 평일 11:25~18:00에만 켜짐 (EventBridge Scheduler). 그 밖의 시간에는 주소가 열리지 않음
 
 ## 배포 뒤 점검
