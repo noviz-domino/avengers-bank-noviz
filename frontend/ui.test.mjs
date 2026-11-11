@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { esc, maskAccountNumber, button, carouselPager, header, pageTitle, sectionHead, listRow, cardBox, stateBlock, field, bottomTabs, restoreFocus } from "./ui.mjs";
+import { esc, maskAccountNumber, button, carouselPager, socialButton, header, pageTitle, sectionHead, listRow, cardBox, stateBlock, field, bottomTabs, restoreFocus } from "./ui.mjs";
 
 test("계좌번호는 가운데 3자리를 가리고, 잘못된 형식은 노출하지 않는다", () => {
   assert.equal(maskAccountNumber("110-101-000001"), "110-***-000001");
@@ -54,4 +54,12 @@ test("배너 넘김 부품은 두 화살표와 현재 페이지를 표시한다"
   assert.match(html, /data-action="prev" aria-label="이전 배너"/);
   assert.match(html, /class="ui-carousel-page" role="status">2 \/ 3</);
   assert.match(html, /data-action="next" aria-label="다음 배너"/);
+});
+
+test("간편 로그인 버튼은 로고와 플랫폼 이름을 버튼 안에 함께 넣는다", () => {
+  const google = socialButton("google");
+  assert.match(google, /^<button type="button" class="ui-social ui-social--google" data-action="social-soon" aria-label="Google 간편로그인"><svg/);
+  assert.match(google, /<span>Google<\/span><\/button>$/);
+  assert.match(socialButton("naver", { action: "naver-login" }), /data-action="naver-login".*<span>NAVER<\/span>/);
+  assert.doesNotMatch(socialButton("<x>"), /<x>/);
 });

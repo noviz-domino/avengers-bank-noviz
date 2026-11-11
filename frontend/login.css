@@ -6,23 +6,25 @@
 .login-b { display: flex; flex-direction: column; padding: 0; background: #10233b; }
 .lb-hero { position: relative; overflow: hidden; flex: 1; min-height: 250px; display: flex; flex-direction: column; justify-content: flex-end; padding: 28px 28px 34px; color: #fff; }
 .lb-watermark { position: absolute; right: -70px; top: -30px; width: 280px; opacity: .13; transform: rotate(14deg); }
-.lb-brand { display: flex; align-items: center; gap: 6px; margin-bottom: auto; font-size: 14px; font-weight: 700; color: #dbe5f0; }
-.lb-brand svg { width: 18px; }
+.lb-brand { display: flex; align-items: center; gap: 8px; margin-bottom: auto; font-size: 19px; font-weight: 700; color: #dbe5f0; }
+.lb-brand svg { width: 24px; }
 .lb-hero h1 { font-size: 32px; line-height: 1.25; letter-spacing: -.04em; }
 .lb-hero h1 + p { margin-top: 10px; color: #b5c4d6; font-size: 14px; }
 .lb-sheet { padding: 28px 28px max(24px, env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: #fff; }
-.lb-sheet form { display: grid; gap: 14px; }
-.lb-sheet label { gap: 6px; margin: 0; color: var(--ui-muted); font-size: 13px; font-weight: 600; }
-.lb-sheet input { min-height: 52px; border: 1px solid transparent; border-radius: 14px; background: var(--ui-surface); font-size: 16px; }
+.lb-sheet form { display: grid; gap: 14px; padding-inline: 12px; } /* 입력칸·버튼 양옆에 여백을 더 준다 */
+.lb-sheet label { margin: 0; }
+.lb-sheet input { min-height: 52px; border: 1px solid transparent; border-radius: 999px; background: var(--ui-surface); font-size: 16px; text-align: center; }
+.lb-sheet input::placeholder { color: #a9b2be; font-weight: 500; }
+.lb-sheet input:focus::placeholder { color: transparent; } /* 칸을 누르면 안내 글을 바로 숨겨 가운데 커서와 겹치지 않게 */
 .lb-sheet input:focus-visible { outline: none; border-color: #10233b; background: #fff; }
-.lb-sheet .primary { min-height: 54px; margin-top: 6px; border-radius: 14px; background: #10233b; font-size: 16px; }
+.lb-sheet .primary { min-height: 54px; margin-top: 6px; border-radius: 999px; background: #10233b; font-size: 16px; }
 .lb-sheet .error, .lb-sheet .note { margin: 0; text-align: center; }
 .lb-links { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 10px; }
 .lb-links i { width: 1px; height: 12px; background: #c5cfda; }
 .lb-links button { min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--ui-muted); font-size: 13px; font-weight: 700; }
-.lb-social { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--ui-line); }
-.lb-social span { margin-right: auto; color: var(--ui-muted); font-size: 13px; }
-.lb-social button { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid var(--ui-line); border-radius: 50%; background: #fff; }
-.lb-social svg { width: 22px; }
+.lb-social { margin-top: 8px; }
+.lb-or { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--ui-muted); font-size: 13px; }
+.lb-or::before, .lb-or::after { content: ""; flex: 1; height: 1px; background: var(--ui-line); }
+.lb-social > div { display: flex; justify-content: center; gap: 12px; margin-top: 14px; }
 .lb-sheet [data-social-note] { margin-top: 10px; }
 

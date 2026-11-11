@@ -15,6 +15,7 @@
 |---|---|---|---|
 | [v1](v1-2026-11-11-before/) | 2026-11-11 | 개편 직전 상태 (main `7b36f5c`). 시안 14·15·20·21·23·25번을 따라 구현한 화면 | [ADR 0021](../../decisions/0021-ui-components.md) |
 | [v2](v2-2026-11-11-compact/) | 2026-11-11 | 여백 줄이기, AI 상담 채팅형 개편, 로그인 화면 다시 디자인 | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
+| [v3](v3-2026-11-11-login-review/) | 2026-11-11 | 로그인 화면 리뷰 반영 (로그인 화면만 다시 찍음) | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
 
 ## v1 → v2 화면별 비교
 
@@ -28,6 +29,14 @@
 | 카드 (크게) | ![v1](v1-2026-11-11-before/06-cards-large.jpg) | ![v2](v2-2026-11-11-compact/06-cards-large.jpg) | 보기 전환을 제목 줄의 아이콘 버튼으로. 카드가 한 장이면 선택 줄을 숨김. 카드 그림과 겹치던 카드명 제거 |
 | 카드 (목록) | ![v1](v1-2026-11-11-before/07-cards-list.jpg) | ![v2](v2-2026-11-11-compact/07-cards-list.jpg) | 같은 머리글. 중복된 "전체보기" 제거 |
 | 전체 메뉴 | ![v1](v1-2026-11-11-before/08-menu.jpg) | ![v2](v2-2026-11-11-compact/08-menu.jpg) | 제목 중복 제거, 글자 버튼 2열 → 아이콘 타일 4열, PIN 변경 폼은 접어 둠, 중복된 검색 줄 제거 |
+
+## v2 → v3 로그인 화면 (PR 리뷰 반영)
+
+| v2 (전) | v3 (후) | 바뀐 점 |
+|---|---|---|
+| ![v2](v2-2026-11-11-compact/01-login.jpg) | ![v3](v3-2026-11-11-login-review/01-login.jpg) | 위쪽 은행명을 14px → 19px로 키움. 입력칸·로그인 버튼 양옆 여백을 늘리고 완전히 둥글게(알약). "아이디·비밀번호"는 칸 안의 흐린 안내 글로 넣고 입력 글자는 가운데 정렬. 간편 로그인은 흐린 구분선 가운데에 "간편 로그인" 표시, 그 아래 가운데에 둥근 정사각형 버튼 두 개, 버튼 안에 로고(위)와 Google·NAVER(아래)를 함께 넣음(공통 부품 `socialButton`) |
+
+리뷰 중에 만든 **간편 로그인 가로 버튼 두 줄 안**(로고 + "구글 간편로그인")은 고르지 않아 보관합니다: [캡처](login-options-2026-11-11/social-wide-buttons.jpg), [코드](login-options-2026-11-11/archived-code/social-wide-buttons.mjs), [스타일](login-options-2026-11-11/archived-code/social-wide-buttons.css)
 
 ## 로그인 화면 시안 비교 (2026-11-11) — **B 선택**
 

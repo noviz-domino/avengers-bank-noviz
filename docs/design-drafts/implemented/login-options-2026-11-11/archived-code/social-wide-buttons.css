@@ -1,0 +1,8 @@
+/* 보관된 간편 로그인 안: 가로로 긴 버튼 두 줄. 원래 frontend/ui.css와 login.css에 있었다. */
+.ui-social {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+  min-height: 50px; padding: 0 20px; border: 1px solid var(--ui-line); border-radius: 999px;
+  background: var(--ui-white); color: var(--ui-navy); font-size: 15px; font-weight: 600;
+}
+.ui-social svg { width: 20px; flex: none; }
+.lb-social > div { display: grid; gap: 8px; margin-top: 14px; padding-inline: 12px; }

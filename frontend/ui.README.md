@@ -44,6 +44,7 @@
 | `esc(value)` | `null`·`undefined`는 빈 문자열, HTML 특수문자 5개를 이스케이프해요 |
 | `icon(name)` | 장식용 인라인 SVG. `back`, `arrow`, `chevron`, `down`, `wallet`, `pig`, `clock`, `home`, `products`, `chat`, `cards`, `menu`, `eye`, `eyeOff`, `pause`, `play`, `single`, `list`, `send`, `gift`, `shield`, `target` 등 |
 | `button(label, {action, variant='quiet', icon, ariaLabel, pressed, className=''})` | `primary` / `outline` / `quiet` / `pill`. 아이콘만 있는 버튼은 `ariaLabel` 필수예요 |
+| `socialButton(provider, {action='social-soon'})` | `google` / `naver`. 84×76px 둥근 정사각형 안에 로고(위)와 `Google`·`NAVER`(아래)를 함께 넣어 글자까지 누르는 영역이에요. 읽어 주는 이름은 "Google 간편로그인"이에요. 여러 개는 가운데 정렬한 한 줄에 둬요 |
 | `carouselPager(page, count, {previous, next})` | 홈·상품 배너 공용 넘김 표시. 이전·다음 액션과 현재 페이지를 표시해요 |
 | `header({title='', brandHtml='', back, rightHtml='', heading=false})` | 52px 머리글. `back`은 뒤로 가기 버튼의 액션, 버튼은 44×44px이에요. `heading: true`면 제목을 `h1`으로 그려요 (탭 화면처럼 머리글 제목이 곧 페이지 제목일 때. 본문에 `pageTitle`을 또 두지 않아요) |
 | `iconToggle(options, {label, current, prefix='', attr='data-action'})` | 아이콘만 있는 보기 전환. `options`는 `[값, 아이콘, 읽어 줄 이름]` 배열, 액션 값은 `prefix + 값`이에요. 카드 화면의 크게/목록 전환에 써요 |
