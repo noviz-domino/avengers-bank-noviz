@@ -5,8 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
 from avengers_bank.core.dependencies import RequestedBy, get_current_user
-from avengers_bank.core.responses import SuccessResponse, error_responses
+from avengers_bank.core.responses import ErrorResponse, SuccessResponse, error_responses
 from avengers_bank.domains.approvals.schemas import ActionResponse
+from avengers_bank.domains.transfers import clearing
 from avengers_bank.domains.transfers.schemas import TransferCreate
 from avengers_bank.domains.transfers.service import transfer_service
 from avengers_bank.domains.users.schemas import UserResponse
@@ -14,9 +15,17 @@ from avengers_bank.domains.users.schemas import UserResponse
 router = APIRouter(prefix="/transfers", tags=["transfers"], responses=error_responses(401, 422))
 
 
+HUB_ERRORS = {502: {"model": ErrorResponse}, 503: {"model": ErrorResponse}}
+
+
+@router.get("/banks", response_model=SuccessResponse[list[dict[str, str]]], responses=HUB_ERRORS)
+async def list_banks(me: Annotated[UserResponse, Depends(get_current_user)]):
+    return SuccessResponse(data=await clearing.banks())
+
+
 @router.post(
     "", response_model=SuccessResponse[ActionResponse],
-    status_code=status.HTTP_202_ACCEPTED, responses=error_responses(400, 409),
+    status_code=status.HTTP_202_ACCEPTED, responses=error_responses(400, 409) | HUB_ERRORS,
 )
 async def request_transfer(
     data: TransferCreate, response: Response,

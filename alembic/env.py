@@ -16,6 +16,7 @@ from avengers_bank.domains.audit.models import AuditLog  # noqa: F401
 from avengers_bank.domains.cards.models import Card, CardProduct, CardTransaction  # noqa: F401
 from avengers_bank.domains.rag.models import RagChunk  # noqa: F401
 from avengers_bank.domains.products.models import AccountProduct, ProductPreferentialRate  # noqa: F401
+from avengers_bank.domains.transfers.models import ClearingReceipt  # noqa: F401
 from avengers_bank.domains.users.models import RefreshToken, User  # noqa: F401
 
 config = context.config

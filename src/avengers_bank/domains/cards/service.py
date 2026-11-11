@@ -2,13 +2,14 @@
 
 import logging
 from datetime import UTC, date, datetime, timedelta
+from hashlib import sha256
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.clock import today_kst
-from avengers_bank.core.exceptions import BadRequestException, ConflictException, NotFoundException
+from avengers_bank.core.exceptions import ApiException, BadRequestException, ConflictException, NotFoundException
 from avengers_bank.domains.accounts.categories import classify
 from avengers_bank.domains.accounts.models import Account
 from avengers_bank.domains.accounts.money import TransferRejected, execute_card_ledger
@@ -18,6 +19,7 @@ from avengers_bank.domains.approvals.repository import approval_repository
 from avengers_bank.domains.audit.repository import audit_repository
 from avengers_bank.domains.cards.card_number import make_card_num, mask, prefix
 from avengers_bank.domains.cards.models import Card, CardProduct, CardTransaction
+from avengers_bank.domains.cards.protection import review_reason
 from avengers_bank.domains.cards.repository import card_repository
 from avengers_bank.domains.cards.schemas import (
     CardBillRunResponse,
@@ -26,8 +28,10 @@ from avengers_bank.domains.cards.schemas import (
     CardPayment,
     CardResponse,
     CardTransactionResponse,
+    MerchantPayment,
     PendingRefundResponse,
 )
+from avengers_bank.domains.users.models import User
 
 # 기본 한도. 올리는 것은 보안을 약하게 해서 승인 기능과 함께 만든다 (ADR 0009)
 DEBIT_DAILY_LIMIT = 1_000_000
@@ -62,6 +66,16 @@ async def run_unsuspend_card(db: AsyncSession, action: PendingAction) -> None:
     if card.status != "SUSPENDED":
         raise TransferRejected("CARD_NOT_SUSPENDED", "정지된 카드가 아닙니다.")
     card.status = "ACTIVE"
+
+
+async def run_card_payment(db: AsyncSession, action: PendingAction) -> None:
+    payment = CardPayment.model_validate(action.payload["payment"])
+    try:
+        card = await card_service._my_card(db, action.user_id, action.payload["card_id"], lock=True)
+        tx = await card_service._execute_payment(db, card, payment)
+    except ApiException as e:
+        raise TransferRejected(e.code, e.message) from e
+    action.result = {"card_tx_id": tx.card_tx_id}
 
 
 def tx_not_found() -> NotFoundException:
@@ -170,11 +184,18 @@ class CardService:
             raise not_found()
         return found[0]
 
-    async def pay(self, db: AsyncSession, user_id: int, card_id: int, data: CardPayment) -> tuple[CardTransaction, bool]:
-        """가맹점 결제 흉내 (ADR 0010). 카드 행을 잠가서 같은 카드의 결제·취소를 한 줄로 세운다
-        (한도 합계와 요청 번호 검사가 동시 결제에 뚫리지 않게)"""
+    async def pay(
+        self, db: AsyncSession, card_id: int, data: CardPayment, *, user_id: int | None = None
+    ) -> tuple[CardTransaction | PendingAction, bool]:
+        """같은 카드의 결제와 확인 요청을 카드 행 잠금으로 직렬화한다."""
         async with db.begin():
-            card = await self._my_card(db, user_id, card_id, lock=True)
+            found = await card_repository.find_by_id(db, card_id, lock=True)
+            if found is None or (user_id is not None and found[0].user_id != user_id):
+                raise not_found()
+            card, product_name = found
+            user = await db.get(User, card.user_id)
+            state = user.card_protection or {}
+            settings = state.get("settings", {})
             existing = await card_repository.find_tx_by_key(db, card_id, data.idempotency_key)
             if existing is not None:
                 if (existing.merchant_name, existing.amount) != (data.merchant_name, data.amount):
@@ -182,40 +203,73 @@ class CardService:
                         message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
                     )
                 return existing, False
+
+            payment = data.model_dump(include=set(CardPayment.model_fields))
+            payload = {"card_id": card_id, "payment": payment}
+            key = "card-review-" + sha256(f"{card_id}:{data.idempotency_key}".encode()).hexdigest()
+            prior = await approval_repository.find_by_key(db, card.user_id, key)
+            now = datetime.now(UTC)
+            if user_id is not None and (prior or settings.get("location_check") or settings.get("active_from")):
+                raise ConflictException(
+                    message="보호 중인 결제는 가맹점 결제 경로로 보내야 합니다.", code="MERCHANT_CHANNEL_REQUIRED"
+                )
+            if prior is not None:
+                if prior.action_type != "CARD_PAYMENT" or prior.payload != payload:
+                    raise ConflictException(
+                        message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
+                    )
+                expires = prior.expires_at
+                if prior.status == "PENDING" and (expires if expires.tzinfo else expires.replace(tzinfo=UTC)) > now:
+                    return prior, False
+                raise ConflictException(message="거절·만료되었거나 실패한 결제입니다.", code="CARD_PAYMENT_NOT_APPROVABLE")
+
             if card.status != "ACTIVE":
                 raise ConflictException(message="쓸 수 없는 카드입니다(정지·분실).", code="CARD_NOT_ACTIVE")
-            used_today = await card_repository.spent_since(db, card_id, kst_midnight_utc(today_kst()))
-            if used_today + data.amount > card.daily_limit:
-                left = max(card.daily_limit - used_today, 0)
-                raise BadRequestException(
-                    message=f"오늘 더 쓸 수 있는 금액은 {left:,}원입니다.", code="CARD_DAILY_LIMIT_EXCEEDED"
+            if isinstance(data, MerchantPayment) and (reason := await review_reason(db, card_id, state, data, now)):
+                action = PendingAction(
+                    user_id=card.user_id, action_type="CARD_PAYMENT", requested_by="SYSTEM", idempotency_key=key,
+                    expires_at=now + APPROVAL_TTL, payload=payload,
+                    summary=f"{card.nickname or product_name} 끝자리 {card.card_num[-4:]} · "
+                            f"{data.merchant_name} {data.amount:,}원 · {reason}",
                 )
-            category = classify("CARD_PAYMENT", None, data.merchant_name)
-            tx = CardTransaction(
-                card_id=card_id, idempotency_key=data.idempotency_key, merchant_name=data.merchant_name,
-                category=category, amount=data.amount, status="APPROVED",
+                return await approval_repository.save(db, action), True
+            return await self._execute_payment(db, card, data), True
+
+    async def _execute_payment(self, db: AsyncSession, card: Card, data: CardPayment) -> CardTransaction:
+        if card.status != "ACTIVE":
+            raise ConflictException(message="쓸 수 없는 카드입니다(정지·분실).", code="CARD_NOT_ACTIVE")
+        used_today = await card_repository.spent_since(db, card.card_id, kst_midnight_utc(today_kst()))
+        if used_today + data.amount > card.daily_limit:
+            left = max(card.daily_limit - used_today, 0)
+            raise BadRequestException(
+                message=f"오늘 더 쓸 수 있는 금액은 {left:,}원입니다.", code="CARD_DAILY_LIMIT_EXCEEDED"
             )
-            if card.card_type == "CREDIT":
-                if await card_repository.has_overdue(db, card_id):
-                    raise ConflictException(message="밀린 카드 대금이 있어 결제할 수 없습니다.", code="CARD_OVERDUE")
-                unpaid = await card_repository.unpaid_credit(db, card_id)
-                if unpaid + data.amount > card.credit_limit:
-                    left = max(card.credit_limit - unpaid, 0)
-                    raise BadRequestException(message=f"남은 신용 한도는 {left:,}원입니다.", code="CREDIT_LIMIT_EXCEEDED")
-                tx.billing_status = "UNBILLED"  # 돈은 대금 출금일에 나간다 (대금 출금 PR)
-            else:
-                try:
-                    ledger = await execute_card_ledger(
-                        db, owner_user_id=user_id, account_id=card.linked_account_id, tx_type="CARD_PAYMENT",
-                        amount=-data.amount, merchant_name=data.merchant_name, category=category,
-                    )
-                except TransferRejected as e:
-                    raise rejected(e) from None
-                tx.account_tx_id = ledger.tx_id
-            db.add(tx)
-            await db.flush()
-            await db.refresh(tx)
-            return tx, True
+        category = classify("CARD_PAYMENT", None, data.merchant_name)
+        tx = CardTransaction(
+            card_id=card.card_id, idempotency_key=data.idempotency_key, merchant_name=data.merchant_name,
+            category=category, amount=data.amount, status="APPROVED",
+        )
+        if card.card_type == "CREDIT":
+            if await card_repository.has_overdue(db, card.card_id):
+                raise ConflictException(message="밀린 카드 대금이 있어 결제할 수 없습니다.", code="CARD_OVERDUE")
+            unpaid = await card_repository.unpaid_credit(db, card.card_id)
+            if unpaid + data.amount > card.credit_limit:
+                left = max(card.credit_limit - unpaid, 0)
+                raise BadRequestException(message=f"남은 신용 한도는 {left:,}원입니다.", code="CREDIT_LIMIT_EXCEEDED")
+            tx.billing_status = "UNBILLED"
+        else:
+            try:
+                ledger = await execute_card_ledger(
+                    db, owner_user_id=card.user_id, account_id=card.linked_account_id, tx_type="CARD_PAYMENT",
+                    amount=-data.amount, merchant_name=data.merchant_name, category=category,
+                )
+            except TransferRejected as e:
+                raise rejected(e) from None
+            tx.account_tx_id = ledger.tx_id
+        db.add(tx)
+        await db.flush()
+        await db.refresh(tx)
+        return tx
 
     async def cancel(self, db: AsyncSession, user_id: int, card_id: int, card_tx_id: int) -> CardTransaction:
         """전액 취소. 이미 돈이 나간 것(체크카드, 대금을 낸 신용카드)은 결제 계좌로 환불(REFUND),
@@ -279,9 +333,12 @@ class CardService:
             await db.refresh(tx)
             return tx
 
-    async def list_txs(self, db: AsyncSession, user_id: int, card_id: int) -> list[CardTransaction]:
+    async def list_txs(
+        self, db: AsyncSession, user_id: int, card_id: int, payment_date: date | None = None
+    ) -> list[CardTransaction]:
         await self._my_card(db, user_id, card_id)
-        return await card_repository.find_txs(db, card_id)
+        since = kst_midnight_utc(payment_date) if payment_date else None
+        return await card_repository.find_txs(db, card_id, since, since + timedelta(days=1) if since else None)
 
     async def limits(self, db: AsyncSession, user_id: int, card_id: int) -> CardLimitsResponse:
         card = await self._my_card(db, user_id, card_id)

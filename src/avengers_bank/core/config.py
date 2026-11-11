@@ -1,7 +1,8 @@
+import re
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,12 +14,18 @@ class Settings(BaseSettings):
     db_echo: bool = False
     # 대금 출금 같은 시스템 작업 API의 키 (ADR 0011). 없으면 그 API는 꺼진다
     system_api_key: SecretStr | None = Field(default=None, min_length=32)
+    clearing_hub_url: str = "https://clearing-hub.ai-agent-develop.cloud"
+    clearing_bank_code: str | None = Field(default=None, pattern=r"^[0-9]{3}$")
+    clearing_api_key: SecretStr | None = None
+    clearing_private_key: SecretStr | None = None
+    clearing_hub_public_key: str | None = Field(default=None, pattern=r"^[A-Za-z0-9+/]{43}=$")
     # RAG·Agent (ADR 0013). 키가 없으면 RAG API는 503. 무료 티어 키만, GitHub Secrets에 넣지 않는다
     gemini_api_key: SecretStr | None = None
     gemini_model: str = "gemini-3.8-flash"
     gemini_embedding_model: str = "gemini-embedding-2"
     # Gemini 3의 생각 수준. 낮을수록 빠르다. low가 p50 15→8초 (ADR 0016 측정). minimal은 3.8 Flash가 지원하지 않음
     gemini_thinking: Literal["low", "medium", "high"] = "low"
+    kakao_local_api_key: SecretStr | None = None
     # Agent 실행 추적 (ADR 0016). 키가 없으면 꺼진다
     langfuse_public_key: str | None = None
     langfuse_secret_key: SecretStr | None = None
@@ -27,7 +34,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore",
         env_ignore_empty=True,  # .env.example처럼 `KEY=`로 비워 두면 "없음" (PR #17 리뷰)
+        hide_input_in_errors=True,
     )
+
+    @field_validator("clearing_private_key")
+    @classmethod
+    def clearing_key_format(cls, key: SecretStr | None) -> SecretStr | None:
+        if key and not re.fullmatch(r"[A-Za-z0-9+/]{43}=", key.get_secret_value()):
+            raise ValueError("ClearingHub 개인키는 raw Ed25519 32바이트의 표준 base64여야 합니다.")
+        return key
 
 
 @lru_cache

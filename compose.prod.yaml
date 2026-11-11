@@ -1,0 +1,10 @@
+# 서버용 덮어쓰기: docker compose -f compose.yaml -f compose.prod.yaml up -d --build
+# 개발용 설정(DB 포트 공개, 마이그레이션 폴더 연결)을 끄고, 서버가 켜질 때 자동으로 다시 올라오게 한다
+services:
+  db:
+    ports: !reset []
+    restart: unless-stopped
+
+  app:
+    volumes: !reset []
+    restart: unless-stopped

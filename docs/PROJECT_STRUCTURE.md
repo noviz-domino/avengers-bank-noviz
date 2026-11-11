@@ -23,6 +23,7 @@ avengers-bank/
 │   ├── assets/event-bank.webp # 홈 이벤트 배너 그림
 │   ├── cards.mjs, products.mjs, chat.mjs # 카드, 상품·가입, AI 상담(SSE)
 │   ├── signup.mjs, settings.mjs, search.mjs # 회원가입, 메뉴·PIN 변경, 거래 검색
+│   ├── protection.html·mjs, benefits.html·mjs # 카드 결제 보호·송금 요청 점검, 혜택 구성·주변 코스 (ADR 0023)
 │   └── *.test.mjs, integration.browser.mjs # 순수 함수 테스트(node --test), 실제 브라우저 통합 점검
 ├── docs/                   # 문서 목차: docs/README.md
 │   └── decisions/          # 설계 결정 기록(ADR): 왜 바꿨는지
@@ -40,7 +41,8 @@ avengers-bank/
 │   ├── test_deposits.py        # 예금 개설 승인, 실패 때 빈 계좌가 남지 않음, 특판 종료, 예금 추가 입금 불가
 │   ├── test_transaction_search.py  # 검색 조건·합계·한국 날짜·쪽, 남의 거래 404, 카테고리 규칙·수정
 │   ├── test_cards.py           # 카드번호·Luhn, 발급, 결제 계좌 규칙, 정지·분실·해제(PIN), 남의 카드 404
-│   ├── test_card_payments.py   # 카드 결제·재전송·한도·취소 환불·신용 안 갚은 금액·남의 카드 404
+│   ├── test_card_payments.py   # 카드 결제·재전송·한도·취소 환불·신용 안 갚은 금액·남의 카드 404, 결제 보호(위치·활동시간 → 202 승인 대기, 거절·만료·정지)
+│   ├── test_benefits.py        # 혜택 구성 검증(100크레딧·업종당 하나), 소비 기반 추천, 주변 코스 예산·시간·쿠폰, 카카오 응답 계약
 │   ├── test_card_bills.py      # 신용 대금 출금·다시 불러도 한 번·결제일 당일분 제외·연체·청구 후 취소·서버 키
 │   ├── test_account_number.py  # 계좌번호 규칙, CHECK 제약, 마이그레이션과 모델의 CHECK 일치
 │   └── test_alembic_env.py     # 모든 models.py가 alembic/env.py에 import됐는지
@@ -52,18 +54,19 @@ avengers-bank/
     │   ├── database.py     # DB 연결, Base, get_db
     │   ├── security.py     # 비밀번호 해시, JWT
     │   ├── dependencies.py # get_current_user (로그인 사용자 확인)
+    │   ├── geo.py          # 두 좌표 사이 거리(하버사인): 카드 결제 보호·주변 코스
     │   ├── exceptions.py   # BadRequest/Unauthorized/Forbidden/NotFound/Conflict
     │   ├── exception_handlers.py
     │   └── responses.py    # SuccessResponse, ErrorResponse 형식
     └── domains/
         ├── users/          # 회원가입, 로그인, 내 정보          ✅ 구현됨
-        ├── products/       # 계좌·대출 상품 조회, 우대금리       ✅ 목록·상세, 가입 조건·적용 금리(eligibility.py)
+        ├── products/       # 계좌·대출 상품 조회, 우대금리       ✅ 목록·상세, 가입 조건·적용 금리(eligibility.py), 혜택 구성(benefits.py, benefit_schemas.py, benefit_coupons.json)·주변 코스(nearby.py, 카카오 로컬)
         ├── accounts/       # 계좌·예적금 조건·장부              ✅ 개설·조회, 거래 검색, 카테고리(categories.py), 계좌번호 규칙, **돈 실행 지점(money.py)**
         ├── approvals/      # 승인 대기 작업, PIN 승인·거절        ✅
         ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
         ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성
-        ├── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소·대금 출금(/system)
-        ├── agent/          # AI 상담: 라우터 + 계좌·카드·상품 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl) ✅
+        ├── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소·대금 출금(/system), 결제 보호(protection.py, 가맹점 결제 /system/card-payments)
+        ├── agent/          # AI 상담: 라우터 + 계좌·카드·상품 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl), 송금 전 요청 점검(transfer_check.py), 혜택 상담(benefits.py) ✅
         ├── mcp_server/     # MCP 도구 16개(REST를 사용자 토큰으로), HTTP /mcp + 로컬 stdio(login, 토큰 파일) ✅
         └── rag/            # 상품·약관 RAG: 데모 약관(docs/*.md), 청킹, Gemini 연결(ai.py), 하이브리드 검색, 평가(golden.jsonl) ✅
 ```
@@ -106,6 +109,7 @@ users ◀── approvals ◀── transfers   (이체는 승인 대기를 만�
 | `account_products`, `product_preferential_rates` | `AccountProduct`, `ProductPreferentialRate` | `domains/products/models.py` |
 | `accounts`, `account_terms`, `account_transactions` | `Account`, `AccountTerms`, `AccountTransaction` | `domains/accounts/models.py` |
 | `pending_actions` | `PendingAction` | `domains/approvals/models.py` |
+| `clearing_receipts` | `ClearingReceipt` | `domains/transfers/models.py` |
 | `audit_logs` | `AuditLog` | `domains/audit/models.py` |
 | `card_products`, `cards`, `card_transactions` | `CardProduct`, `Card`, `CardTransaction` | `domains/cards/models.py` |
 

@@ -15,6 +15,7 @@ from avengers_bank.domains.agent import checkpoint, tracing
 from avengers_bank.domains.agent.graph import MAX_HOPS, build
 from avengers_bank.domains.agent.schemas import ChatResponse, ChatTurn
 from avengers_bank.domains.agent.stream import EventTranslator, sse
+from avengers_bank.domains.agent.transfer_check import build_transfer_check
 from avengers_bank.domains.mcp_server import api as mcp_api
 from avengers_bank.domains.mcp_server.server import mcp
 from avengers_bank.domains.rag.ai import unavailable
@@ -76,29 +77,45 @@ async def read(queue: asyncio.Queue) -> AsyncIterator[str]:
 
 class AgentService:
     async def chat(self, llm: BaseChatModel, user_id: int, token: str, session_id: str, message: str,
-                   callbacks: list | None = None) -> ChatResponse:
+                   callbacks: list | None = None, *, transfer_check: bool = False) -> ChatResponse:
         thread = thread_id(user_id, session_id)
+        if transfer_check:
+            thread += ":transfer-check"
         take(thread)
         try:
-            callbacks = [*tracing.handlers(), *(callbacks or [])]
-            return await self._turn(llm, thread, session_id, token, message, callbacks, tracing.metadata(user_id, session_id))
+            # 붙여넣은 문자와 조회 거래를 외부 추적 서비스로 보내지 않는다.
+            trace_callbacks = [] if transfer_check else tracing.handlers()
+            callbacks = [*trace_callbacks, *(callbacks or [])]
+            return await self._turn(
+                llm, user_id, thread, session_id, token, message, callbacks,
+                tracing.metadata(user_id, session_id), transfer_check,
+            )
         finally:
             busy.discard(thread)
 
-    async def _turn(self, llm, thread: str, session_id: str, token: str, message: str, callbacks: list,
-                    metadata: dict) -> ChatResponse:
+    async def _turn(self, llm, user_id: int, thread: str, session_id: str, token: str, message: str, callbacks: list,
+                    metadata: dict, transfer_check: bool) -> ChatResponse:
         config = prepare(token, thread, callbacks, metadata)
+        if transfer_check:
+            config.update(recursion_limit=12, run_name="transfer_check")
         try:
             async with asyncio.timeout(TURN_TIMEOUT):
-                async with create_connected_server_and_client_session(mcp) as session:
-                    graph = build(llm, await load_mcp_tools(session), checkpoint.saver)
-                    state = await graph.ainvoke(first_turn(message), config)
+                if transfer_check:
+                    graph = build_transfer_check(llm, user_id, checkpoint.saver)
+                    state = await graph.ainvoke({"messages": [HumanMessage(message)]}, config)
+                else:
+                    async with create_connected_server_and_client_session(mcp) as session:
+                        graph = build(llm, await load_mcp_tools(session), checkpoint.saver)
+                        state = await graph.ainvoke(first_turn(message), config)
         except ApiException:
             raise
         except Exception:  # LLM(외부 서비스) 실패·시간 초과·형식 오류. 원인은 로그로 (버그도 여기로 오니 로그를 본다)
             logger.exception("agent turn failed: thread=%s", thread)
             raise unavailable("AI 상담을 지금 쓸 수 없습니다. 잠시 후 다시 시도해 주세요.") from None
-        return ChatResponse(session_id=session_id, reply=final_reply(state["messages"]), routed=state["routed"])
+        return ChatResponse(
+            session_id=session_id, reply=final_reply(state["messages"]),
+            routed=["transfer_check"] if transfer_check else state["routed"],
+        )
 
     def open_stream(self, llm: BaseChatModel, user_id: int, token: str, session_id: str, message: str,
                     callbacks: list | None = None) -> AsyncIterator[str]:

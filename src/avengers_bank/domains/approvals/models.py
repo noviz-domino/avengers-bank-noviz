@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from avengers_bank.core.database import Base, in_sql
 
 ACTION_STATUSES = ("PENDING", "APPROVED", "REJECTED", "EXPIRED", "EXECUTED", "FAILED")
-REQUESTERS = ("WEB", "AGENT", "MCP")
+REQUESTERS = ("WEB", "AGENT", "MCP", "SYSTEM")
 
 
 class PendingAction(Base):

@@ -179,6 +179,8 @@ function home() {
       return listRow({ title: txLabel(tx), subtitle: shortDate(tx.created_at) + " · " + (account ? accountName(account) : tx.category ?? "미분류"), amount: (tx.amount > 0 ? "+" : "−") + money(Math.abs(tx.amount)), credit: tx.amount > 0 });
     }).join("") + '</ul>' : stateBlock("empty", { message: "아직 거래내역이 없어요." })) + '</section>'
     + cardBox('<h2>' + icon("chat") + '금융 업무를 물어보세요</h2><button type="button" class="ui-button ui-ai-prompt" data-action="chat"><span>이번 달 카페에서 얼마 썼어?</span>' + icon("arrow") + '</button>', "ui-ai")
+    + (location.pathname.startsWith("/app/") ? '<p><a href="./benefits.html">내 혜택 찾아보기</a></p>'
+      + '<p><a href="./protection.html">실제 서버 카드 보호 시연</a></p>' : "")
     + '</main>' + nav("home");
 }
 
@@ -316,6 +318,8 @@ function transferPage() {
   } else if (active === "review") {
     content = progress + '<h1>이체 내용을 확인해 주세요</h1><section class="card">' + review + '</section>' + sourceCard
       + (error ? '<p class="error" role="alert">' + escape(error) + "</p>" : "")
+      + (location.pathname.startsWith("/app/")
+        ? '<p><a href="./protection.html#transfer-check" target="_blank" rel="noopener">받은 송금 요청 점검하기 (새 탭)</a></p>' : "")
       + '<div class="dock"><button type="button" class="primary" data-action="submit-transfer"' + (busy ? " disabled" : "") + ">"
       + (busy ? "요청하는 중…" : "PIN으로 승인하기") + "</button></div>";
   } else {

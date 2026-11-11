@@ -43,9 +43,23 @@ class CardRepository:
         return await db.scalar(select(CardTransaction).where(
             CardTransaction.card_id == card_id, CardTransaction.idempotency_key == key))
 
-    async def find_txs(self, db: AsyncSession, card_id: int) -> list[CardTransaction]:
-        return list(await db.scalars(select(CardTransaction).where(CardTransaction.card_id == card_id)
-                                     .order_by(CardTransaction.card_tx_id.desc())))
+    async def used_merchant_since(self, db: AsyncSession, card_id: int, merchant_name: str, since: datetime) -> bool:
+        # shortcut: 시뮬레이터는 가맹점 이름으로 비교하며, 결제망 연동 시 가맹점 식별자를 사용한다.
+        match = select(CardTransaction.card_tx_id).where(
+            CardTransaction.card_id == card_id, CardTransaction.merchant_name == merchant_name,
+            CardTransaction.status == "APPROVED", CardTransaction.approved_at >= since,
+        )
+        return bool(await db.scalar(select(match.exists())))
+
+    async def find_txs(
+        self, db: AsyncSession, card_id: int, since: datetime | None = None, before: datetime | None = None
+    ) -> list[CardTransaction]:
+        query = select(CardTransaction).where(CardTransaction.card_id == card_id)
+        if since is not None:
+            query = query.where(CardTransaction.approved_at >= since)
+        if before is not None:
+            query = query.where(CardTransaction.approved_at < before)
+        return list(await db.scalars(query.order_by(CardTransaction.card_tx_id.desc())))
 
     async def spent_since(self, db: AsyncSession, card_id: int, since: datetime) -> int:
         """취소하지 않은 사용액 합계 (1일 한도). 누적액은 저장하지 않고 계산한다 (ERD 규칙 11)"""

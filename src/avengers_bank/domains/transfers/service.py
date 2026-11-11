@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.exceptions import BadRequestException, ConflictException
 from avengers_bank.domains.accounts.models import Account
-from avengers_bank.domains.accounts.money import TransferRejected, check_transfer, today_transfer_out
+from avengers_bank.domains.accounts.money import TransferRejected, check_transfer, check_transfer_amount, today_transfer_out
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
+from avengers_bank.domains.transfers import clearing
 from avengers_bank.domains.transfers.schemas import TransferCreate
 from avengers_bank.domains.users.models import User
 
@@ -34,20 +35,36 @@ class TransferService:
             src = await db.get(Account, data.from_account_id)
             if src is not None and src.user_id != user_id:
                 src = None  # 남의 계좌는 없는 것과 같다 (ADR 0008)
-            dst = await db.scalar(select(Account).where(Account.account_num == data.to_account_num))
+            sent_today = await today_transfer_out(db, data.from_account_id)
             try:
-                internal = check_transfer(src, dst, data.amount, await today_transfer_out(db, data.from_account_id))
+                if data.to_bank is None:
+                    dst = await db.scalar(select(Account).where(Account.account_num == data.to_account_num))
+                    internal = check_transfer(src, dst, data.amount, sent_today)
+                    receiver = await db.get(User, dst.user_id)
+                    to_whom = label(dst) if internal else f"{receiver.name}님({dst.account_num})"
+                    payload = {"to_account_id": dst.account_id}
+                else:
+                    clearing.check_source(src, user_id)
+                    if data.amount > 100_000_000:
+                        raise TransferRejected("LIMIT_EXCEEDED", "타행 이체는 1회 1억 원까지 가능합니다.")
+                    check_transfer_amount(src, data.amount, sent_today)
+                    holder_name = await clearing.recipient(data.to_bank, data.to_account_num)
+                    sender = await db.get(User, user_id)
+                    to_whom = f"{holder_name}님(은행 {data.to_bank}, {data.to_account_num})"
+                    payload = {
+                        "to_bank": data.to_bank, "holder_name": holder_name,
+                        "from_account": src.account_num, "sender_name": sender.name,
+                    }
             except TransferRejected as e:
                 raise BadRequestException(message=e.message, code=e.code) from None
 
-            receiver = await db.get(User, dst.user_id)
-            to_whom = label(dst) if internal else f"{receiver.name}님({dst.account_num})"
             action = PendingAction(
-                user_id=user_id, action_type="TRANSFER", requested_by=requested_by,
+                user_id=user_id, action_type="TRANSFER" if data.to_bank is None else clearing.ACTION_TYPE,
+                requested_by=requested_by,
                 idempotency_key=data.idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
                 payload={
-                    "from_account_id": src.account_id, "to_account_id": dst.account_id,
-                    "to_account_num": dst.account_num, "amount": data.amount, "memo": data.memo,
+                    "from_account_id": src.account_id, "to_account_num": data.to_account_num,
+                    "amount": data.amount, "memo": data.memo, **payload,
                 },
                 # 승인 화면 문장은 서버가 payload로 만든다 (규칙 5)
                 summary=f"{label(src)}에서 {to_whom}에게 {data.amount:,}원 보내기",
@@ -62,9 +79,10 @@ class TransferService:
 
     def _same_request(self, existing: PendingAction, data: TransferCreate) -> PendingAction:
         p = existing.payload
-        same = (existing.action_type == "TRANSFER" and p["from_account_id"] == data.from_account_id
+        action_type = "TRANSFER" if data.to_bank is None else clearing.ACTION_TYPE
+        same = (existing.action_type == action_type and p["from_account_id"] == data.from_account_id
                 and p["to_account_num"] == data.to_account_num and p["amount"] == data.amount
-                and p.get("memo") == data.memo)
+                and p.get("memo") == data.memo and p.get("to_bank") == data.to_bank)
         if not same:
             raise ConflictException(
                 message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
