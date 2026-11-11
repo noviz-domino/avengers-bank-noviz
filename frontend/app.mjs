@@ -8,30 +8,12 @@ import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
 import { mountSearch } from "./search.mjs";
-import { loginB, loginC } from "./login-variants.mjs";
+import { loginView } from "./login.mjs";
 import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, pageTitle, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus, carouselPager } from "./ui.mjs";
 
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const brand = '<span class="brand">' + shield + '캡아메리카뱅크</span>';
-// 로그인 화면 캐릭터: 망토를 두르고 은행 방패를 든 동글이 (장식이라 읽어 주지 않음)
-const mascot = '<svg class="mascot" viewBox="0 0 160 150" aria-hidden="true">'
-  + '<ellipse cx="80" cy="142" rx="46" ry="6" fill="#132844" opacity=".08"/>'
-  + '<path d="M50 66Q38 118 50 134H110Q122 118 110 66Z" fill="#b84039"/>'
-  + '<path d="m80 8 4 8.5 9.3 1.2-6.8 6.4 1.8 9.2L80 28.8l-8.3 4.5 1.8-9.2-6.8-6.4 9.3-1.2Z" fill="#e0a43a"/>'
-  + '<rect x="46" y="36" width="68" height="96" rx="34" fill="#fff" stroke="#132844" stroke-width="4"/>'
-  + '<circle cx="68" cy="72" r="5.5" fill="#132844"/><circle cx="92" cy="72" r="5.5" fill="#132844"/>'
-  + '<circle cx="70" cy="70" r="1.8" fill="#fff"/><circle cx="94" cy="70" r="1.8" fill="#fff"/>'
-  + '<ellipse cx="60" cy="85" rx="6" ry="3.6" fill="#f3b9b1"/><ellipse cx="100" cy="85" rx="6" ry="3.6" fill="#f3b9b1"/>'
-  + '<path d="M72 86q8 8 16 0" fill="none" stroke="#132844" stroke-width="3.5" stroke-linecap="round"/>'
-  + '<path d="M48 96Q30 88 30 66" fill="none" stroke="#132844" stroke-width="4" stroke-linecap="round"/>'
-  + '<circle cx="30" cy="61" r="6.5" fill="#fff" stroke="#132844" stroke-width="3.5"/>'
-  + '<ellipse cx="67" cy="136" rx="10" ry="5" fill="#132844"/><ellipse cx="93" cy="136" rx="10" ry="5" fill="#132844"/>'
-  + '<g transform="translate(96 82) scale(1.45)">' + shield.replace(/^<svg[^>]*>|<\/svg>$/g, "") + "</g></svg>";
-const socialLogo = {
-  google: '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>',
-  naver: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#03C75A"/><path fill="#fff" d="M13.7 12.4 10.1 7H7v10h3.3v-5.4l3.6 5.4H17V7h-3.3z"/></svg>',
-};
 const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products", "signup", "menu", "search", "budget"]);
 const stepOrder = ["recipient", "amount", "review"];
 const hidden = "••••••";
@@ -261,25 +243,7 @@ function accountPage(manage) {
 }
 
 function login() {
-  const { error, notice, busy } = loginState;
-  // 기본은 시안 B. 고르지 않은 A·C도 지우지 않고 남겨 두며 주소에 ?login=a / ?login=c 로 볼 수 있다
-  const pick = new URLSearchParams(location.search).get("login");
-  if (pick !== "a") return (pick === "c" ? loginC : loginB)(loginState, { shield, socialLogo });
-  return '<main class="login"><div class="login-head">' + mascot
-    + '<h1 class="login-brand">' + shield + "캡아메리카뱅크</h1></div>"
-    // 입력칸 이름은 칸 안 안내 글로 보여 주고, 화면 낭독용 label은 숨겨 둔다
-    + '<form data-form="login"><label><span class="ui-sr-only">아이디</span><input name="login_id" placeholder="아이디" required autocomplete="username" maxlength="50"></label>'
-    + '<label><span class="ui-sr-only">비밀번호</span><input name="password" type="password" placeholder="비밀번호" required autocomplete="current-password"></label>'
-    + (notice ? '<p class="note" role="status">' + escape(notice) + "</p>" : "")
-    + '<p class="error" role="alert">' + escape(error) + '</p>'
-    + '<button class="primary"' + (busy ? " disabled" : "") + '>' + (busy ? "로그인 중…" : "로그인") + "</button>"
-    + "</form>"
-    + '<div class="login-links">' + button("signup", "회원가입", "link") + '<i aria-hidden="true"></i>' + button("demo-login", "데모 계정으로 둘러보기", "link") + "</div>"
-    // 간편 로그인은 자리만 잡아 둔다. 아직 연결 전이라 누르면 준비 중 안내만 한다
-    + '<section class="login-social" aria-label="간편 로그인"><p class="login-or">간편 로그인</p><div>'
-    + '<button type="button" data-action="social-soon">' + socialLogo.google + "Google</button>"
-    + '<button type="button" data-action="social-soon">' + socialLogo.naver + "네이버</button></div>"
-    + '<p class="note" role="status" data-social-note></p></section></main>';
+  return loginView(loginState, { shield });
 }
 
 function startTransfer(source, draft, from = currentPage()) {

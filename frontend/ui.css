@@ -42,6 +42,12 @@
 .ui-button--quiet { background: transparent; }
 .ui-button--pill { background: #10233bb3; color: var(--ui-white); border-radius: 999px; padding-inline: 10px; font-size: var(--ui-small-size); }
 .ui-button:disabled { opacity: .5; }
+.ui-social {
+  display: grid; place-content: center; justify-items: center; gap: 6px; width: 84px; height: 76px;
+  padding: 0; border: 1px solid var(--ui-line); border-radius: var(--ui-radius);
+  background: var(--ui-white); color: var(--ui-navy); font-size: 12px; font-weight: 600;
+}
+.ui-social svg { width: 24px; }
 .ui-header { display: flex; align-items: center; gap: var(--ui-space-sm); min-height: 52px; padding: 4px var(--ui-page-gutter); background: var(--ui-white); }
 .ui-header-title { flex: 1; min-width: 0; margin: 0; font-size: var(--ui-section-size); line-height: 1.35; letter-spacing: -.02em; font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
 h1.ui-header-title { font-size: 22px; }
