@@ -26,3 +26,16 @@ const TYPE_LABEL = {
 export const txLabel = (tx) => tx.counterparty_name ?? tx.memo ?? TYPE_LABEL[tx.tx_type] ?? tx.tx_type;
 
 export const money = (amount) => `${amount.toLocaleString("ko-KR")}원`;
+
+// 개설일처럼 연도까지 보여 줄 날짜. 서버 UTC 시각을 한국 날짜로 바꾼다 (2026.11.09)
+const longFormat = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" });
+export const longDate = (iso) => longFormat.format(new Date(iso)).replaceAll("-", ".");
+
+const ACCOUNT_TYPE = { CHECKING: "입출금", DEPOSIT: "예금", SAVINGS: "적금" };
+export const accountType = (account) => ACCOUNT_TYPE[account.account_type] ?? "계좌";
+
+// 서버 승인 summary("생활비(110-…)에서 토니 스타크님(110-…)에게 1,000원 보내기")에서 남의 계좌 받는 분 이름만 꺼낸다.
+// 서버가 확인한 이름만 쓰고, 문장 꼴이 다르면 null이라 화면은 이름 없이 금액만 보여 준다
+export function recipientName(summary) {
+  return /\)에서 ([^()]+님)\(\d{3}-\d{3}-\d{6}\)에게 [\d,]+원 보내기$/.exec(summary ?? "")?.[1] ?? null;
+}
