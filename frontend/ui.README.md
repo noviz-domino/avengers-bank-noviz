@@ -7,10 +7,11 @@
 | 용도 | CSS 변수 | 값 |
 |---|---|---|
 | 크림 / 흰색 / 네이비 | `--ui-cream`, `--ui-white`, `--ui-navy` | `#fbf5e9` / `#fff` / `#10233b` |
-| 입출금 / 옅은 배경 | `--ui-blue`, `--ui-blue-soft` | `#235b91` / `#eef5fc` |
+| 입출금 / 옅은 배경 | `--ui-blue`, `--ui-blue-soft` | `#1d5fa8` / `#edf4fd` |
+| 조용한 회색 면 (총자산·대화 영역·타일) | `--ui-surface` | `#f4f6f8` |
 | 예금·적금 / 옅은 배경 | `--ui-sage`, `--ui-sage-soft` | `#487657` / `#eef6f0` |
 | 최근 거래 / 옅은 배경 | `--ui-amber`, `--ui-amber-soft` | `#96611c` / `#fcf3e3` |
-| 오류 / 보조 글자 / 구분선 | `--ui-error`, `--ui-muted`, `--ui-line` | `#a22938` / `#647083` / `#edf0f3` |
+| 오류 / 보조 글자 / 구분선 | `--ui-error`, `--ui-muted`, `--ui-line` | `#a22938` / `#647083` / `#e6eaef` |
 | 페이지 / 섹션 / 본문 / 보조 | `--ui-title-size`, `--ui-section-size`, `--ui-body-size`, `--ui-small-size` | 26 / 18 / 15 / 13px |
 | 좌우 여백 | `--ui-page-gutter` | 24px, 340px 이하 16px |
 | 여백 단위 | `--ui-space-xs`, `--ui-space-sm`, `--ui-space-md`, `--ui-space-lg` | 4 / 8 / 16 / 24px |
@@ -26,7 +27,9 @@
 - 새 색·글자 크기를 화면별로 추가하지 않아요. 필요한 공통 변경은 `ui.css`의 디자인 값에서 해요.
 - 누르는 영역은 가로·세로 최소 44px, 제목은 `word-break: keep-all; overflow-wrap: anywhere`, 긴 별칭의 부모에는 `min-width: 0`을 유지해요.
 - `ui.css`는 `index.html`의 **첫 스타일시트**예요. 새 부품 규칙은 `ui-` 클래스로 한정해 기존 화면 CSS와 충돌을 막아요. `[hidden]`만 전역으로 숨김을 보장해요.
-- 화면에는 의미 있는 `h1`을 하나 두어요. `header`는 내비게이션 머리글, `pageTitle`은 본문 제목이에요.
+- 화면에는 의미 있는 `h1`을 하나 두어요. 탭 화면(상품·AI 상담·카드·전체)은 `header({ heading: true })`의 제목이 `h1`이고, 오른쪽 도구(보기 전환·발급·새 대화)를 같은 줄에 둬요. 은행명은 홈 머리글에만 작게 둬요.
+- 디자인을 바꾸면 [버전별 캡처](../docs/design-drafts/implemented/README.md)에 새 버전 폴더를 추가하고 이유를 ADR에 남겨요.
+- 같은 높이에 놓을 수 있는 것은 한 줄에 둬요 (제목+도구, 금액+이체 버튼, 설명+값). 한 줄을 버튼 하나가 차지하지 않게 해요.
 - 부품의 일반 문자열은 자동 이스케이프돼요. `*Html` 인자는 **부품으로 조합한 신뢰할 수 있는 HTML만** 받아요. 서버·사용자 문자열을 그대로 넘기지 말아요. 서버 문구와 금융 조건은 임의로 고치지 않아요.
 - 이벤트는 기존 컨테이너의 위임 핸들러에서 `data-action`으로 연결해요. 부품은 API·라우팅·이벤트 등록을 하지 않아요. 금액은 `format.mjs`의 `money`로 먼저 표시 문자열을 만들어요.
 - 카드·상품처럼 모듈 내부 액션을 처리할 때는 위임 핸들러에서 `event.stopPropagation()`으로 앱의 전역 라우팅과 구분해요. 기존 `data-card-action`·`data-product-*`를 옮길 때 이 연결도 함께 바꿔요. 주 화면 탭은 `app.mjs`가 한 번만 붙이므로 모듈에서 중복 생성하지 말아요.
@@ -39,10 +42,11 @@
 | 함수 시그니처 | 설명 |
 |---|---|
 | `esc(value)` | `null`·`undefined`는 빈 문자열, HTML 특수문자 5개를 이스케이프해요 |
-| `icon(name)` | 장식용 인라인 SVG. `back`, `arrow`, `chevron`, `down`, `wallet`, `pig`, `clock`, `home`, `products`, `chat`, `cards`, `menu`, `eye`, `eyeOff`, `pause`, `play` |
+| `icon(name)` | 장식용 인라인 SVG. `back`, `arrow`, `chevron`, `down`, `wallet`, `pig`, `clock`, `home`, `products`, `chat`, `cards`, `menu`, `eye`, `eyeOff`, `pause`, `play`, `single`, `list`, `send`, `gift`, `shield`, `target` 등 |
 | `button(label, {action, variant='quiet', icon, ariaLabel, pressed, className=''})` | `primary` / `outline` / `quiet` / `pill`. 아이콘만 있는 버튼은 `ariaLabel` 필수예요 |
 | `carouselPager(page, count, {previous, next})` | 홈·상품 배너 공용 넘김 표시. 이전·다음 액션과 현재 페이지를 표시해요 |
-| `header({title='', brandHtml='', back, rightHtml=''})` | 64px 머리글. `back`은 뒤로 가기 버튼의 액션, 버튼은 44×44px이에요 |
+| `header({title='', brandHtml='', back, rightHtml='', heading=false})` | 52px 머리글. `back`은 뒤로 가기 버튼의 액션, 버튼은 44×44px이에요. `heading: true`면 제목을 `h1`으로 그려요 (탭 화면처럼 머리글 제목이 곧 페이지 제목일 때. 본문에 `pageTitle`을 또 두지 않아요) |
+| `iconToggle(options, {label, current, prefix='', attr='data-action'})` | 아이콘만 있는 보기 전환. `options`는 `[값, 아이콘, 읽어 줄 이름]` 배열, 액션 값은 `prefix + 값`이에요. 카드 화면의 크게/목록 전환에 써요 |
 | `pageTitle(title)` | 26px `h1`, 긴 제목을 어절 단위로 줄바꿈해요 |
 | `sectionHead({title, count, total='', icon, tone='blue', action, expanded, controls, rightHtml=''})` | `blue` / `sage` / `amber`. 액션이 있으면 접기 버튼을 만들고 `aria-expanded`·`aria-controls`를 연결해요 |
 | `listRow({title, subtitle='', amount, action, buttonHtml='', icon, tone='blue', credit=false})` | `li`를 반환해요. `ul` 안에 배치해요. 제목은 왼쪽, 금액과 선택 버튼은 같은 오른쪽 끝선이에요 |

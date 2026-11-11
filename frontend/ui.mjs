@@ -25,6 +25,12 @@ const paths = {
   eyeOff: '<path d="m3 3 18 18M10 5a12 12 0 0 1 12 7s-1 3-4 5M6 6a20 20 0 0 0-4 6s4 7 10 7c2 0 4-.6 5-1.5M10 10a3 3 0 0 0 4 4"/>',
   pause: '<path d="M9 6v12M15 6v12"/>',
   play: '<path d="m9 5 10 7-10 7Z"/>',
+  single: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18"/>',
+  list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  send: '<path d="M12 19V5m-6 6 6-6 6 6"/>',
+  gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M3 13h18M12 9v12M12 9C8 9 6 4 9 4s3 5 3 5Zm0 0c4 0 6-5 3-5s-3 5-3 5Z"/>',
+  shield: '<path d="M12 3 20 6v6c0 5-3 8-8 10-5-2-8-5-8-10V6Z"/><path d="m9 12 2 2 4-4"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12h.01"/>',
 };
 export function icon(name) {
   return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? ""}</svg>`;
@@ -42,8 +48,15 @@ export function carouselPager(page, count, { previous, next }) {
   </div>`;
 }
 
-export function header({ title = "", brandHtml = "", back, rightHtml = "" } = {}) {
-  return `<header class="ui-header">${back ? button("", { action: back, icon: "back", ariaLabel: "뒤로 가기", className: "ui-back" }) : ""}<div class="ui-header-title">${brandHtml || esc(title)}</div><div class="ui-header-actions">${rightHtml}</div></header>`;
+// heading: 탭 화면처럼 상단바 제목이 곧 페이지 제목일 때 h1로 그린다 (본문에 pageTitle을 또 두지 않는다)
+export function header({ title = "", brandHtml = "", back, rightHtml = "", heading = false } = {}) {
+  const tag = heading ? "h1" : "div";
+  return `<header class="ui-header">${back ? button("", { action: back, icon: "back", ariaLabel: "뒤로 가기", className: "ui-back" }) : ""}<${tag} class="ui-header-title">${brandHtml || esc(title)}</${tag}><div class="ui-header-actions">${rightHtml}</div></header>`;
+}
+// 아이콘만 있는 둘 중 하나 고르기. options: [[값, 아이콘, 읽어 줄 이름]], attr은 화면 모듈의 액션 속성 이름
+export function iconToggle(options, { label, current, prefix = "", attr = "data-action" }) {
+  return `<div class="ui-icon-toggle" role="group" aria-label="${esc(label)}">${options.map(([value, glyph, name]) =>
+    `<button type="button" ${attr}="${esc(prefix + value)}" aria-label="${esc(name)}" title="${esc(name)}" aria-pressed="${value === current}">${icon(glyph)}</button>`).join("")}</div>`;
 }
 export const pageTitle = (title) => `<h1 class="ui-page-title">${esc(title)}</h1>`;
 

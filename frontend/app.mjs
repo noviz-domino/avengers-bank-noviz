@@ -8,6 +8,7 @@ import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
 import { mountSearch } from "./search.mjs";
+import { loginB, loginC } from "./login-variants.mjs";
 import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, pageTitle, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus, carouselPager } from "./ui.mjs";
 
 const app = document.querySelector("#app");
@@ -27,6 +28,10 @@ const mascot = '<svg class="mascot" viewBox="0 0 160 150" aria-hidden="true">'
   + '<circle cx="30" cy="61" r="6.5" fill="#fff" stroke="#132844" stroke-width="3.5"/>'
   + '<ellipse cx="67" cy="136" rx="10" ry="5" fill="#132844"/><ellipse cx="93" cy="136" rx="10" ry="5" fill="#132844"/>'
   + '<g transform="translate(96 82) scale(1.45)">' + shield.replace(/^<svg[^>]*>|<\/svg>$/g, "") + "</g></svg>";
+const socialLogo = {
+  google: '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>',
+  naver: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#03C75A"/><path fill="#fff" d="M13.7 12.4 10.1 7H7v10h3.3v-5.4l3.6 5.4H17V7h-3.3z"/></svg>',
+};
 const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products", "signup", "menu", "search", "budget"]);
 const stepOrder = ["recipient", "amount", "review"];
 const hidden = "••••••";
@@ -186,14 +191,16 @@ function syncCampaignTimer() {
 document.addEventListener("visibilitychange", syncCampaignTimer);
 
 function home() {
-  const head = uiHeader({ brandHtml: brand });
+  const head = uiHeader({ brandHtml: brand, rightHtml: uiButton("", { action: "search", icon: "search", ariaLabel: "거래내역 검색" }) });
   if (!accounts) return head + '<main class="ui-home">' + stateBlock(accountsError ? "error" : "loading", accountsError ? { message: accountsError, retryAction: "reload" } : {}) + '</main>' + nav("home");
   const groups = [["checking", "입출금", "blue", "wallet"], ["savings", "예금·적금", "sage", "pig"]];
   return head + '<main class="ui-home">'
     + '<section class="balance ui-balance" aria-label="내 총자산"><div><p>내 총자산</p>'
     + uiButton("", { action: "privacy", icon: privateBalance ? "eyeOff" : "eye", ariaLabel: privateBalance ? "잔액 보기" : "잔액 숨기기", pressed: privateBalance })
     + '</div><h1>' + (privateBalance ? hidden : money(total)) + '</h1></section>'
-    + cardBox('<h2>예산 가드</h2><p>' + (budget?.enrolled ? '지금 더 쓸 수 있는 돈 <strong>' + (privateBalance ? hidden : money(budget.free_to_spend)) + '</strong>' : '남은 생활비와 저축 목표를 함께 확인해요.') + '</p>' + uiButton(budget?.enrolled ? '내 예산 보기' : '예산 설정하기', { action: 'budget', variant: 'outline' }))
+    + '<button type="button" class="ui-link-card" data-action="budget">' + icon("target") + '<span><strong>예산 가드</strong><small>'
+    + (budget?.enrolled ? '지금 더 쓸 수 있는 돈</small></span><b>' + (privateBalance ? hidden : money(budget.free_to_spend)) + '</b>' : '생활비와 저축 목표를 지키게 도와줘요</small></span><b class="ui-link-card-cta">설정하기</b>')
+    + icon("chevron") + '</button>'
     + '<section class="ui-campaign" aria-roledescription="캐러셀" aria-label="은행 이벤트">' + campaignContent() + '</section>'
     + (accountsError ? stateBlock("error", { message: accountsError, retryAction: "reload" }) : "")
     + groups.map(([kind, label, tone, glyph]) => {
@@ -210,8 +217,8 @@ function home() {
       return listRow({ title: txLabel(tx), subtitle: shortDate(tx.created_at) + " · " + (account ? accountName(account) : tx.category ?? "미분류"), amount: (tx.amount > 0 ? "+" : "−") + money(Math.abs(tx.amount)), credit: tx.amount > 0 });
     }).join("") + '</ul>' : stateBlock("empty", { message: "아직 거래내역이 없어요." })) + '</section>'
     + cardBox('<h2>' + icon("chat") + '금융 업무를 물어보세요</h2><button type="button" class="ui-button ui-ai-prompt" data-action="chat"><span>이번 달 카페에서 얼마 썼어?</span>' + icon("arrow") + '</button>', "ui-ai")
-    + (location.pathname.startsWith("/app/") ? '<p><a href="./benefits.html">내 혜택 찾아보기</a></p>'
-      + '<p><a href="./protection.html">실제 서버 카드 보호 시연</a></p>' : "")
+    + (location.pathname.startsWith("/app/") ? '<nav class="ui-quick-links" aria-label="바로가기"><a href="./benefits.html">' + icon("gift") + '내 혜택 찾기</a>'
+      + '<a href="./protection.html">' + icon("shield") + '카드 보호 시연</a></nav>' : "")
     + '</main>' + nav("home");
 }
 
@@ -255,16 +262,24 @@ function accountPage(manage) {
 
 function login() {
   const { error, notice, busy } = loginState;
+  // 기본은 시안 B. 고르지 않은 A·C도 지우지 않고 남겨 두며 주소에 ?login=a / ?login=c 로 볼 수 있다
+  const pick = new URLSearchParams(location.search).get("login");
+  if (pick !== "a") return (pick === "c" ? loginC : loginB)(loginState, { shield, socialLogo });
   return '<main class="login"><div class="login-head">' + mascot
     + '<h1 class="login-brand">' + shield + "캡아메리카뱅크</h1></div>"
-    + '<form data-form="login"><label>아이디<input name="login_id" required autocomplete="username" maxlength="50"></label>'
-    + '<label>비밀번호<input name="password" type="password" required autocomplete="current-password"></label>'
+    // 입력칸 이름은 칸 안 안내 글로 보여 주고, 화면 낭독용 label은 숨겨 둔다
+    + '<form data-form="login"><label><span class="ui-sr-only">아이디</span><input name="login_id" placeholder="아이디" required autocomplete="username" maxlength="50"></label>'
+    + '<label><span class="ui-sr-only">비밀번호</span><input name="password" type="password" placeholder="비밀번호" required autocomplete="current-password"></label>'
     + (notice ? '<p class="note" role="status">' + escape(notice) + "</p>" : "")
     + '<p class="error" role="alert">' + escape(error) + '</p>'
     + '<button class="primary"' + (busy ? " disabled" : "") + '>' + (busy ? "로그인 중…" : "로그인") + "</button>"
     + "</form>"
-    + '<div class="login-extra">' + button("demo-login", "데모 계정으로 시작하기", "outline")
-    + button("signup", "회원가입", "link") + "</div></main>";
+    + '<div class="login-links">' + button("signup", "회원가입", "link") + '<i aria-hidden="true"></i>' + button("demo-login", "데모 계정으로 둘러보기", "link") + "</div>"
+    // 간편 로그인은 자리만 잡아 둔다. 아직 연결 전이라 누르면 준비 중 안내만 한다
+    + '<section class="login-social" aria-label="간편 로그인"><p class="login-or">간편 로그인</p><div>'
+    + '<button type="button" data-action="social-soon">' + socialLogo.google + "Google</button>"
+    + '<button type="button" data-action="social-soon">' + socialLogo.naver + "네이버</button></div>"
+    + '<p class="note" role="status" data-social-note></p></section></main>';
 }
 
 function startTransfer(source, draft, from = currentPage()) {
@@ -535,6 +550,7 @@ app.addEventListener("click", async (event) => {
       app.querySelector('[name="login_id"]').value = "demo";
       app.querySelector('[name="password"]').value = "demo-password-1234";
       return app.querySelector('[name="password"]').form.requestSubmit();
+    case "social-soon": app.querySelector("[data-social-note]").textContent = "간편 로그인은 준비 중이에요. 지금은 아이디로 로그인해 주세요."; return;
     case "logout": apiLogout(); reset(); loginState = { error: "", notice: "", busy: false }; return go("login");
     case "reload": accountsError = ""; render(); return loadAccounts();
     case "more-tx": return loadTransactions(true);

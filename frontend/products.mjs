@@ -1,8 +1,7 @@
 import { api, idempotencyKey } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
-import { esc, header as uiHeader, pageTitle, stateBlock, carouselPager, icon, maskAccountNumber } from "./ui.mjs";
+import { esc, header as uiHeader, stateBlock, carouselPager, icon, maskAccountNumber } from "./ui.mjs";
 
-const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7" fill="none" stroke="#132844" stroke-width="3"/><path d="M10 29c4-3 9-5 14-6" fill="none" stroke="#b84039" stroke-width="3"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const icons = { CHECKING: icon("wallet"), DEPOSIT: icon("products"), SAVINGS: icon("pig") };
 
 // 서버 type 값 → 화면 분류. 대출은 개설할 수 없어 목록에서 뺀다.
@@ -29,9 +28,9 @@ const isOpen = (p) => p.type !== "LOAN";
 
 const link = (product, label, className = "") => `<a class="${className}" href="#product/${product.product_id}">${label}</a>`;
 const rateNote = (product) => '<p class="product-rate-note">' + (Number(product.max_preferential_rate) ? "우대조건 충족 시 · " : "") + "세전</p>";
-const header = (detail) => uiHeader({ brandHtml: detail
-  ? `<a class="product-back" href="#products" aria-label="상품 목록으로 돌아가기">${icon("back")}<span>상품 상세</span></a>`
-  : '<span class="brand">' + shield + "캡아메리카뱅크</span>" });
+const header = (detail) => detail
+  ? uiHeader({ brandHtml: `<a class="product-back" href="#products" aria-label="상품 목록으로 돌아가기">${icon("back")}<span>상품 상세</span></a>` })
+  : uiHeader({ title: "상품", heading: true });
 
 function rateBlock(product) {
   const bonus = Number(product.max_preferential_rate) > 0;
@@ -73,12 +72,12 @@ export function listView(products, kind = "all") {
   if (!Object.hasOwn(kinds, kind)) kind = "all";
   const visible = products.filter((p) => isOpen(p) && (kind === "all" || p.type === kind));
   const banners = bannerCarousel(visible);
-  return header(false) + `<main><p class="product-eyebrow">상품</p>${pageTitle("목표를 담는 상품")}
+  return header(false) + `<main>
     <div class="segments product-filters" role="group" aria-label="상품 종류">${Object.entries(kinds).map(([value, label]) =>
       `<button type="button" data-product-filter="${value}" aria-pressed="${value === kind}">${label}</button>`).join("")}</div>
     ${banners}
-    <div aria-live="polite" class="product-results"><p class="product-count">${kinds[kind]} 상품 ${visible.length}개</p>
-    <section class="product-section"><h2>${banners ? "함께 살펴보세요" : kinds[kind] + " 상품"}</h2>
+    <div aria-live="polite" class="product-results">
+    <section class="product-section"><h2>${kinds[kind]} 상품 ${visible.length}개</h2>
     ${visible.length ? `<ul class="product-list">${visible.map(row).join("")}</ul>` : stateBlock("empty", { message: "이 분류에는 가입할 수 있는 상품이 없어요." })}</section></div>
     <p class="product-footer-note">최고금리는 우대조건 모두 충족 시 · 세전<br>가입 시 적용 가능한 우대는 상품 상세에서 확인해 주세요.</p></main>`;
 }
@@ -130,8 +129,8 @@ const doneView = (title, lines) => header(true) + `<main><p class="success-mark"
   <section class="card">${lines.map((line) => `<p>${esc(line)}</p>`).join("")}</section>
   <a href="#home" class="primary product-cta">홈에서 확인하기</a><a href="#products" class="product-more">다른 상품 살펴보기</a></main>`;
 
-const errorView = (message) => header(false) + `<main>${pageTitle("상품")}${stateBlock("error", { message, retryAction: "retry" }).replace('data-action="retry"', 'data-product-retry')}</main>`;
-const loadingView = (detail) => header(detail) + `<main>${pageTitle("상품")}${stateBlock("loading")}</main>`;
+const errorView = (message) => header(false) + `<main>${stateBlock("error", { message, retryAction: "retry" }).replace('data-action="retry"', 'data-product-retry')}</main>`;
+const loadingView = (detail) => header(detail) + `<main>${stateBlock("loading")}</main>`;
 const message = (e) => e?.message ?? "요청을 처리하지 못했어요.";
 
 let kind = "all"; // 목록·상세를 오가도 분류를 유지한다

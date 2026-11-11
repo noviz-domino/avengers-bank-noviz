@@ -11,13 +11,14 @@
 .menu-group summary::-webkit-details-marker { display: none; }
 .menu-group[open] summary > .ui-icon { transform: rotate(180deg); }
 .menu-group-body > * { margin-top: var(--ui-space-md); }
-.menu-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.menu-shortcuts .ui-button { justify-content: flex-start; white-space: normal; text-align: left; }
+.menu-shortcuts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--ui-space-sm); }
+.menu-shortcuts button { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 72px; padding: 8px 2px; border: 0; border-radius: var(--ui-radius-sm); background: var(--ui-surface); color: var(--ui-navy); font-size: var(--ui-small-size); font-weight: 700; word-break: keep-all; }
+.menu-shortcuts .ui-icon { color: var(--ui-blue); }
+.menu-logout { display: flex; align-items: center; justify-content: center; gap: var(--ui-space-sm); width: 100%; min-height: 48px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius-sm); background: var(--ui-white); color: var(--ui-muted); font-weight: 700; }
+.menu-logout .ui-icon { width: 20px; height: 20px; flex-basis: 20px; }
+.menu-version { text-align: center; }
 .ext-menu [aria-invalid="true"], .ext-form [aria-invalid="true"] { border-color: var(--ui-error); }
 .ext-menu form .primary { margin-top: 14px; }
-.menu-list { padding: 4px 16px; }
-.menu-list button { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 48px; border: 0; background: transparent; text-align: left; }
-.menu-list button + button { border-top: 1px solid var(--line); }
 .ext-search .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .ext-search form > label:first-child { margin-top: 0; }
 .ext-search .two label + label { margin-top: 0; }

@@ -8,15 +8,17 @@
 
 이 폴더에는 선택하지 않은 안과 중간 수정본까지 생성 순서대로 **43개 PNG**를 보관했습니다. 파일 번호는 시안 선택 번호가 아닙니다. 원본 생성 ID와 SHA-256은 [manifest.json](manifest.json), 전체 과정은 [README.md](README.md)에 있습니다. `references/`는 공식 사이트에서 받은 참고 이미지로 생성 시안 43개와 별도입니다.
 
+> **2026-11-11 갱신:** 실제 구현 화면은 [implemented/](implemented/README.md)에 버전별로 캡처해 둡니다. 여백 줄이기·AI 상담 채팅형·로그인 다시 디자인(v2, [ADR 0027](../decisions/0027-compact-layout-chat-login.md))으로 아래 표의 AI 상담·전체 메뉴·카드 머리글은 시안과 달라졌습니다. 최신 기준은 v2 캡처입니다.
+
 ## 최신 선택과 기준 이미지
 
 | 화면 | 선택 | 기준 이미지 | 이미지에 아직 반영되지 않은 결정 |
 |---|---|---|---|
 | 홈 | 초기 1번을 계속 수정한 최종 방향 | [14 홈](14-home-compact-privacy-latest.png) | **승인 대기 이체 안내 영역 삭제** |
 | 상품 | 1번 | [15 상품](15-products-option-1-selected.png) | 세부 금리 문구·조건·실제 모바일 간격 검토 |
-| AI 상담 | 3번 | [20 AI 상담](20-ai-chat-option-3-selected.png) | 계좌·거래 / 상품 안내 / 이체 예시를 모두 제공하는 방향 유지 |
+| AI 상담 | 3번 → **v2에서 채팅형으로 변경** | [v2 캡처](implemented/v2-2026-11-11-compact/05-ai-chat.jpg) (이전: [20 AI 상담](20-ai-chat-option-3-selected.png)) | 예시는 점선 말풍선으로 보여 주고 누르면 입력칸에 채움 |
 | 카드 | 1번 크게 보기 + 3번 목록 보기 | [21 크게 보기](21-cards-option-1.png), [23 목록 보기](23-cards-option-3.png) | 보기 방식 선택과 혜택 메뉴 추가를 후속 시안에 반영 |
-| 전체 메뉴 | 2번 | [25 전체 메뉴](25-all-menu-option-2.png) | 접기·펼치기, 보안·설정 메뉴의 실제 API 범위 검토 |
+| 전체 메뉴 | 2번 → **v2에서 아이콘 타일 + PIN 폼만 접기** | [v2 캡처](implemented/v2-2026-11-11-compact/08-menu.jpg) (이전: [25 전체 메뉴](25-all-menu-option-2.png)) | 은행 업무는 아이콘 4열로 펼쳐 둠 |
 | 계좌 화면 | 3번 | [29 계좌](29-account-detail-option-3.png) | 아래 별도 **계좌 정보** 진입은 제거하고 오른쪽 위 **관리**로 통합 |
 | 이체 받는 계좌 | 토스 참조 추가 1번, 이후 로고 축소 | [39 받는 계좌](39-transfer-recipient-small-logo.png) | 팀원 은행 연동 전에는 당행 계좌 대상 |
 | 이체 금액 입력 | 선택된 이체 흐름의 후속 화면 | [40 금액](40-transfer-amount-small-logo.png) | 입력 상태·잔액·한도 검증 필요 |

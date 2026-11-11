@@ -2,14 +2,15 @@
 // 이체 등은 에이전트가 승인 대기만 만들고, 사용자가 버튼 → 공통 PIN 창(approval.mjs)에서 직접 승인한다.
 import { api, accessToken, apiBase } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
-import { esc as escape, header, button, pageTitle, sectionHead, icon } from "./ui.mjs";
+import { esc as escape, header, icon } from "./ui.mjs";
 
-const questions = [
-  ["계좌·거래", "내 계좌 잔액 알려줘", "이번 달 카페에서 얼마 썼어?"],
-  ["카드", "내 카드 한도 얼마 남았어?", "카드 이용내역 보여줘"],
-  ["상품 안내", "스타크 적금 우대조건 알려줘", "예금과 적금은 어떻게 달라?"],
-  ["예산", "이번 달 얼마 더 쓸 수 있어?", "30만 원짜리 사도 돼?"],
-  ["이체", "생활비 통장에서 비상금 통장으로 1,000원 보내줘"],
+// 첫 화면에서 "이렇게 치면 된다"를 보여 주는 예시. 누르면 보내지 않고 입력칸에 채운다 (고쳐서 보낼 수 있게)
+const examples = [
+  "내 계좌 잔액 알려줘",
+  "이번 달 카페에서 얼마 썼어?",
+  "내 카드 한도 얼마 남았어?",
+  "스타크 적금 우대조건 알려줘",
+  "생활비 통장에서 비상금 통장으로 1,000원 보내줘",
 ];
 const RATE_LIMIT_MESSAGE = "요청이 많아요. 잠시 후 다시 물어봐 주세요.";
 const NETWORK_MESSAGE = "서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.";
@@ -166,40 +167,43 @@ async function approve(messageIndex, actionId) {
   draw();
 }
 
-function intro(shield) {
-  return '<section class="hero spread"><div><h2>무엇이 궁금하세요?</h2><p>은행 업무를 대화로 간편하게</p></div>'
-    + '<span class="chat-art">' + shield + '</span></section><section><h2>이런 질문을 할 수 있어요</h2>'
-    + questions.map(([group, ...examples]) => '<div class="question-group">' + sectionHead({ title: group, icon: group === '상품 안내' ? 'pig' : group === '카드' ? 'cards' : 'wallet', tone: group === '상품 안내' ? 'sage' : 'blue' })
-      + examples.map((q) => '<button type="button" data-chat-question="' + escape(q) + '"><span>' + escape(q) + '</span>' + icon('chevron') + '</button>').join("") + "</div>").join("") + "</section>";
-}
+const GREETING = "안녕하세요, 캡아메리카뱅크 AI 상담이에요.\n계좌·카드·상품·예산을 말하듯이 물어보세요. 이체는 내용을 확인한 뒤 PIN으로 직접 승인해요.";
 
 /** 상담 화면을 root에 그린다. 하단 메뉴는 app.mjs가 붙인다. 정리 함수를 돌려준다 */
 export function mountChat(root, { shield = "" } = {}) {
-  root.innerHTML = header({ title: 'AI 상담', back: 'home', rightHtml: button('새 대화', { className: 'chat-new' }).replace('type="button"', 'type="button" data-chat-new') })
-    + '<main class="chat">' + pageTitle('AI 상담') + '<div class="chat-feed" aria-live="polite"></div>'
-    + '<form class="composer" data-form="chat"><p class="note">이체는 확인 후 별도 창에서 PIN으로 승인해요.</p>'
-    + '<div><input name="question" aria-label="질문" placeholder="궁금한 내용을 입력하세요" maxlength="1000" required>'
-    + '<button class="ui-button ui-button--primary primary" aria-label="보내기">↑</button></div></form></main>';
+  root.innerHTML = header({ title: "AI 상담", heading: true, rightHtml: '<button type="button" class="ui-button ui-button--quiet" data-chat-new>' + icon("plus") + "새 대화</button>" })
+    + '<main class="chat"><div class="chat-feed" aria-live="polite"></div>'
+    + '<form class="composer" data-form="chat"><div><input name="question" aria-label="질문" placeholder="예: 이번 달 카페에서 얼마 썼어?" maxlength="1000" autocomplete="off" required>'
+    + '<button class="ui-button ui-button--primary primary" aria-label="보내기">' + icon("send") + "</button></div></form></main>";
   const feed = root.querySelector(".chat-feed");
   const send = root.querySelector(".composer .primary");
   const input = root.querySelector("input");
+  const newChat = root.querySelector("[data-chat-new]");
   let alive = true;
+  // AI 말풍선은 방패 아바타와 한 줄, 내 말풍선은 오른쪽
+  const avatar = '<span class="chat-avatar">' + shield + "</span>";
+  const fromAi = (inner) => '<div class="chat-row">' + avatar + '<article class="bubble assistant"><span class="ui-sr-only">AI 상담</span>' + inner + "</article></div>";
+  const bubble = (item, i) => item.role === "user"
+    ? '<article class="bubble user"><span class="ui-sr-only">나</span><p>' + escape(item.text) + "</p></article>"
+    : fromAi("<p>" + escape(plain(item.text)) + "</p>" + (item.actions ?? []).map((a) => '<div class="chat-action"><small>' + escape(a.summary)
+      + '</small><button type="button" class="ui-button ui-button--outline" data-chat-approve="' + i + '" data-action-id="' + escape(a.id) + '"' + (a.busy ? " disabled" : "") + ">이체 확인하기</button></div>").join(""));
+  const intro = () => fromAi("<p>" + escape(GREETING) + "</p>")
+    + '<p class="chat-hint">이렇게 입력해 보세요. 누르면 입력칸에 들어가요.</p>'
+    + examples.map((q) => '<button type="button" class="bubble user chat-example" data-chat-question="' + escape(q) + '">' + escape(q) + "</button>").join("");
   draw = () => {
     if (!alive) return;
-    feed.innerHTML = (messages.length ? messages.map((item, i) =>
-      '<article class="bubble ' + item.role + '"><small>' + (item.role === "user" ? "나" : "AI 상담") + "</small><p>" + escape(plain(item.text)) + "</p>"
-      + (item.actions ?? []).map((a) => "<small>" + escape(a.summary) + '</small><button type="button" class="outline" data-chat-approve="' + i + '" data-action-id="' + escape(a.id) + '"'
-        + (a.busy ? " disabled" : "") + ">이체 확인하기</button>").join("") + "</article>").join("") : intro(shield))
-      + (responding ? '<p class="status" role="status">' + escape(progress) + "</p>" : "");
+    feed.innerHTML = (messages.length ? messages.map(bubble).join("") : intro())
+      + (responding ? '<div class="chat-row">' + avatar + '<p class="bubble assistant status" role="status">' + escape(progress) + '<span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span></p></div>' : "");
     send.disabled = responding;
+    newChat.hidden = !messages.length;
     if (messages.length) feed.lastElementChild?.scrollIntoView({ block: "nearest" });
   };
   const onClick = (event) => {
     const el = event.target.closest("button");
     if (!el) return;
-    if (el.dataset.chatQuestion) ask(el.dataset.chatQuestion);
+    if (el.dataset.chatQuestion) { input.value = el.dataset.chatQuestion; input.focus(); }
     else if (el.dataset.chatApprove) approve(Number(el.dataset.chatApprove), el.dataset.actionId);
-    else if ("chatNew" in el.dataset) { resetChat(); draw(); }
+    else if ("chatNew" in el.dataset) { resetChat(); draw(); input.focus(); }
   };
   const onSubmit = (event) => {
     event.preventDefault();

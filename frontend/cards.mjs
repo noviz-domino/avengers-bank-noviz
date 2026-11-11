@@ -1,6 +1,6 @@
 import { api, idempotencyKey } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
-import { esc as escape, header, pageTitle, stateBlock, restoreFocus, maskAccountNumber } from "./ui.mjs";
+import { esc as escape, header, stateBlock, restoreFocus, maskAccountNumber, iconToggle, icon as uiIcon } from "./ui.mjs";
 
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff8e9" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const icons = {
@@ -13,6 +13,8 @@ const icons = {
 };
 const icon = (name) => `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
 const won = (amount) => `${Number(amount ?? 0).toLocaleString("ko-KR")}원`;
+const typeText = (card) => card.card_type === "DEBIT" ? "체크" : "신용";
+const titles = { history: "이용내역", benefits: "카드 혜택", limit: "한도 확인", manage: "카드 관리", issue: "카드 발급" };
 const statusText = (card) => ({ ACTIVE: "사용 중", SUSPENDED: "일시정지", LOST: "분실 신고" }[card.status] ?? card.status);
 const button = (action, label, className = "quiet", extra = "") => `<button type="button" class="${className}${["primary", "outline", "quiet"].includes(className) ? ` ui-button ui-button--${className}` : ""}" data-card-action="${action}" ${extra}>${label}</button>`;
 
@@ -101,15 +103,12 @@ export function mountCards(root, { embedded = false } = {}) {
   }
 
   function selection(card) {
-    const picker = `<div class="cards-view" role="group" aria-label="카드 보기 방식">
-      ${button("view-large", "▣ 크게 보기", "", `aria-pressed="${view === "large"}"`)}
-      ${button("view-list", "☷ 목록 보기", "", `aria-pressed="${view === "list"}"`)}</div>`;
-    if (view === "list") return `${picker}<section aria-label="보유 카드"><h2>보유 카드 ${cards.length}장</h2><div class="cards-list">${cards.map((item) => button(`select-${item.card_id}`,
+    if (view === "list") return `<section aria-label="보유 카드"><h2>보유 카드 ${cards.length}장</h2><div class="cards-list">${cards.map((item) => button(`select-${item.card_id}`,
       `${artwork(item, true)}<span class="cards-list-info"><strong>${escape(cardName(item))}</strong><span>•••• ${escape(last4(item))}</span><small class="cards-status ${item.status === "ACTIVE" ? "" : "cards-status-alert"}">${statusText(item)}</small></span><span class="cards-check" aria-hidden="true">${item.card_id === card.card_id ? "✓" : "›"}</span>`,
       "cards-list-item", `aria-pressed="${item.card_id === card.card_id}" aria-label="${escape(cardName(item))} 끝 네 자리 ${escape(last4(item))}, ${statusText(item)}"`)).join("")}</div></section>`;
-    return `${picker}<section aria-label="보유 카드"><div class="spread"><h2>내 카드 한 장</h2><span class="note">${cards.findIndex((item) => item.card_id === card.card_id) + 1} / ${cards.length}</span></div>
-      <div class="cards-type" role="group" aria-label="카드 선택">${cards.map((item) => button(`select-${item.card_id}`, `${item.card_type === "DEBIT" ? "체크" : "신용"} ${escape(last4(item))}`, "", `aria-pressed="${item.card_id === card.card_id}"`)).join("")}</div>
-      ${artwork(card)}<div class="cards-selected"><strong>${escape(cardName(card))}</strong><span>•••• ${escape(last4(card))} <span class="cards-status ${card.status === "ACTIVE" ? "" : "cards-status-alert"}">${statusText(card)}</span></span></div></section>`;
+    // 카드가 한 장이면 고를 것이 없으니 선택 줄을 그리지 않는다. 이름은 카드 그림에 이미 있다
+    return `<section aria-label="보유 카드">${cards.length > 1 ? `<div class="cards-type" role="group" aria-label="카드 선택">${cards.map((item) => button(`select-${item.card_id}`, `${typeText(item)} ${escape(last4(item))}`, "", `aria-pressed="${item.card_id === card.card_id}"`)).join("")}</div>` : ""}
+      ${artwork(card)}<div class="cards-selected"><span>${typeText(card)}카드 •••• ${escape(last4(card))}</span><span class="cards-status ${card.status === "ACTIVE" ? "" : "cards-status-alert"}">${statusText(card)}</span></div></section>`;
   }
 
   function summary(card) {
@@ -132,20 +131,20 @@ export function mountCards(root, { embedded = false } = {}) {
   function overview(card) {
     return `${selection(card)}${summary(card)}<nav class="cards-actions" aria-label="선택 카드 메뉴">
       ${[["history", "이용내역"], ["benefits", "카드 혜택"], ["manage", "카드 관리"]].map(([action, label]) => button(action, `${icon(action)}<span>${label}</span>`, "")).join("")}</nav>
-      <section><div class="spread"><h2>최근 이용내역</h2>${button("history", "전체보기 ›")}</div>
+      <section><h2>최근 이용내역</h2>
       ${cardData(card, (data) => transactionRows(monthTransactions(data.transactions).slice(0, 3)))}</section>`;
   }
 
   function detail(card) {
     const product = productOf(card);
-    if (page === "history") return `${pageTitle("이용내역")}<p class="note">${kstMonth().replace("-", "년 ")}월 · ${escape(cardName(card))}</p>${summary(card)}
+    if (page === "history") return `<p class="note">${kstMonth().replace("-", "년 ")}월 · ${escape(cardName(card))}</p>${summary(card)}
       ${cardData(card, (data) => transactionRows(monthTransactions(data.transactions)))}`;
-    if (page === "benefits") return `${pageTitle("카드 혜택")}<p class="note">${escape(cardName(card))}</p><section class="cards-summary"><h2>상품 혜택 안내</h2><p>${escape(product?.benefits ?? "혜택 안내를 불러오지 못했어요.")}</p></section>
+    if (page === "benefits") return `<p class="note">${escape(cardName(card))}</p><section class="cards-summary"><h2>상품 혜택 안내</h2><p>${escape(product?.benefits ?? "혜택 안내를 불러오지 못했어요.")}</p></section>
       ${product ? `<dl><dt>연회비</dt><dd>${won(product.annual_fee)}</dd></dl>` : ""}<p class="note">실제 할인액·남은 혜택 집계는 제공하지 않아요. 세부 적용 조건은 상품 약관 확인이 필요해요.</p>`;
-    if (page === "limit") return `${pageTitle("한도 확인")}<p class="note">${escape(cardName(card))}</p>
+    if (page === "limit") return `<p class="note">${escape(cardName(card))}</p>
       ${cardData(card, ({ limits, transactions }) => `<section class="cards-summary"><dl><dt>1일 이용 한도</dt><dd>${won(limits.daily_limit)}</dd><dt>오늘 사용액</dt><dd>${won(limits.daily_used)}</dd>${card.card_type === "CREDIT" ? `<dt>신용 한도</dt><dd>${won(limits.credit_limit)}</dd><dt>신용 미결제 사용액</dt><dd>${won(limits.credit_used)}</dd><dt>신용 잔여 한도</dt><dd>${won(limits.credit_limit - limits.credit_used)}</dd>` : ""}</dl></section>
       <p class="note">월 이용금액은 ${won(monthTotal(transactions))}이에요. ${card.card_type === "CREDIT" ? "신용 미결제 사용액은 지난달 사용액도 포함할 수 있어 월 이용금액과 달라요. 신용 잔여 한도는 오늘 결제 가능한 금액과 달라요." : "체크카드 결제는 연결 계좌 잔액과 오늘 사용한 금액에 따라서도 제한돼요."} 한도 변경은 제공하지 않아요.</p>`)}`;
-    return `${pageTitle("카드 관리")}<p class="note">${escape(cardName(card))} · •••• ${escape(last4(card))}</p><section class="cards-summary"><dl><dt>카드 상태</dt><dd>${statusText(card)}</dd><dt>연결 계좌</dt><dd>${accountLabel(card.linked_account_id)}</dd>${card.card_type === "CREDIT" ? `<dt>대금 결제일</dt><dd>매월 ${card.payment_day}일</dd>` : ""}</dl></section>
+    return `<p class="note">${escape(cardName(card))} · •••• ${escape(last4(card))}</p><section class="cards-summary"><dl><dt>카드 상태</dt><dd>${statusText(card)}</dd><dt>연결 계좌</dt><dd>${accountLabel(card.linked_account_id)}</dd>${card.card_type === "CREDIT" ? `<dt>대금 결제일</dt><dd>매월 ${card.payment_day}일</dd>` : ""}</dl></section>
       ${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}
       ${button("limit", '한도 확인 <span aria-hidden="true">›</span>', "cards-manage-row")}
       ${card.status === "SUSPENDED" ? button("unsuspend", "정지 해제 (PIN 승인)", "cards-manage-row", busy ? "disabled" : "") : button("suspend", "일시정지", "cards-manage-row", card.status !== "ACTIVE" || busy ? "disabled" : "")}
@@ -156,7 +155,7 @@ export function mountCards(root, { embedded = false } = {}) {
   function issueForm() {
     const checking = accounts.filter((account) => account.account_type === "CHECKING" && account.status === "ACTIVE");
     if (error) return "";
-    return `${pageTitle("카드 발급")}<form class="cards-issue" data-form="issue">
+    return `<form class="cards-issue" data-form="issue">
       <fieldset><legend>카드 상품</legend>${products.map((product, index) => `<label class="cards-issue-option"><input type="radio" name="product_id" value="${product.product_id}" data-type="${escape(product.type)}" ${index === 0 ? "checked" : ""}>
         <span><strong>${escape(product.name)}</strong><small>${product.type === "CREDIT" ? "신용" : "체크"} · 연회비 ${won(product.annual_fee)}<br>${escape(product.benefits)}</small></span></label>`).join("") || '<p class="empty">발급 가능한 카드 상품이 없어요.</p>'}</fieldset>
       <label>연결할 입출금 계좌<select name="linked_account_id" required>${checking.map((account) => `<option value="${account.account_id}">${escape(account.nickname || account.product_name)} · ${escape(account.account_num)}</option>`).join("")}</select></label>
@@ -166,12 +165,12 @@ export function mountCards(root, { embedded = false } = {}) {
   }
 
   function body() {
-    if (loading) return `<main>${pageTitle("카드")}${stateBlock("loading", { message: "카드를 불러오는 중이에요." })}</main>`;
-    if (error) return `<main>${pageTitle("카드")}${stateBlock("error", { message: error, retryAction: "reload" }).replace('data-action=', 'data-card-action=')}</main>`;
+    if (loading) return `<main>${stateBlock("loading", { message: "카드를 불러오는 중이에요." })}</main>`;
+    if (error) return `<main>${stateBlock("error", { message: error, retryAction: "reload" }).replace('data-action=', 'data-card-action=')}</main>`;
     if (page === "issue") return `<main>${issueForm()}</main>`;
     const card = selected();
-    if (!card) return `<main>${pageTitle("카드")}${stateBlock("empty", { message: "아직 발급받은 카드가 없어요." })}${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${button("issue", "카드 발급받기", "primary")}</main>`;
-    return `<main>${page === "overview" ? `<div class="spread">${pageTitle("카드")}${button("issue", "+ 카드 발급", "quiet")}</div>${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${overview(card)}` : detail(card)}</main>`;
+    if (!card) return `<main>${stateBlock("empty", { message: "아직 발급받은 카드가 없어요." })}${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${button("issue", "카드 발급받기", "primary")}</main>`;
+    return `<main>${page === "overview" ? `${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${overview(card)}` : detail(card)}</main>`;
   }
 
   function render() {
@@ -179,7 +178,10 @@ export function mountCards(root, { embedded = false } = {}) {
     const activeAction = root.contains(root.ownerDocument.activeElement) ? root.ownerDocument.activeElement.dataset.cardAction : undefined;
     const card = selected();
     const back = page === "limit" ? "manage" : "overview";
-    root.innerHTML = `${header(page === "overview" || (!card && page !== "issue") ? { brandHtml: `<span class="brand">${shield}캡아메리카뱅크</span>` } : { title: "내 카드", back }).replace('data-action=', 'data-card-action=')}
+    const tools = card && !loading && !error && page === "overview"
+      ? iconToggle([["large", "single", "카드 크게 보기"], ["list", "list", "카드 목록으로 보기"]], { label: "카드 보기 방식", current: view, prefix: "view-", attr: "data-card-action" })
+        + button("issue", uiIcon("plus") + "발급", "quiet") : "";
+    root.innerHTML = `${header(page === "overview" || (!card && page !== "issue") ? { title: "카드", heading: true, rightHtml: tools } : { title: titles[page], heading: true, back }).replace('data-action=', 'data-card-action=')}
       ${body()}
       <dialog class="cards-dialog" aria-labelledby="cards-confirm-title">${confirmStatus && card ? `<h2 id="cards-confirm-title">${confirmStatus === "LOST" ? "분실 신고할까요?" : "일시정지할까요?"}</h2><p>${escape(cardName(card))} · •••• ${escape(last4(card))}</p><p class="note">${confirmStatus === "LOST" ? "분실 신고 후에는 다시 사용할 수 없어요. 되돌릴 수 없고 새 카드를 발급받아야 해요." : "카드 사용을 잠시 멈춰요. 정지 해제는 PIN 승인이 필요해요."}</p><div class="cards-dialog-actions">${button("cancel", "취소", "outline")}${button("confirm", confirmStatus === "LOST" ? "분실 신고" : "일시정지", "primary")}</div>` : ""}</dialog>`;
     focus();

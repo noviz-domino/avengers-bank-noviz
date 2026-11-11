@@ -28,7 +28,7 @@ const rowHtml = (t) => '<li><div><strong>' + esc(t.counterparty_name || t.memo |
 
 /** ctx: { go } */
 export function mountSearch(container, ctx) {
-  container.innerHTML = topbar("거래내역 검색", "to-menu") + '<main class="ext-search"><h1 class="ui-page-title">거래내역 검색</h1><form id="search-form" novalidate>'
+  container.innerHTML = topbar("거래내역 검색", "to-menu", true) + '<main class="ext-search"><form id="search-form" novalidate>'
     + '<label>검색어<input name="keyword" maxlength="50" placeholder="메모·상대방 이름"></label>'
     + '<div class="two"><label>시작일<input name="from_date" type="date"></label><label>종료일<input name="to_date" type="date"></label></div>'
     + '<div class="two"><label>구분<select name="direction"><option value="">전체</option><option value="IN">입금</option><option value="OUT">출금</option></select></label>'
