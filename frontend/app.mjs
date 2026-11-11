@@ -1,13 +1,13 @@
 import { mountChat, resetChat } from "./chat.mjs";
 import { ApiError, api, idempotencyKey, isSignedIn, login as apiLogin, logout as apiLogout, onExpired } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
-import { accountName, kindOf, money, normalizeAccountNum, parseAmount, shortDate, txLabel } from "./format.mjs";
+import { accountName, accountType, kindOf, longDate, money, normalizeAccountNum, parseAmount, recipientName, shortDate, txLabel } from "./format.mjs";
 import { mountCards } from "./cards.mjs";
 import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
 import { mountSearch } from "./search.mjs";
-import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus } from "./ui.mjs";
+import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, pageTitle, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus } from "./ui.mjs";
 
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
@@ -116,17 +116,25 @@ function reset() {
   transfer = undefined;
 }
 
-function header(title, back = "", right = "") {
-  return '<header class="topbar"><div>' + (back ? button(back, "←", "back") : "") + title
-    + '</div><div>' + right + "</div></header>";
-}
+// 계좌·이체 화면의 정보 행. 값은 이미 이스케이프했거나 부품으로 만든 HTML만 넘긴다
+const infoRows = (rows) => '<dl class="info-rows">' + rows.filter(Boolean).map(([term, valueHtml]) =>
+  "<div><dt>" + term + "</dt><dd>" + valueHtml + "</dd></div>").join("") + "</dl>";
+const accountLines = (account) => "<strong>" + escape(accountName(account)) + "</strong><small>" + maskAccountNumber(account.account_num) + "</small>";
+// 받는 은행은 이체 상단이 아니라 은행명 옆에만 작은 로고로 보여 준다
+const bankLine = (number = "") => '<p class="bank-line"><span class="mini-logo">' + shield + "캡아메리카뱅크</span>"
+  + (number ? "<small>" + escape(number) + "</small>" : "") + "</p>";
 
+// 날짜가 바뀔 때마다 날짜 줄을 넣고, 금액 아래에 거래 후 잔액을 둔다
 function transactions(rows) {
-  if (!rows.length) return '<p class="empty">표시할 거래가 없어요.</p>';
-  return '<ul class="rows">' + rows.map((tx) =>
-    '<li><div><strong>' + escape(txLabel(tx)) + '</strong><small>' + shortDate(tx.created_at) + " · " + escape(tx.category ?? "미분류")
-    + '</small></div><strong class="' + (tx.amount > 0 ? "credit" : "") + '">'
-    + (tx.amount > 0 ? "+" : "−") + money(Math.abs(tx.amount)) + "</strong></li>").join("") + "</ul>";
+  if (!rows.length) return stateBlock("empty", { message: "표시할 거래가 없어요." });
+  let day;
+  return '<ul class="tx-list">' + rows.map((tx) => {
+    const date = shortDate(tx.created_at);
+    const head = date === day ? "" : '<li class="tx-date">' + date + "</li>";
+    day = date;
+    return head + listRow({ title: txLabel(tx), subtitle: tx.category ?? "미분류", amount: (tx.amount > 0 ? "+" : "−") + money(Math.abs(tx.amount)),
+      credit: tx.amount > 0, buttonHtml: "<small>" + (privateBalance ? hidden : money(tx.balance_after)) + "</small>" });
+  }).join("") + "</ul>";
 }
 
 function campaignContent() {
