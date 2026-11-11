@@ -12,3 +12,10 @@
 {"q": "카드 한도랑 내 잔액 알려줘", "expected": [["card", "account"], ["account", "card"]]}
 {"q": "안녕", "expected": [[]]}
 {"q": "고마워!", "expected": [[]]}
+{"q": "이번 달 얼마 더 쓸 수 있어?", "expected": [["budget"]]}
+{"q": "30만 원짜리 사도 돼?", "expected": [["budget"]]}
+{"q": "오늘 하루에 얼마까지 써도 돼?", "expected": [["budget"]]}
+{"q": "목표 저축 잘 지키고 있어?", "expected": [["budget"]]}
+{"q": "잔액이랑 이번 달 예산 알려줘", "expected": [["account", "budget"], ["budget", "account"]]}
+{"q": "이번 달 식비 얼마 썼어?", "expected": [["account"]]}
+{"q": "예산 관리는 어떻게 신청해?", "expected": [["budget"], ["product"]]}

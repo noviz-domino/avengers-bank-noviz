@@ -18,7 +18,7 @@ pytestmark = pytest.mark.anyio
 VERSIONS = Path(__file__).parent.parent / "alembic" / "versions"
 # CHECK를 만드는 마이그레이션. 새로 만들면 여기에 추가한다
 CHECK_MIGRATIONS = [
-    "c3d9e1a47b20", "d81f4b6c2e90", "f2b8d4e6a913", "b6e1f3a8c442", "c4f8a2d6e1b7", "d7b3e5f9a2c1", "0910c4d93eb1",
+    "c3d9e1a47b20", "d81f4b6c2e90", "f2b8d4e6a913", "b6e1f3a8c442", "c4f8a2d6e1b7", "d7b3e5f9a2c1", "0910c4d93eb1", "d9fc087bbcd1", "a61d9e72b4c8",
 ]
 
 
@@ -74,6 +74,28 @@ def test_migration_creates_every_check():
         )
         missing = [n for n in migration.CHECKS if not created(n)]
         assert not missing, (revision, missing)
+
+
+def test_budget_goal_migration_rejects_partial_null_goals():
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import create_engine, text
+
+    migration = load_migration("a61d9e72b4c8")
+    with create_engine("sqlite://").begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE budget_profiles (goal_name TEXT, goal_target_amount INTEGER, "
+            "goal_months INTEGER, goal_monthly_amount INTEGER, "
+            f"CONSTRAINT ck_budget_profiles_goal CHECK ({migration.OLD_CHECK}))"
+        ))
+        conn.execute(text("INSERT INTO budget_profiles VALUES ('goal', 600, 6, 100)"))
+        with Operations.context(MigrationContext.configure(conn)):
+            migration.upgrade()
+        for column in ("goal_name", "goal_target_amount", "goal_months", "goal_monthly_amount"):
+            with pytest.raises(IntegrityError):
+                conn.execute(text(f"UPDATE budget_profiles SET {column} = NULL"))
+        conn.execute(text("UPDATE budget_profiles SET goal_name = NULL, goal_target_amount = NULL, "
+                          "goal_months = NULL, goal_monthly_amount = NULL"))
 
 
 async def seed(db) -> None:

@@ -41,6 +41,7 @@
 | `esc(value)` | `null`·`undefined`는 빈 문자열, HTML 특수문자 5개를 이스케이프해요 |
 | `icon(name)` | 장식용 인라인 SVG. `back`, `arrow`, `chevron`, `down`, `wallet`, `pig`, `clock`, `home`, `products`, `chat`, `cards`, `menu`, `eye`, `eyeOff`, `pause`, `play` |
 | `button(label, {action, variant='quiet', icon, ariaLabel, pressed, className=''})` | `primary` / `outline` / `quiet` / `pill`. 아이콘만 있는 버튼은 `ariaLabel` 필수예요 |
+| `carouselPager(page, count, {previous, next})` | 홈·상품 배너 공용 넘김 표시. 이전·다음 액션과 현재 페이지를 표시해요 |
 | `header({title='', brandHtml='', back, rightHtml=''})` | 64px 머리글. `back`은 뒤로 가기 버튼의 액션, 버튼은 44×44px이에요 |
 | `pageTitle(title)` | 26px `h1`, 긴 제목을 어절 단위로 줄바꿈해요 |
 | `sectionHead({title, count, total='', icon, tone='blue', action, expanded, controls, rightHtml=''})` | `blue` / `sage` / `amber`. 액션이 있으면 접기 버튼을 만들고 `aria-expanded`·`aria-controls`를 연결해요 |
@@ -95,6 +96,6 @@ focus();
 
 ## 배너 그림과 확인
 
-`assets/event-bank.webp`는 홈 14번을 참고해 기본 ImageGen 도구로 만든 투명 배경 그림이에요(원본 PNG 1.1MB → 480px WebP 25KB로 줄여 저장). 최종 프롬프트는 “배너 속 네이비 지붕·별 방패·돌기둥·세이지 덤불·금색 색종이 은행 그림만 추출, 글자·UI 제거, 투명 배경”이에요. 이벤트 문구·링크·페이지·재생 상태는 HTML로 표시해요. 새 혜택이나 알림 기능은 만들지 않았어요.
+홈 배너는 문구·배경·그림이 한 장에 담긴 WebP 파일이에요. 오픈 기념은 `assets/banner-opening.webp`, 신규가입은 `assets/banner-welcome.webp`를 같은 이름으로 교체하면 돼요. 두 이미지의 비율은 1989:791을 기준으로 맞춰요. 문구나 목적지가 바뀌면 `app.mjs`의 대체 텍스트나 링크도 함께 바꿔요. 페이지 넘김과 재생·정지는 이미지 위의 버튼으로 동작해요.
 
 `node --test frontend/*.test.mjs`와 `node tests/browser/run-integration.mjs`로 확인해요. 브라우저 점검은 실제 데모 DB에 1,000원 이체·별칭 변경과 복원을 수행해요. 390px·320px에서 전체보기·이체·숨김·접기·하단 탭과 긴 별칭의 가로 넘침을 추가로 확인해요.

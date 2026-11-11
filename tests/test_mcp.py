@@ -55,11 +55,13 @@ def as_user(monkeypatch, headers):
 
 async def test_tool_list_has_no_approval_payment_or_system():
     tools = {t.name: t for t in await mcp.list_tools()}
-    assert len(tools) == 16
+    assert len(tools) == 18
     assert not [n for n in tools if any(w in n for w in ("approve", "pin", "pay", "bill", "reindex", "refund"))]
     assert tools["get_my_accounts"].annotations.readOnlyHint is True
     assert tools["request_transfer"].annotations.destructiveHint is False  # 승인 대기만 만듦
     assert tools["close_account"].annotations.destructiveHint is True
+    assert tools["get_budget"].annotations.readOnlyHint is tools["check_budget"].annotations.readOnlyHint is True
+    assert not [n for n in tools if "budget" in n and n not in ("get_budget", "check_budget")]  # 신청·변경·해제는 사람이
 
 
 async def test_transfer_tool_only_creates_pending(bank, monkeypatch):
@@ -163,3 +165,54 @@ async def test_call_retries_once_after_401(monkeypatch):
     monkeypatch.setattr(api, "client", mock_client(lambda r: httpx.Response(502, text="<html>bad gateway</html>")))
     with pytest.raises(ToolError, match="연결할 수 없습니다"):  # JSON이 아닌 응답
         await tool("get_my_cards")
+
+
+class FakeBudget(httpx.AsyncBaseTransport):
+    """예산 REST(/budget*)만 정해 둔 응답으로, 나머지는 진짜 테스트 앱으로. 받은 요청을 seen에 남긴다.
+    shortcut: 예산 API가 다른 브랜치에서 만들어지는 중이라 계약대로 흉내 낸다. 합친 뒤에는 진짜 API로 바꿔도 된다"""
+
+    def __init__(self, budget: dict, check: dict | None = None):
+        self.budget, self.check, self.seen = budget, check, []
+        self.app = httpx.ASGITransport(app=app)
+
+    async def handle_async_request(self, request):
+        if not request.url.path.startswith("/budget"):
+            return await self.app.handle_async_request(request)
+        self.seen.append(request)
+        data = self.check if request.url.path == "/budget/check" else self.budget
+        return httpx.Response(200, json={"success": True, "message": None, "data": data})
+
+    def client(self):
+        return httpx.AsyncClient(transport=self, base_url="http://bank")
+
+
+async def test_budget_tools_call_rest_with_user_token(bank, monkeypatch):
+    client, tony, peter, src, dst = bank
+    fake = FakeBudget({"enrolled": False}, {"allowed": False, "free_to_spend": 100_000, "after": -200_000,
+                                             "shortage": 200_000, "always_allowed": False, "message": "예산을 넘어요"})
+    monkeypatch.setattr(api, "client", fake.client)
+    as_user(monkeypatch, tony)
+    assert (await tool("get_budget"))["data"] == {"enrolled": False}
+    assert (await tool("check_budget", amount=300_000, category="쇼핑"))["data"]["shortage"] == 200_000
+    assert (await tool("check_budget", amount=5_000))["data"]["allowed"] is False
+    assert [(r.method, r.url.path, dict(r.url.params)) for r in fake.seen] == [
+        ("GET", "/budget", {}), ("GET", "/budget/check", {"amount": "300000", "category": "쇼핑"}),
+        ("GET", "/budget/check", {"amount": "5000"})]  # 카테고리를 안 주면 보내지 않는다
+    assert {r.headers["authorization"] for r in fake.seen} == {tony["Authorization"]}  # 사용자 토큰으로만
+    with pytest.raises(ToolError):  # 0원·음수는 REST까지 가지 않는다
+        await tool("check_budget", amount=0)
+
+
+async def test_budget_tools_with_real_budget_api(bank, monkeypatch):
+    client, tony, peter, *_ = bank
+    as_user(monkeypatch, tony)
+    assert (await tool("get_budget"))["data"] == {"enrolled": False}
+    response = await client.post("/budget", headers=tony,
+                                 json={"monthly_income": 100_000, "payday": 1})
+    assert response.status_code == 201
+    summary = (await tool("get_budget"))["data"]
+    assert summary["free_to_spend"] == 100_000
+    check = (await tool("check_budget", amount=300_000, category="쇼핑"))["data"]
+    assert (check["allowed"], check["after"], check["shortage"]) == (False, -200_000, 200_000)
+    as_user(monkeypatch, peter)
+    assert (await tool("get_budget"))["data"] == {"enrolled": False}

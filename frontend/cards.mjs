@@ -1,5 +1,6 @@
 import { api, idempotencyKey } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
+import { esc as escape, header, pageTitle, stateBlock, restoreFocus, maskAccountNumber } from "./ui.mjs";
 
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff8e9" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const icons = {
@@ -11,10 +12,9 @@ const icons = {
   store: '<path d="M5 14v15h22V14M3 13l4-9h18l4 9M3 13q4 7 9 0 4 7 9 0 4 7 8 0M12 29V19h8v10"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]}</svg>`;
-const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
 const won = (amount) => `${Number(amount ?? 0).toLocaleString("ko-KR")}원`;
 const statusText = (card) => ({ ACTIVE: "사용 중", SUSPENDED: "일시정지", LOST: "분실 신고" }[card.status] ?? card.status);
-const button = (action, label, className = "quiet", extra = "") => `<button type="button" class="${className}" data-card-action="${action}" ${extra}>${label}</button>`;
+const button = (action, label, className = "quiet", extra = "") => `<button type="button" class="${className}${["primary", "outline", "quiet"].includes(className) ? ` ui-button ui-button--${className}` : ""}" data-card-action="${action}" ${extra}>${label}</button>`;
 
 // 순수 함수: 서버 값을 화면용으로 바꾼다 (테스트 대상)
 export const last4 = (card) => String(card.masked_card_num ?? "").slice(-4);
@@ -35,7 +35,7 @@ function artwork(card, miniature = false) {
 
 const txIcon = (tx) => /카페|커피/.test(tx.category) ? ["green", "cafe"] : /편의점/.test(tx.category) ? ["blue", "store"] : ["amber", "shop"];
 function transactionRows(transactions) {
-  if (!transactions.length) return '<p class="empty">이달 이용내역이 없어요.</p>';
+  if (!transactions.length) return stateBlock("empty", { message: "이달 이용내역이 없어요." });
   return `<ul class="rows cards-transactions">${transactions.map((tx) => {
     const [color, name] = txIcon(tx);
     const canceled = tx.status !== "APPROVED";
@@ -64,7 +64,7 @@ export function mountCards(root, { embedded = false } = {}) {
   const selected = () => cards.find((card) => card.card_id === selectedId);
   const accountLabel = (id) => {
     const account = accounts.find((item) => item.account_id === id);
-    return account ? `${escape(account.nickname || account.product_name)} · ${escape(account.account_num)}` : "연결 계좌";
+    return account ? `${escape(account.nickname || account.product_name)} · ${maskAccountNumber(account.account_num)}` : "연결 계좌";
   };
   const productOf = (card) => products.find((item) => item.name === card.product_name);
   const message = (e) => e?.message ?? "요청을 처리하지 못했어요.";
@@ -124,8 +124,8 @@ export function mountCards(root, { embedded = false } = {}) {
 
   const cardData = (card, render) => {
     const data = extra[card.card_id];
-    if (!data || data.loading) return '<p class="empty" role="status">불러오는 중이에요.</p>';
-    if (data.error) return `<p class="error" role="alert">${escape(data.error)}</p>${button("retry-card", "다시 불러오기", "outline")}`;
+    if (!data || data.loading) return stateBlock("loading");
+    if (data.error) return stateBlock("error", { message: data.error, retryAction: "retry-card" }).replace('data-action=', 'data-card-action=');
     return render(data);
   };
 
@@ -138,14 +138,14 @@ export function mountCards(root, { embedded = false } = {}) {
 
   function detail(card) {
     const product = productOf(card);
-    if (page === "history") return `<h1>이용내역</h1><p class="note">${kstMonth().replace("-", "년 ")}월 · ${escape(cardName(card))}</p>${summary(card)}
+    if (page === "history") return `${pageTitle("이용내역")}<p class="note">${kstMonth().replace("-", "년 ")}월 · ${escape(cardName(card))}</p>${summary(card)}
       ${cardData(card, (data) => transactionRows(monthTransactions(data.transactions)))}`;
-    if (page === "benefits") return `<h1>카드 혜택</h1><p class="note">${escape(cardName(card))}</p><section class="cards-summary"><h2>상품 혜택 안내</h2><p>${escape(product?.benefits ?? "혜택 안내를 불러오지 못했어요.")}</p></section>
+    if (page === "benefits") return `${pageTitle("카드 혜택")}<p class="note">${escape(cardName(card))}</p><section class="cards-summary"><h2>상품 혜택 안내</h2><p>${escape(product?.benefits ?? "혜택 안내를 불러오지 못했어요.")}</p></section>
       ${product ? `<dl><dt>연회비</dt><dd>${won(product.annual_fee)}</dd></dl>` : ""}<p class="note">실제 할인액·남은 혜택 집계는 제공하지 않아요. 세부 적용 조건은 상품 약관 확인이 필요해요.</p>`;
-    if (page === "limit") return `<h1>한도 확인</h1><p class="note">${escape(cardName(card))}</p>
+    if (page === "limit") return `${pageTitle("한도 확인")}<p class="note">${escape(cardName(card))}</p>
       ${cardData(card, ({ limits, transactions }) => `<section class="cards-summary"><dl><dt>1일 이용 한도</dt><dd>${won(limits.daily_limit)}</dd><dt>오늘 사용액</dt><dd>${won(limits.daily_used)}</dd>${card.card_type === "CREDIT" ? `<dt>신용 한도</dt><dd>${won(limits.credit_limit)}</dd><dt>신용 미결제 사용액</dt><dd>${won(limits.credit_used)}</dd><dt>신용 잔여 한도</dt><dd>${won(limits.credit_limit - limits.credit_used)}</dd>` : ""}</dl></section>
       <p class="note">월 이용금액은 ${won(monthTotal(transactions))}이에요. ${card.card_type === "CREDIT" ? "신용 미결제 사용액은 지난달 사용액도 포함할 수 있어 월 이용금액과 달라요. 신용 잔여 한도는 오늘 결제 가능한 금액과 달라요." : "체크카드 결제는 연결 계좌 잔액과 오늘 사용한 금액에 따라서도 제한돼요."} 한도 변경은 제공하지 않아요.</p>`)}`;
-    return `<h1>카드 관리</h1><p class="note">${escape(cardName(card))} · •••• ${escape(last4(card))}</p><section class="cards-summary"><dl><dt>카드 상태</dt><dd>${statusText(card)}</dd><dt>연결 계좌</dt><dd>${accountLabel(card.linked_account_id)}</dd>${card.card_type === "CREDIT" ? `<dt>대금 결제일</dt><dd>매월 ${card.payment_day}일</dd>` : ""}</dl></section>
+    return `${pageTitle("카드 관리")}<p class="note">${escape(cardName(card))} · •••• ${escape(last4(card))}</p><section class="cards-summary"><dl><dt>카드 상태</dt><dd>${statusText(card)}</dd><dt>연결 계좌</dt><dd>${accountLabel(card.linked_account_id)}</dd>${card.card_type === "CREDIT" ? `<dt>대금 결제일</dt><dd>매월 ${card.payment_day}일</dd>` : ""}</dl></section>
       ${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}
       ${button("limit", '한도 확인 <span aria-hidden="true">›</span>', "cards-manage-row")}
       ${card.status === "SUSPENDED" ? button("unsuspend", "정지 해제 (PIN 승인)", "cards-manage-row", busy ? "disabled" : "") : button("suspend", "일시정지", "cards-manage-row", card.status !== "ACTIVE" || busy ? "disabled" : "")}
@@ -156,7 +156,7 @@ export function mountCards(root, { embedded = false } = {}) {
   function issueForm() {
     const checking = accounts.filter((account) => account.account_type === "CHECKING" && account.status === "ACTIVE");
     if (error) return "";
-    return `<h1>카드 발급</h1><form class="cards-issue" data-form="issue">
+    return `${pageTitle("카드 발급")}<form class="cards-issue" data-form="issue">
       <fieldset><legend>카드 상품</legend>${products.map((product, index) => `<label class="cards-issue-option"><input type="radio" name="product_id" value="${product.product_id}" data-type="${escape(product.type)}" ${index === 0 ? "checked" : ""}>
         <span><strong>${escape(product.name)}</strong><small>${product.type === "CREDIT" ? "신용" : "체크"} · 연회비 ${won(product.annual_fee)}<br>${escape(product.benefits)}</small></span></label>`).join("") || '<p class="empty">발급 가능한 카드 상품이 없어요.</p>'}</fieldset>
       <label>연결할 입출금 계좌<select name="linked_account_id" required>${checking.map((account) => `<option value="${account.account_id}">${escape(account.nickname || account.product_name)} · ${escape(account.account_num)}</option>`).join("")}</select></label>
@@ -166,20 +166,24 @@ export function mountCards(root, { embedded = false } = {}) {
   }
 
   function body() {
-    if (loading) return '<main><p class="empty" role="status">카드를 불러오는 중이에요.</p></main>';
-    if (error) return `<main><h1>카드</h1><p class="error" role="alert">${escape(error)}</p>${button("reload", "다시 시도", "outline")}</main>`;
+    if (loading) return `<main>${pageTitle("카드")}${stateBlock("loading", { message: "카드를 불러오는 중이에요." })}</main>`;
+    if (error) return `<main>${pageTitle("카드")}${stateBlock("error", { message: error, retryAction: "reload" }).replace('data-action=', 'data-card-action=')}</main>`;
     if (page === "issue") return `<main>${issueForm()}</main>`;
     const card = selected();
-    if (!card) return `<main><h1>카드</h1><p class="empty">아직 발급받은 카드가 없어요.</p>${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${button("issue", "카드 발급받기", "primary")}</main>`;
-    return `<main>${page === "overview" ? `<div class="spread"><h1>카드</h1>${button("issue", "+ 카드 발급", "quiet")}</div>${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${overview(card)}` : detail(card)}</main>`;
+    if (!card) return `<main>${pageTitle("카드")}${stateBlock("empty", { message: "아직 발급받은 카드가 없어요." })}${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${button("issue", "카드 발급받기", "primary")}</main>`;
+    return `<main>${page === "overview" ? `<div class="spread">${pageTitle("카드")}${button("issue", "+ 카드 발급", "quiet")}</div>${notice ? `<p class="note" role="status">${escape(notice)}</p>` : ""}${overview(card)}` : detail(card)}</main>`;
   }
 
   function render() {
+    const focus = restoreFocus(root);
+    const activeAction = root.contains(root.ownerDocument.activeElement) ? root.ownerDocument.activeElement.dataset.cardAction : undefined;
     const card = selected();
     const back = page === "limit" ? "manage" : "overview";
-    root.innerHTML = `<header class="topbar"><div>${page === "overview" || (!card && page !== "issue") ? `<span class="brand">${shield}캡아메리카뱅크</span>` : button(back, "←", "back", 'aria-label="뒤로 가기"') + "<span>내 카드</span>"}</div></header>
+    root.innerHTML = `${header(page === "overview" || (!card && page !== "issue") ? { brandHtml: `<span class="brand">${shield}캡아메리카뱅크</span>` } : { title: "내 카드", back }).replace('data-action=', 'data-card-action=')}
       ${body()}
       <dialog class="cards-dialog" aria-labelledby="cards-confirm-title">${confirmStatus && card ? `<h2 id="cards-confirm-title">${confirmStatus === "LOST" ? "분실 신고할까요?" : "일시정지할까요?"}</h2><p>${escape(cardName(card))} · •••• ${escape(last4(card))}</p><p class="note">${confirmStatus === "LOST" ? "분실 신고 후에는 다시 사용할 수 없어요. 되돌릴 수 없고 새 카드를 발급받아야 해요." : "카드 사용을 잠시 멈춰요. 정지 해제는 PIN 승인이 필요해요."}</p><div class="cards-dialog-actions">${button("cancel", "취소", "outline")}${button("confirm", confirmStatus === "LOST" ? "분실 신고" : "일시정지", "primary")}</div>` : ""}</dialog>`;
+    focus();
+    if (activeAction) root.querySelector(`[data-card-action="${activeAction}"]`)?.focus({ preventScroll: true });
     if (confirmStatus && card) {
       const dialog = root.querySelector("dialog");
       dialog.addEventListener("close", () => { confirmStatus = ""; focusReturn?.focus(); });
@@ -241,6 +245,7 @@ export function mountCards(root, { embedded = false } = {}) {
   function handleClick(event) {
     const target = event.target.closest("[data-card-action]");
     if (!target || !root.contains(target)) return;
+    event.stopPropagation();
     const action = target.dataset.cardAction;
     if (action === "cancel") return root.querySelector("dialog").close();
     if (action === "reload") return loadAll();

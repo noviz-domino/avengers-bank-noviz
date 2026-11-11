@@ -7,7 +7,7 @@
 FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph · MCP · Gemini · Langfuse
 
 - **돈 처리**: 잔액·장부를 바꾸는 곳은 실행 함수 하나, 행 잠금, 요청 번호(같은 요청이 두 번 와도 한 번만), 승인 대기 + 거래 PIN
-- **AI 상담**: 라우터가 계좌·카드·상품 담당을 고르고, 담당은 MCP 도구로 REST만 부름 → AI는 사용자보다 큰 권한이 없음
+- **AI 상담**: 라우터가 계좌·카드·상품·예산 담당을 고르고, 담당은 MCP 도구로 REST만 부름 → AI는 사용자보다 큰 권한이 없음
 - **RAG**: 상품 DB + 앱 규칙을 쓴 데모 약관, 벡터 + 단어 하이브리드 검색, 근거 인용(정답 세트 Hit@5 1.000)
 - **문서**: [설계 결정](docs/decisions/README.md), [기능별 코드 가이드](docs/guides/README.md)
 
@@ -47,11 +47,11 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → PIN 승인 → 실행(잔액·한도 재검사), 거절, 요청 번호, 감사 기록 |
 | cards | ✅ 발급(Luhn 번호·가린 번호), 정지·분실(바로), 정지 해제(PIN), 결제·취소·사용내역·한도, 신용 대금 출금·연체 |
-| chat | ✅ AI 상담: 라우터(턴마다 한 번 계획) + 담당 3개, 대화 기억, Langfuse 추적 |
-| mcp | ✅ AI 도구 16개. HTTP `/mcp`(Bearer), 로컬 stdio(Claude Desktop) |
+| chat | ✅ AI 상담: 라우터(턴마다 한 번 계획) + 담당 4개(예산 담당은 서버가 계산한 숫자를 설명만), 대화 기억, Langfuse 추적 |
+| mcp | ✅ AI 도구 18개(예산 조회·결제 영향 미리 보기 포함, 신청·변경은 사람이 화면에서). HTTP `/mcp`(Bearer), 로컬 stdio(Claude Desktop) |
 | rag | ✅ 검색·답변, 색인 갱신(바뀐 청크만 임베딩), 정답 세트 평가 |
 
-대출·예산 관리는 기획만 있고 구현하지 않았습니다([범위](docs/planning/scope.md)).
+예산 관리는 월급 주기 계산, 신청·조회·변경·해지 화면, 체크·신용카드 및 타인 이체 가드, AI 조회·설명을 구현했습니다([ADR 0024](docs/decisions/0024-budget-guard.md)). 소비 패턴 분석·이월·목표 자동 이체와 대출은 후속 범위입니다.
 
 ## 2. 실행 방법
 
@@ -214,7 +214,7 @@ AI가 만든 승인 대기는 `requested_by = AGENT`로 남아서, 승인 화면
 | 항목 | 값 | 기준 |
 |---|---|---|
 | RAG 검색 (정답 세트 38문항) | hybrid Hit@1 0.947 · Hit@5 1.000 · MRR 0.966 / vector만 Hit@1 1.000 | [ADR 0013](docs/decisions/0013-agent-rag-plan.md) |
-| AI 상담 라우팅 (질문 14개) | 13~14 / 14 | [ADR 0016](docs/decisions/0016-agent-latency-tracing.md) |
+| AI 상담 라우팅 (질문 21개) | 20/21, 호출 오류 0, p50 7.5초·p95 12.9초. 연체 규칙 질문의 라우팅 지침 보완 후 해당 1개 재검증 통과 | [ADR 0016](docs/decisions/0016-agent-latency-tracing.md), [검증 기록](docs/design-drafts/RESUME_STATUS.md) |
 | AI 상담 응답 시간 | p50 **15.0 → 8.2초**, p95 28.5 → 16.8초 (질문당 LLM 호출 4.1 → 3.1번) | 목표 p95 8초는 아직 넘음 |
 | 스트리밍 체감 | 첫 진행 표시 0~0.3초, 첫 글자 7~14초 (끝나는 시간은 같음) | [ADR 0018](docs/decisions/0018-chat-stream-router.md) |
 

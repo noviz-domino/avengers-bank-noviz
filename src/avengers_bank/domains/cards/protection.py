@@ -30,7 +30,8 @@ async def update_settings(
     db: AsyncSession, user_id: int, data: CardProtectionUpdate, ip: str | None
 ) -> CardProtection:
     await user_service.verify_pin(db, user_id, data.pin, ip=ip, target="card_protection")
-    settings = CardProtection.model_validate(data.model_dump(exclude={"pin"}))
+    # 설정 필드만 고른다: PIN 스키마(ApproveRequest)에 승인용 필드(reason·emergency)가 더 있어도 섞이지 않게
+    settings = CardProtection.model_validate(data.model_dump(include=set(CardProtection.model_fields)))
     async with db.begin():
         user = await db.get(User, user_id, with_for_update=True, populate_existing=True)
         state = dict(user.card_protection or {})

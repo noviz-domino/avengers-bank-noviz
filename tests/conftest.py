@@ -11,6 +11,7 @@ from httpx import ASGITransport, AsyncClient
 import avengers_bank.domains.accounts.models  # noqa: F401  모든 테이블을 Base에 등록
 import avengers_bank.domains.approvals.models  # noqa: F401
 import avengers_bank.domains.audit.models  # noqa: F401
+import avengers_bank.domains.budget.models  # noqa: F401
 import avengers_bank.domains.cards.models  # noqa: F401
 import avengers_bank.domains.products.models  # noqa: F401
 import avengers_bank.domains.rag.models  # noqa: F401

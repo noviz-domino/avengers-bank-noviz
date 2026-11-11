@@ -21,7 +21,7 @@ const field = (name, label, attrs = "") =>
 
 /** container에 회원가입 화면을 그린다. ctx: { go, onSignedIn } */
 export function mountSignup(container, ctx) {
-  container.innerHTML = topbar("회원가입", "to-login") + '<main><form class="ext-form" novalidate><h1>새로 가입해요</h1>'
+  container.innerHTML = topbar("회원가입", "to-login") + '<main><form class="ext-form" novalidate><h1 class="ui-page-title">새로 가입해요</h1>'
     + field("login_id", "아이디", 'autocomplete="username" maxlength="50" autocapitalize="none"')
     + field("password", "비밀번호 (8자 이상)", 'type="password" autocomplete="new-password" maxlength="128"')
     + field("password2", "비밀번호 확인", 'type="password" autocomplete="new-password" maxlength="128"')
@@ -33,6 +33,7 @@ export function mountSignup(container, ctx) {
   const form = container.querySelector("form");
   const show = (errors) => {
     for (const k of [...Object.keys(LABELS), "password2", "form"]) container.querySelector("#e-" + k).textContent = errors[k] ?? "";
+    for (const k of [...Object.keys(LABELS), "password2"]) form.elements[k].setAttribute('aria-invalid', !!errors[k]);
     const first = Object.keys(errors).find((k) => form.elements[k]);
     if (first) form.elements[first].focus();
   };
