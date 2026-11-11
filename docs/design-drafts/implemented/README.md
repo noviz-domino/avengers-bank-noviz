@@ -31,13 +31,15 @@
 
 ## 로그인 화면 시안 비교 (2026-11-11) — **B 선택**
 
-같은 폼·같은 동작으로 모양만 다른 세 가지를 만들어 비교했고 **B를 골랐습니다.** 고르지 않은 A·C도 지우지 않습니다. 나중에 다시 쓸 수 있게 코드와 캡처를 모두 남깁니다.
+같은 폼·같은 동작으로 모양만 다른 세 가지를 만들어 비교했고 **B를 골랐습니다.** 고르지 않은 A·C도 지우지 않습니다. 다만 앱에는 B 하나만 두고, A·C는 나중에 다시 쓸 수 있게 코드와 캡처를 이 폴더에 기록으로 남깁니다(앱에서 열리는 주소는 없습니다).
 
-| 시안 | 상태 | 보는 주소 | 코드 |
-|---|---|---|---|
-| A. 캐릭터 + 알약 | 보관 | `/app/?login=a#login` | `frontend/app.mjs`의 `login`, `styles.css`의 `.login` |
-| **B. 네이비 배경 + 흰 시트** | **선택 (기본)** | `/app/#login` | `frontend/login-variants.mjs`의 `loginB`, `login-variants.css`의 `.login-b` |
-| C. 글자 + 사선 띠 | 보관 | `/app/?login=c#login` | `login-variants.mjs`의 `loginC`, `login-variants.css`의 `.login-c` |
+| 시안 | 상태 | 코드 |
+|---|---|---|
+| A. 캐릭터 + 알약 | 보관 | [archived-code/login-a.mjs](login-options-2026-11-11/archived-code/login-a.mjs), [login-a.css](login-options-2026-11-11/archived-code/login-a.css) |
+| **B. 네이비 배경 + 흰 시트** | **선택 (앱에서 사용)** | `frontend/login.mjs`의 `loginView`, `frontend/login.css` |
+| C. 글자 + 사선 띠 | 보관 | [archived-code/login-c.mjs](login-options-2026-11-11/archived-code/login-c.mjs), [login-c.css](login-options-2026-11-11/archived-code/login-c.css) |
+
+> 2026-11-11 수정: 처음에는 A·C를 앱에 남겨 `?login=a`·`?login=c`로 열리게 했지만, 그 주소를 없애고 이 보관 폴더로 옮겼습니다 ([ADR 0027](../../decisions/0027-compact-layout-chat-login.md)).
 
 | A. 캐릭터 + 알약 (보관) | B. 네이비 배경 + 흰 시트 (선택) | C. 글자 + 사선 띠 (보관) |
 |---|---|---|
