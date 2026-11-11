@@ -1,0 +1,13 @@
+{
+  "registration": "PASS",
+  "ping": "PASS",
+  "signed_response": "PASS",
+  "receive": "COMPLETED",
+  "amount": 1000,
+  "requests": 2,
+  "stored_receipts": 1,
+  "unsigned_request_http": 401,
+  "transfer_id": "bbc7dd56-b959-471c-9b53-361b36273c59",
+  "target": "http://127.0.0.1:18080",
+  "real_bank_db_connected": false
+}

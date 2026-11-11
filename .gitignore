@@ -1,4 +1,5 @@
 .env
+clearinghub-local-registration.json
 .venv/
 __pycache__/
 *.py[cod]
