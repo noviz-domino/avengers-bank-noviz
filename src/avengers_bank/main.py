@@ -74,5 +74,19 @@ app.add_route("/mcp", mcp_app)
 
 # 모바일 웹 앱을 같은 서버의 /app에서 서빙한다 (같은 주소라 CORS·API 주소 설정이 필요 없음, 배포 단위 하나)
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+
+
+class RevalidatedStaticFiles(StaticFiles):
+    """빌드 없이 파일 이름이 늘 같아서, 브라우저가 쓸 때마다 서버에 바뀌었는지 확인하게 한다 (ADR 0028).
+
+    안 바뀌었으면 304로 본문 없이 끝나고, 바뀌었으면 새 파일을 받는다. 옛 ui.mjs와 새 login.mjs가 섞여 흰 화면이 되는 것을 막는다.
+    """
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 if FRONTEND_DIR.is_dir():
-    app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+    app.mount("/app", RevalidatedStaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

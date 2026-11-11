@@ -6,6 +6,7 @@
 
 - [x] `Dockerfile` 하나로 빌드. 시작할 때 `alembic upgrade head` → `seed` → `uvicorn` (상품·데모 사용자·이체 받는 사람이 없을 때만 넣음)
 - [x] 모바일 웹을 같은 서버의 `/app`에서 서빙: 같은 출처라 CORS·API 주소 설정 없음
+- [x] `/app` 파일은 `Cache-Control: no-cache`로 쓸 때마다 서버에 확인: 배포 직후 옛 모듈이 섞여 흰 화면이 되지 않게 ([ADR 0028](decisions/0028-static-no-cache.md))
 - [x] CORS는 내 PC 개발 서버(127.0.0.1·localhost)만 허용
 - [x] 필수 비밀 값이 없으면 서버가 뜨지 않음: `JWT_SECRET_KEY`는 32자 이상, `SYSTEM_API_KEY`는 비우면 시스템 API 꺼짐
 - [x] 테스트: `uv run pytest`(백엔드), `node --test frontend/*.test.mjs`(화면 로직), `node tests/browser/run-integration.mjs`(실제 백엔드 + 브라우저 전체 흐름)
