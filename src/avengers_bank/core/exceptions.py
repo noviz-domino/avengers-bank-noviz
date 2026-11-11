@@ -5,12 +5,14 @@ class ApiException(Exception):
         code: str,
         message: str,
         headers: dict[str, str] | None = None,
+        data: dict | None = None,
     ):
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
         self.headers = headers
+        self.data = data  # 오류와 함께 돌려줄 값 (예: 예산 확인용 action_id). 없으면 응답에서 빠진다
 
 
 class BadRequestException(ApiException):

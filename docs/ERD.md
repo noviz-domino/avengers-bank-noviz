@@ -251,6 +251,19 @@ erDiagram
 | `LOAN_REPAY` | 대출 상환 출금 | − | 고정 지출 |
 | `REFUND` | 환불·취소 | + | 수입 (다른 주기) 또는 차감 취소 (같은 주기) |
 
+## 예산 — 통합 작업 트리에서 추가 (ADR 0024)
+
+마이그레이션 `d9fc087bbcd1`. 아직 배포하지 않았으며 [복구 상태](design-drafts/RESUME_STATUS.md)에 남은 작업을 기록한다.
+
+| 테이블 | 키와 관계 | 주요 값 |
+|---|---|---|
+| `budget_profiles` | `user_id` PK → users | 수입, 월급날(1~28), 하루 필수 생활비 JSON, 항상 통과 업종 JSON, 목표 이름·금액·개월·월 저축액, active, created_at |
+| `fixed_expenses` | `fixed_expense_id` PK, user_id → budget_profiles | 이름, 금액, 출금일(1~31, 없는 날은 말일) |
+| `budget_cycles` | `cycle_id` PK, user_id → users, UNIQUE(user_id, start_date) | 주기 시작·종료일, created_at. 지출 검사 시 행 잠금 |
+| `budget_decisions` | `decision_id` PK, user_id → users, action_id → pending_actions (항상 통과는 NULL) | 금액, 확인 때 자유 사용 가능액, 사유, 긴급 여부, created_at |
+
+목표는 현재 프로필에 한 개만 저장한다. `savings_goals`·`categories` 테이블은 추가하지 않았다. 승인 요청의 예산 스냅샷은 기존 JSON payload에 저장한다. 결정 기록은 결제 실행과 같은 트랜잭션으로 남긴다.
+
 ## 예정
 
 기능을 만들 때 그 PR에서 추가합니다. 컬럼은 그때 확정합니다.
@@ -260,7 +273,7 @@ erDiagram
 | 대출 | `loans` | user_id, product_id, loan_num(110-4PP-…), account_id, principal, remaining_principal, applied_rate, term_months, status. `account_products`에 `income_multiplier`(한도 = 연소득 × 배수) 추가 |
 | 대출 | `loan_schedules` | loan_id, seq, due_date, principal_amount, interest_amount, status, paid_tx_id |
 | 예산 | `categories` | name, is_essential, is_daily, default_always_pass (신청 때 보여 줄 추천값. 실제 설정은 사용자별로 `budget_profiles`에, ADR 0007) |
-| 예산 | `budget_profiles`, `fixed_expenses`, `savings_goals`, `budget_cycles`, `budget_decisions` | [budget.md](planning/budget.md) 참고. `budget_cycles`가 결제 검사 때 잠그는 행 |
+| 예산 | `savings_goals` | 다중 목표·진행 관리. 현재 단일 목표는 budget_profiles에 저장 ([ADR 0024](decisions/0024-budget-guard.md)) |
 | Agent | `recipients` | user_id, bank_name, account_num, holder_name, nickname, last_sent_at |
 | Agent | `chat_messages` | user_id, session_id, channel(WEB/MCP), role, content, intent, action_id |
 | 2차 | `passkeys` | user_id, credential_id, public_key, sign_count |

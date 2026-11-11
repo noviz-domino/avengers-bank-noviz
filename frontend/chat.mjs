@@ -2,17 +2,17 @@
 // 이체 등은 에이전트가 승인 대기만 만들고, 사용자가 버튼 → 공통 PIN 창(approval.mjs)에서 직접 승인한다.
 import { api, accessToken, apiBase } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
+import { esc as escape, header, button, pageTitle, sectionHead, icon } from "./ui.mjs";
 
 const questions = [
   ["계좌·거래", "내 계좌 잔액 알려줘", "이번 달 카페에서 얼마 썼어?"],
   ["카드", "내 카드 한도 얼마 남았어?", "카드 이용내역 보여줘"],
   ["상품 안내", "스타크 적금 우대조건 알려줘", "예금과 적금은 어떻게 달라?"],
+  ["예산", "이번 달 얼마 더 쓸 수 있어?", "30만 원짜리 사도 돼?"],
   ["이체", "생활비 통장에서 비상금 통장으로 1,000원 보내줘"],
 ];
 const RATE_LIMIT_MESSAGE = "요청이 많아요. 잠시 후 다시 물어봐 주세요.";
 const NETWORK_MESSAGE = "서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.";
-
-const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 // 마크다운은 렌더링하지 않고 굵게(**)와 목록 표시만 걷어 읽기 좋게 한다
 const plain = (text) => text.replace(/\*\*(.+?)\*\*/g, "$1").replace(/`/g, "").replace(/^[-*] /gm, "• ");
@@ -168,18 +168,17 @@ async function approve(messageIndex, actionId) {
 function intro(shield) {
   return '<section class="hero spread"><div><h2>무엇이 궁금하세요?</h2><p>은행 업무를 대화로 간편하게</p></div>'
     + '<span class="chat-art">' + shield + '</span></section><section><h2>이런 질문을 할 수 있어요</h2>'
-    + questions.map(([group, ...examples]) => '<div class="question-group"><h3>' + group + "</h3>"
-      + examples.map((q) => '<button type="button" data-chat-question="' + q + '">' + q + '<span aria-hidden="true">›</span></button>').join("") + "</div>").join("") + "</section>";
+    + questions.map(([group, ...examples]) => '<div class="question-group">' + sectionHead({ title: group, icon: group === '상품 안내' ? 'pig' : group === '카드' ? 'cards' : 'wallet', tone: group === '상품 안내' ? 'sage' : 'blue' })
+      + examples.map((q) => '<button type="button" data-chat-question="' + escape(q) + '"><span>' + escape(q) + '</span>' + icon('chevron') + '</button>').join("") + "</div>").join("") + "</section>";
 }
 
 /** 상담 화면을 root에 그린다. 하단 메뉴는 app.mjs가 붙인다. 정리 함수를 돌려준다 */
 export function mountChat(root, { shield = "" } = {}) {
-  root.innerHTML = '<header class="topbar"><div><button type="button" class="back" data-action="home" aria-label="뒤로 가기">←</button>AI 상담</div>'
-    + '<div><button type="button" class="quiet" data-chat-new>새 대화</button></div></header>'
-    + '<main class="chat"><div class="chat-feed" aria-live="polite"></div>'
+  root.innerHTML = header({ title: 'AI 상담', back: 'home', rightHtml: button('새 대화', { className: 'chat-new' }).replace('type="button"', 'type="button" data-chat-new') })
+    + '<main class="chat">' + pageTitle('AI 상담') + '<div class="chat-feed" aria-live="polite"></div>'
     + '<form class="composer" data-form="chat"><p class="note">이체는 확인 후 별도 창에서 PIN으로 승인해요.</p>'
     + '<div><input name="question" aria-label="질문" placeholder="궁금한 내용을 입력하세요" maxlength="1000" required>'
-    + '<button class="primary" aria-label="보내기">↑</button></div></form></main>';
+    + '<button class="ui-button ui-button--primary primary" aria-label="보내기">↑</button></div></form></main>';
   const feed = root.querySelector(".chat-feed");
   const send = root.querySelector(".composer .primary");
   const input = root.querySelector("input");

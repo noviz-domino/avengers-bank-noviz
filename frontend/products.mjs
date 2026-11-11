@@ -1,10 +1,9 @@
 import { api, idempotencyKey } from "./api.mjs";
 import { openApproval } from "./approval.mjs";
+import { esc, header as uiHeader, pageTitle, stateBlock, carouselPager, icon, maskAccountNumber } from "./ui.mjs";
 
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7" fill="none" stroke="#132844" stroke-width="3"/><path d="M10 29c4-3 9-5 14-6" fill="none" stroke="#b84039" stroke-width="3"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
-const art = '<svg class="product-art" viewBox="0 0 180 160" aria-hidden="true"><ellipse cx="95" cy="147" rx="71" ry="7" fill="#d7d8bc"/><path d="m55 62-5-26q27 0 28 26" fill="#90a477"/><ellipse cx="96" cy="94" rx="60" ry="47" fill="#b6c49a"/><path d="M62 122v23h16l5-16m31-2 4 18h16v-28" fill="#98ad80"/><ellipse cx="43" cy="99" rx="25" ry="23" fill="#c7d2af"/><path d="M36 94v9m13-9v9" stroke="#6d8058" stroke-width="4" stroke-linecap="round"/><circle cx="67" cy="77" r="4" fill="#26394a"/><path d="M153 86q23-19 14-27-10-6-10 5" fill="none" stroke="#98ad80" stroke-width="5"/><path d="M89 53h29" stroke="#687c54" stroke-width="5" stroke-linecap="round"/><circle cx="104" cy="31" r="23" fill="#f0c65c" stroke="#d9a543" stroke-width="4"/><path d="m104 15 5 10 11 1-8 8 2 11-10-6-10 6 2-11-8-8 11-1Z" fill="#fff1b5"/><path d="M121 83v16c0 11-8 19-17 24-9-5-17-13-17-24V83l17-5Z" fill="#fff" opacity=".8"/><path d="m104 87 3 6 7 1-5 5 1 7-6-4-6 4 1-7-5-5 7-1Z" fill="#829668"/></svg>';
-const icons = { CHECKING: "⇄", DEPOSIT: "▥", SAVINGS: "♧" };
-const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const icons = { CHECKING: icon("wallet"), DEPOSIT: icon("products"), SAVINGS: icon("pig") };
 
 // 서버 type 값 → 화면 분류. 대출은 개설할 수 없어 목록에서 뺀다.
 export const kinds = { all: "전체", CHECKING: "입출금", DEPOSIT: "예금", SAVINGS: "적금" };
@@ -30,9 +29,9 @@ const isOpen = (p) => p.type !== "LOAN";
 
 const link = (product, label, className = "") => `<a class="${className}" href="#product/${product.product_id}">${label}</a>`;
 const rateNote = (product) => '<p class="product-rate-note">' + (Number(product.max_preferential_rate) ? "우대조건 충족 시 · " : "") + "세전</p>";
-const header = (detail) => '<header class="topbar">' + (detail
-  ? '<a class="product-back" href="#products" aria-label="상품 목록으로 돌아가기">← <span>상품 상세</span></a>'
-  : '<span class="brand">' + shield + "캡아메리카뱅크</span>") + "</header>";
+const header = (detail) => uiHeader({ brandHtml: detail
+  ? `<a class="product-back" href="#products" aria-label="상품 목록으로 돌아가기">${icon("back")}<span>상품 상세</span></a>`
+  : '<span class="brand">' + shield + "캡아메리카뱅크</span>" });
 
 function rateBlock(product) {
   const bonus = Number(product.max_preferential_rate) > 0;
@@ -40,13 +39,24 @@ function rateBlock(product) {
     <strong>${maxRate(product)}</strong></div><div><small>기본 연</small><b>${percent(product.base_rate)}</b></div></div>${rateNote(product)}`;
 }
 
-function featured(product) {
-  return `<section class="product-feature" aria-labelledby="featured-name"><span class="product-badge">${badge[product.type]}</span>
-    <h2 id="featured-name">${esc(product.name)}</h2>
-    ${rateBlock(product)}${art}<div class="product-facts"><p>기간 <strong>${term(product)}</strong></p>
-    <p>${product.type === "SAVINGS" ? "월 납입액" : "가입 금액"} <strong>${amount(product).replace(/^월 /, "")}</strong></p></div>
-    ${link(product, '상품 자세히 보기 <span aria-hidden="true">→</span>', "primary product-cta")}</section>`;
+const productBanners = [
+  { type: "SAVINGS", name: "스타크 자유적금", image: "product-savings.webp", message: "차곡차곡, 나만의 목돈 만들기" },
+  { type: "DEPOSIT", name: "히어로 정기예금", image: "product-deposit.webp", message: "모아둔 목돈, 든든하게 맡기기" },
+];
+
+function bannerCarousel(products) {
+  const slides = productBanners.flatMap(({ type, name, image, message }) => {
+    const product = products.find((item) => item.type === type && item.name === name);
+    return product ? [link(product, `<img src="./assets/${image}" width="1536" height="1024" alt="${esc(name + ". " + message + ". 상품 자세히 보기")}">`, "product-banner")] : [];
+  });
+  if (!slides.length) return "";
+  return `<section class="product-banners" aria-label="추천 상품 배너">
+    <div class="product-banner-track">${slides.join("")}</div>
+    ${slides.length > 1 ? carouselPager(1, slides.length, { previous: "product-banner-prev", next: "product-banner-next" }) : ""}
+  </section>`;
 }
+
+const slideIndex = (track) => Math.round(track.scrollLeft / track.clientWidth);
 
 function row(product) {
   return `<li>${link(product, `<span class="product-icon ${product.type.toLowerCase()}" aria-hidden="true">${icons[product.type]}</span>
@@ -62,14 +72,14 @@ function row(product) {
 export function listView(products, kind = "all") {
   if (!Object.hasOwn(kinds, kind)) kind = "all";
   const visible = products.filter((p) => isOpen(p) && (kind === "all" || p.type === kind));
-  const star = visible.find((p) => p.type === "SAVINGS");
-  const others = visible.filter((p) => p !== star);
-  return header(false) + `<main><p class="product-eyebrow">상품</p><h1 tabindex="-1">목표를 담는 상품</h1>
+  const banners = bannerCarousel(visible);
+  return header(false) + `<main><p class="product-eyebrow">상품</p>${pageTitle("목표를 담는 상품")}
     <div class="segments product-filters" role="group" aria-label="상품 종류">${Object.entries(kinds).map(([value, label]) =>
       `<button type="button" data-product-filter="${value}" aria-pressed="${value === kind}">${label}</button>`).join("")}</div>
+    ${banners}
     <div aria-live="polite" class="product-results"><p class="product-count">${kinds[kind]} 상품 ${visible.length}개</p>
-    ${star ? featured(star) : ""}<section class="product-section"><h2>${star ? "함께 살펴보세요" : kinds[kind] + " 상품"}</h2>
-    ${others.length ? `<ul class="product-list">${others.map(row).join("")}</ul>` : '<p class="empty">다른 상품은 다른 분류에서 살펴보세요.</p>'}</section></div>
+    <section class="product-section"><h2>${banners ? "함께 살펴보세요" : kinds[kind] + " 상품"}</h2>
+    ${visible.length ? `<ul class="product-list">${visible.map(row).join("")}</ul>` : stateBlock("empty", { message: "이 분류에는 가입할 수 있는 상품이 없어요." })}</section></div>
     <p class="product-footer-note">최고금리는 우대조건 모두 충족 시 · 세전<br>가입 시 적용 가능한 우대는 상품 상세에서 확인해 주세요.</p></main>`;
 }
 
@@ -96,7 +106,7 @@ export function detailView(product) {
 }
 
 // 가입 입력 화면. 서버가 조건 검사를 다시 하므로 입력 힌트만 준다.
-function joinView(product, accounts) {
+export function joinView(product, accounts) {
   const checking = accounts.filter((a) => a.account_type === "CHECKING" && a.status === "ACTIVE");
   const field = (label, name, extra = "") => `<label>${label}<input name="${name}" ${extra}></label>`;
   const termField = field(`가입 기간 (${term(product)})`, "term_months", `type="number" inputmode="numeric" min="${product.min_term_months}" max="${product.max_term_months}" required`);
@@ -106,7 +116,7 @@ function joinView(product, accounts) {
     fields = termField + field(`월 납입액 (${amount(product).replace(/^월 /, "")}, 원)`, "monthly_payment", `type="number" inputmode="numeric" min="${product.min_amount}" max="${product.max_amount}" required`)
       + field("납입일 (매월 1~28일)", "payment_day", 'type="number" inputmode="numeric" min="1" max="28" value="25" required') + nickname;
   } else if (product.type === "DEPOSIT") {
-    fields = `<label>출금 계좌<select name="from_account_id" required>${checking.map((a) => `<option value="${a.account_id}">${esc(a.nickname || a.product_name)} · ${esc(a.account_num)} · ${a.balance.toLocaleString("ko-KR")}원</option>`).join("")}</select></label>`
+    fields = `<fieldset class="product-source"><legend>출금 계좌</legend>${checking.length ? checking.map((a, index) => `<label class="product-source-option"><input type="radio" name="from_account_id" value="${a.account_id}" ${index === 0 ? "checked" : ""} required><span><strong>${esc(a.nickname || a.product_name)}</strong><small>${maskAccountNumber(a.account_num)}</small><span>잔액 ${a.balance.toLocaleString("ko-KR")}원</span></span></label>`).join("") : stateBlock("empty", { message: "예금에 가입하려면 사용 중인 입출금 계좌가 필요해요." })}</fieldset>`
       + field(`맡길 금액 (${amount(product)}, 원)`, "amount", `type="number" inputmode="numeric" min="${product.min_amount}" max="${product.max_amount}" required`) + termField + nickname;
   }
   return header(true) + `<main><h1 tabindex="-1">${esc(product.name)} 가입</h1>
@@ -120,8 +130,8 @@ const doneView = (title, lines) => header(true) + `<main><p class="success-mark"
   <section class="card">${lines.map((line) => `<p>${esc(line)}</p>`).join("")}</section>
   <a href="#home" class="primary product-cta">홈에서 확인하기</a><a href="#products" class="product-more">다른 상품 살펴보기</a></main>`;
 
-const errorView = (message) => header(false) + `<main><h1>상품</h1><p class="error" role="alert">${esc(message)}</p><button type="button" class="outline" data-product-retry>다시 시도</button></main>`;
-const loadingView = (detail) => header(detail) + '<main><p class="empty" role="status">불러오는 중이에요.</p></main>';
+const errorView = (message) => header(false) + `<main>${pageTitle("상품")}${stateBlock("error", { message, retryAction: "retry" }).replace('data-action="retry"', 'data-product-retry')}</main>`;
+const loadingView = (detail) => header(detail) + `<main>${pageTitle("상품")}${stateBlock("loading")}</main>`;
 const message = (e) => e?.message ?? "요청을 처리하지 못했어요.";
 
 let kind = "all"; // 목록·상세를 오가도 분류를 유지한다
@@ -132,7 +142,7 @@ export function mountProducts(root, route = "") {
   let product; // 상세 상품
   let list; // 목록 (분류를 바꿔도 다시 받지 않는다)
   const id = route.startsWith("product/") ? route.slice(8) : null;
-  const set = (html) => { if (alive) { root.innerHTML = html; root.querySelector("h1")?.focus({ preventScroll: true }); } };
+  const set = (html) => { if (alive) { root.innerHTML = html; const title = root.querySelector("h1"); title?.setAttribute("tabindex", "-1"); title?.focus({ preventScroll: true }); } };
 
   async function load() {
     set(loadingView(id !== null));
@@ -187,11 +197,18 @@ export function mountProducts(root, route = "") {
   function handleClick(event) {
     const target = event.target.closest("button");
     if (!target || !root.contains(target)) return;
+    event.stopPropagation();
     const filter = target.dataset.productFilter;
     if (filter !== undefined && Object.hasOwn(kinds, filter)) {
       kind = filter;
       set(listView(list, kind));
       root.querySelector(`[data-product-filter="${kind}"]`)?.focus({ preventScroll: true });
+    } else if (target.dataset.action === "product-banner-prev" || target.dataset.action === "product-banner-next") {
+      const track = root.querySelector(".product-banner-track");
+      const count = track.children.length;
+      const direction = target.dataset.action === "product-banner-next" ? 1 : -1;
+      const index = (slideIndex(track) + direction + count) % count;
+      track.scrollTo({ left: index * track.clientWidth });
     } else if ("productJoin" in target.dataset) join();
     else if ("productCancel" in target.dataset) set(detailView(product));
     else if ("productRetry" in target.dataset) load();
@@ -202,11 +219,21 @@ export function mountProducts(root, route = "") {
     submit(event.target);
   }
 
+  function updateBannerPage(event) {
+    const track = event.target;
+    if (!track.matches?.(".product-banner-track")) return;
+    const page = track.parentElement.querySelector(".ui-carousel-page");
+    const label = `${slideIndex(track) + 1} / ${track.children.length}`;
+    if (page && page.textContent !== label) page.textContent = label;
+  }
+
+  root.addEventListener("scroll", updateBannerPage, true);
   root.addEventListener("click", handleClick);
   root.addEventListener("submit", handleSubmit);
   load();
   return () => {
     alive = false;
+    root.removeEventListener("scroll", updateBannerPage, true);
     root.removeEventListener("click", handleClick);
     root.removeEventListener("submit", handleSubmit);
     root.replaceChildren();
