@@ -103,6 +103,7 @@ async def bank(client):
     fake = FakeChat()
     app.dependency_overrides[get_llm] = lambda: fake
     rag_router.calls.clear()
+    rag_router.daily_calls.clear()
     yield client, tony, peter, src, dst, fake
     app.dependency_overrides.pop(get_llm, None)
 

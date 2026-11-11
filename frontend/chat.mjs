@@ -70,10 +70,11 @@ async function post(message, signal) {
     if (error.status || error.name === "AbortError") throw error;
     throw new Error(NETWORK_MESSAGE);
   }
-  if (response.status === 429) throw new Error(RATE_LIMIT_MESSAGE);
   if (!response.ok) {
+    // 429는 1분 한도와 하루 한도(AI_DAILY_LIMIT) 두 가지라 서버 안내를 그대로 보여 준다
     const json = await response.json().catch(() => null);
-    throw new Error(json?.error?.message ?? "답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.");
+    const fallback = response.status === 429 ? RATE_LIMIT_MESSAGE : "답변을 만들지 못했어요. 잠시 후 다시 시도해 주세요.";
+    throw new Error(json?.error?.message ?? fallback);
   }
   return response;
 }

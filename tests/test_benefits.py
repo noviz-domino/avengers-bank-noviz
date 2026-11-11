@@ -28,6 +28,7 @@ def model(monkeypatch):
     fake = FakeChat()
     monkeypatch.setitem(app.dependency_overrides, get_llm, lambda: fake)
     rag_router.calls.clear()
+    rag_router.daily_calls.clear()
     return fake
 
 

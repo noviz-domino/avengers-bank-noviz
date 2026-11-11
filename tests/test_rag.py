@@ -58,6 +58,7 @@ async def rag(client):
     ai = FakeAI()
     app.dependency_overrides[get_ai] = lambda: ai
     rag_router.calls.clear()  # 요청 수 제한은 서버 메모리라 테스트마다 비운다
+    rag_router.daily_calls.clear()
     me = await user(client, "ironman", "토니")
     yield client, me, ai
     app.dependency_overrides.pop(get_ai, None)
@@ -189,6 +190,19 @@ async def test_rate_limit_and_concurrent_reindex(rag):
     assert embedded[0] == 0 and embedded[1] > 25  # 한 번만 임베딩
     codes = [(await client.get("/rag/search", params={"q": "한도"}, headers=me)).status_code for _ in range(11)]
     assert codes[:10] == [200] * 10 and codes[10] == 429
+
+
+async def test_daily_limit_is_shared_by_everyone_and_resets_next_day(rag, monkeypatch):
+    client, me, ai = rag
+    await reindex(client)
+    monkeypatch.setattr(rag_router.get_settings(), "ai_daily_limit", 3)
+    other = await user(client, "hulk", "브루스")  # 계정을 바꿔도 같은 하루 한도를 나눠 쓴다
+    search = lambda who: client.get("/rag/search", params={"q": "한도"}, headers=who)  # noqa: E731
+    assert [(await search(who)).status_code for who in (me, me, other)] == [200] * 3
+    blocked = await search(other)
+    assert blocked.status_code == 429 and blocked.json()["error"]["code"] == "AI_DAILY_LIMIT"
+    monkeypatch.setattr(rag_router, "today_kst", lambda: date(2099, 1, 1))  # 다음 날이면 다시 센다
+    assert (await search(other)).status_code == 200
 
 
 async def test_question_cannot_close_the_question_tag(rag):
