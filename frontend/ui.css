@@ -80,6 +80,8 @@ button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; backgr
 .ui-field [aria-invalid="true"] { border-color: var(--ui-error); }
 .ui-field .ui-hint, .ui-field .ui-field-error { margin: 0; font-size: var(--ui-small-size); line-height: 1.5; }
 .ui-hint { color: var(--ui-muted); }
+.ui-form-error { margin: 0; color: var(--ui-error); font-size: var(--ui-small-size); line-height: 1.5; }
+.ui-form-error:empty { display: none; }
 .ui-tabs { position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 8px 12px max(8px, env(safe-area-inset-bottom)); border-top: 1px solid var(--ui-line); background: var(--ui-white); }
 .ui-tab { display: grid; justify-items: center; align-content: center; gap: var(--ui-space-xs); min-width: 0; min-height: 52px; padding: 0; border: 0; background: transparent; color: var(--ui-muted); font-size: var(--ui-small-size); white-space: nowrap; }
 .ui-tab[aria-current="page"] { color: var(--ui-blue); font-weight: 800; }
