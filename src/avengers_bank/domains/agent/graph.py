@@ -2,7 +2,7 @@
 
 라우터는 턴 처음에 한 번, 처리할 담당을 순서대로 고른다(구조화된 출력, 정해진 이름만, ADR 0016).
 도메인 Agent는 자기 도구만 가진 Agent이고, 계획 순서대로 차례로 일한다(복합 요청, 최대 MAX_HOPS).
-예산 컨텍스트·코멘트 노드와 대출·예산 Agent는 그 기능을 만들 때 붙인다 (ADR 0013).
+예산 Agent는 서버가 계산한 예산 숫자를 읽고 설명만 한다. 대출 Agent와 예산 코멘트 노드는 후속 범위다 (ADR 0013).
 """
 
 from typing import Literal
@@ -19,8 +19,8 @@ from pydantic import BaseModel, Field
 from avengers_bank.core.clock import today_kst
 
 MAX_HOPS = 3  # 한 턴에 도메인 Agent를 부르는 최대 횟수 (복합 요청 "정지하고 잔액 알려줘"는 2번)
-LABELS = {"account": "계좌", "card": "카드", "product": "상품·약관"}
-AgentName = Literal["account", "card", "product"]
+LABELS = {"account": "계좌", "card": "카드", "product": "상품·약관", "budget": "예산"}
+AgentName = Literal["account", "card", "product", "budget"]
 
 TOOLS: dict[str, list[str]] = {  # ADR 0014의 MCP 도구를 도메인별로 (ADR 0006)
     "account": ["get_my_accounts", "get_account", "search_transactions", "request_transfer", "open_account",
@@ -28,6 +28,7 @@ TOOLS: dict[str, list[str]] = {  # ADR 0014의 MCP 도구를 도메인별로 (AD
     "card": ["get_my_cards", "issue_card", "search_card_transactions", "get_card_limit", "suspend_card",
              "request_unsuspend_card"],
     "product": ["search_products", "get_product_detail", "ask_bank_docs"],
+    "budget": ["get_budget", "check_budget"],  # 읽기만. 신청·변경·해제는 예산 화면에서 사람이 (ADR 0002)
 }
 
 COMMON = """너는 캡아메리카뱅크 앱의 AI 상담원이다. 한국어로 짧고 정확하게 답한다. 오늘은 {today}(한국)이다.
@@ -48,12 +49,26 @@ PROMPTS = {
     "product": "너는 상품·약관 담당이다: 상품 목록과 상세, 약관·규칙 질문. 규칙 질문은 ask_bank_docs로 근거와 함께 답하고 "
                "근거가 없으면 모른다고 한다. ask_bank_docs의 답과 근거에 없는 내용(예: 신용도 영향, 법적 효과)은 덧붙이지 않는다. "
                "투자를 권유하지 않는다.",
+    "budget": "너는 예산 담당이다: 이번 주기(다음 월급날 전까지) 얼마 더 쓸 수 있는지, 이 돈을 써도 되는지 설명한다.\n"
+              "- 숫자는 계산하지 않는다. 더하기·빼기·나누기도 하지 않고, get_budget·check_budget 결과의 숫자만 그대로 "
+              "원 단위로(예: 123,000원) 옮긴다. 결과에 없는 숫자가 필요하면 모른다고 한다.\n"
+              "- '얼마 더 쓸 수 있어'는 get_budget을 부르고 두 줄로 답한다: 생활비만 보면 free_before_saving, "
+              "저축까지 지키면 free_to_spend(자유 사용 가능액). 하루에 쓸 수 있는 돈 daily_allowance와 남은 날 days_left도 덧붙인다. "
+              "음수면 그만큼 모자란다고 쉬운 말로 풀어 준다.\n"
+              "- '이거 사도 돼?', 'X원 써도 돼?'는 check_budget(amount, 알면 category)을 부르고, 쓴 뒤 남는 돈(after)과 "
+              "모자란 돈(shortage)으로 영향을 설명한다. 금액이 없으면 되묻는다.\n"
+              "- enrolled가 false면 예산을 아직 신청하지 않았다고 하고, 신청은 앱의 예산 화면에서 한다고 안내한다. 숫자를 지어내지 않는다.\n"
+              "- 예산을 넘는 결제를 네가 허락하거나 확인해 줄 수 없다. 넘는 결제는 사용자가 앱에서 이유를 적고 PIN으로 직접 확인한다고 안내한다.\n"
+              "- 예산 신청·변경·해제는 도구로 할 수 없다. 앱의 예산 화면에서 하라고 안내한다.\n"
+              "- '~해요' 말투로 짧게 답한다.",
 }
 
 ROUTER = """너는 캡아메리카뱅크 AI 상담의 라우터다. 사용자의 마지막 말을 처리할 담당을 처리할 순서대로 고른다.
 - account: 계좌·잔액·거래내역·이체·계좌 개설과 해지. "어디서 얼마 썼어", "이번 달 지출"처럼 쓴 돈을 묻는 질문도 account(체크카드 결제도 계좌 거래내역에 있다)
 - card: 카드 조회·발급·한도·정지·분실, 특정 카드의 사용내역을 콕 집어 물을 때
 - product: 상품 소개·금리·가입 조건, 약관·규칙 질문. 카드 상품의 혜택·연회비처럼 "어떤 상품인지"를 묻는 질문도 product(내 카드 자체를 묻는 것은 card)
+- "카드 대금 못 내면 어떻게 돼?"처럼 연체 규칙·불이익을 묻는 질문은 product다. "내 카드 대금이 밀렸어?"처럼 내 카드의 현재 상태를 묻는 질문은 card다.
+- budget: 내 예산. "이번 달 얼마 더 쓸 수 있어", "하루에 얼마 써도 돼", "이거 사도 돼?", "30만 원 써도 돼?", 자유 사용 가능액·목표 저축·고정 지출. 이미 쓴 돈의 내역·합계("어디서 얼마 썼어")는 budget이 아니라 account
 여러 업무가 섞이면 사용자가 말한 순서대로 담는다. 앞 대화에 이어지는 말(되물음에 대한 답, "응", "그걸로")은 그 업무의 담당을 고른다.
 은행 업무가 아닌 말(인사, 감사 등)이면 agents를 비우고 reply에 짧게 답한다."""
 

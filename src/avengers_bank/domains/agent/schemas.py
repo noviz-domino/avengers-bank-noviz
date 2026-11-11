@@ -14,7 +14,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
-    routed: list[str]  # 이번 턴에 일한 담당 (account·card·product), 평가·디버깅용
+    routed: list[str]  # 이번 턴에 일한 담당 (account·card·product·budget), 평가·디버깅용
 
 
 class ChatTurn(BaseModel):

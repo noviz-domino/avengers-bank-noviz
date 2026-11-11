@@ -9,7 +9,7 @@ from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResu
 from langchain_core.runnables import RunnableLambda
 from pydantic import Field
 
-from avengers_bank.domains.agent.graph import HISTORY, MAX_HOPS, Plan, recent
+from avengers_bank.domains.agent.graph import HISTORY, LABELS, MAX_HOPS, PROMPTS, Plan, recent
 from avengers_bank.domains.agent.service import final_reply
 from avengers_bank.domains.agent.llm import get_llm
 from avengers_bank.domains.rag import router as rag_router
@@ -212,7 +212,7 @@ def test_measurement_helpers():
             {"routed": None, "expected": [["account"]], "error": "TimeoutError", "calls": 1, "seconds": 90.0}]
     assert summarize(rows) == {"questions": 2, "errors": 1, "routing_accuracy": 0.5, "llm_calls_avg": 3.0,
                                "p50": 2.0, "p95": 2.0}
-    names = {"account", "card", "product"}
+    names = set(LABELS)
     assert all(set(route) <= names for item in load_routing() for alt in item["expected"] for route in [alt])
 
 
@@ -341,3 +341,44 @@ async def test_stream_turn_finishes_even_if_client_disconnects(bank):
     assert service.busy == set()
     history = await service.agent_service.history(1, session_id)
     assert [(t.role, t.content) for t in history] == [("user", "안녕"), ("assistant", "안녕하세요!")]
+
+
+async def test_budget_question_explains_server_numbers(bank, monkeypatch):
+    """예산 담당은 get_budget 결과를 받아 설명만 한다. 복합 요청은 계좌 → 예산 차례로 (예산 REST는 계약대로 흉내)"""
+    from avengers_bank.domains.mcp_server import api
+    from tests.test_mcp import FakeBudget
+
+    client, tony, peter, src, dst, fake = bank
+    budget = FakeBudget({"enrolled": True, "free_before_saving": 450_000, "free_to_spend": 150_000,
+                         "daily_allowance": 10_000, "cycle": {"days_left": 15}})
+    monkeypatch.setattr(api, "client", budget.client)
+    fake.routes = [Plan(agents=["account", "budget"])]
+    fake.replies = [call("get_my_accounts"), AIMessage("잔액은 1,000,000원이에요."), call("get_budget"),
+                    AIMessage("저축까지 지키면 150,000원 더 쓸 수 있어요.")]
+    data = (await chat(client, tony, "잔액이랑 이번 달 예산 알려줘")).json()["data"]
+    assert data["routed"] == ["account", "budget"]
+    assert data["reply"] == "잔액은 1,000,000원이에요.\n\n저축까지 지키면 150,000원 더 쓸 수 있어요."
+    tool_result = [m for m in fake.agent_inputs[3] if isinstance(m, ToolMessage)][-1]
+    assert "150000" in str(tool_result.content)  # 숫자는 서버가 계산한 값이 도구 결과로 온다
+    assert budget.seen[0].headers["authorization"] == tony["Authorization"]
+
+
+async def test_budget_not_enrolled_and_purchase_check(bank, monkeypatch):
+    from avengers_bank.domains.mcp_server import api
+    from tests.test_mcp import FakeBudget
+
+    client, tony, peter, src, dst, fake = bank
+    budget = FakeBudget({"enrolled": False}, {"allowed": False, "free_to_spend": 100_000, "after": -200_000,
+                                              "shortage": 200_000, "always_allowed": False, "message": "예산을 넘어요"})
+    monkeypatch.setattr(api, "client", budget.client)
+    fake.routes = [Plan(agents=["budget"]), Plan(agents=["budget"])]
+    fake.replies = [call("get_budget"), AIMessage("아직 예산을 신청하지 않았어요. 앱의 예산 화면에서 신청할 수 있어요."),
+                    call("check_budget", amount=300_000), AIMessage("사면 200,000원이 모자라요.")]
+    first = (await chat(client, tony, "이번 달 얼마 더 쓸 수 있어?")).json()["data"]
+    assert first["routed"] == ["budget"] and "예산 화면" in first["reply"]
+    assert '"enrolled":false' in str([m for m in fake.agent_inputs[1] if isinstance(m, ToolMessage)][-1].content).replace(" ", "")
+    second = (await chat(client, tony, "30만 원짜리 사도 돼?", first["session_id"])).json()["data"]
+    assert second["reply"] == "사면 200,000원이 모자라요."
+    assert [(r.url.path, r.url.params.get("amount")) for r in budget.seen] == [("/budget", None), ("/budget/check", "300000")]
+    # 프롬프트 규칙: 계산하지 않고, 초과 결제를 대신 확인하지 않는다
+    assert "계산하지 않는다" in PROMPTS["budget"] and "PIN" in PROMPTS["budget"]

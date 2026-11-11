@@ -6,6 +6,18 @@
 
 ## 공통 응답 형식
 
+예산 관리: [ADR 0024](decisions/0024-budget-guard.md). 모바일 앱의 예산 화면에서 신청·조회·변경·해지한다. AI는 조회 도구만 사용한다.
+
+| 메서드 | 경로 | 인증 | 설명 |
+|---|---|---|---|
+| POST | `/budget` | 🔒 | 수입·월급날·고정 지출·하루 생활비·목표로 신청 (201) |
+| GET | `/budget` | 🔒 | 이번 주기 계산 내역. 미신청은 `200 {data: {enrolled: false}}` |
+| GET | `/budget/check?amount=300000` | 🔒 | 지출 영향 조회. amount 양의 정수, category 선택. 미신청 404 |
+| PATCH | `/budget` | 🔒 | 강화는 200 계산 내역. 완화는 202 `BUDGET_UPDATE` 승인 대기, PIN 후 반영. 수입·생활비·고정 지출·목표·항상 통과 업종 변경 |
+| DELETE | `/budget` | 🔒 | 해지 승인 대기 (202, 기존 대기는 200). 기존 승인 API의 PIN 필요 |
+
+예산 초과 카드 결제는 `409 BUDGET_CONFIRMATION_REQUIRED`의 `error.data`로 `action_id`, `free_to_spend`, `after`, `shortage`, `impact`를 준다. 승인 조회에는 `needs_budget_reason`, `budget_impact`가 추가되며, 승인 요청은 기존 `pin` 외에 `reason`(초과 시 필수), `emergency`(기본 false)를 받는다.
+
 성공:
 ```json
 { "data": { ... }, "message": "회원가입이 완료되었습니다." }
@@ -304,15 +316,15 @@ data: {"session_id": "…", "reply": "일일 한도는 1,000,000원입니다.\n\
 
 ## mcp: AI 도구 (`domains/mcp_server`)
 
-MCP(Model Context Protocol) 서버. 도구 16개가 아래 REST API를 사용자 토큰으로 부릅니다. 결정 이유: [ADR 0014](decisions/0014-mcp-server.md), 코드 설명: [가이드 11](guides/11-mcp.md)
+MCP(Model Context Protocol) 서버. 도구 18개가 아래 REST API를 사용자 토큰으로 부릅니다. 결정 이유: [ADR 0014](decisions/0014-mcp-server.md), 코드 설명: [가이드 11](guides/11-mcp.md)
 
 | 상태 | 입구 | 인증 | 설명 |
 |---|---|---|---|
 | ✅ | `POST /mcp` (streamable HTTP, JSON 응답) | `Authorization: Bearer <access token>` | 우리 Agent용. 헤더의 토큰을 그대로 REST에 넘김 |
 | ✅ | `python -m avengers_bank.domains.mcp_server` (stdio) | refresh token 파일 (`login` 명령) | Claude Desktop·Claude Code용 |
 
-- 도구: 계좌 `get_my_accounts` `get_account` `search_transactions` `request_transfer` `open_account` `request_deposit` `close_account` / 카드 `get_my_cards` `issue_card` `search_card_transactions` `get_card_limit` `suspend_card` `request_unsuspend_card` / 상품 `search_products` `get_product_detail` `ask_bank_docs`
-- 없는 것: 승인·PIN, 카드 결제, `/system/*`, 대출
+- 도구: 계좌 `get_my_accounts` `get_account` `search_transactions` `request_transfer` `open_account` `request_deposit` `close_account` / 카드 `get_my_cards` `issue_card` `search_card_transactions` `get_card_limit` `suspend_card` `request_unsuspend_card` / 상품 `search_products` `get_product_detail` `ask_bank_docs` / 예산(읽기만) `get_budget`(`GET /budget`) `check_budget`(`GET /budget/check`, `amount`>0·`category` 선택)
+- 없는 것: 승인·PIN, 카드 결제, `/system/*`, 대출, 예산 신청·변경·해제(`POST`·`PATCH`·`DELETE /budget`: 신청은 사용자가 표를 보고 확정, 약하게 바꾸기·해제는 PIN이라 예산 화면에서 사람이)
 - 실패하면 REST의 오류를 `코드: 메시지`로 돌려줍니다(예: `CARD_NOT_FOUND: 카드를 찾을 수 없습니다.`).
 
 ### 요청한 곳 (`X-Requested-By`)

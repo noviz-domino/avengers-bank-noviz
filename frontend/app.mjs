@@ -3,16 +3,17 @@ import { ApiError, api, idempotencyKey, isSignedIn, login as apiLogin, logout as
 import { openApproval } from "./approval.mjs";
 import { accountName, kindOf, money, normalizeAccountNum, parseAmount, shortDate, txLabel } from "./format.mjs";
 import { mountCards } from "./cards.mjs";
+import { mountBudget } from "./budget.mjs";
 import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
 import { mountSearch } from "./search.mjs";
-import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus } from "./ui.mjs";
+import { esc as escape, header as uiHeader, button as uiButton, bottomTabs as nav, sectionHead, listRow, cardBox, stateBlock, icon, maskAccountNumber, restoreFocus, carouselPager } from "./ui.mjs";
 
 const app = document.querySelector("#app");
 const shield = '<svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 2 29 6v10c0 8-5 14-13 18C8 30 3 24 3 16V6Z" fill="#fff" stroke="#132844" stroke-width="2.5"/><path d="M7 24c6-5 13-7 20-7M10 28c4-3 9-5 14-6" fill="none" stroke="#132844" stroke-width="2.5"/><path d="M11 29c4-3 8-4 12-5" fill="none" stroke="#b84039" stroke-width="2"/><path d="m16 7 1.6 3.4 3.7.5-2.7 2.6.7 3.7-3.3-1.8-3.3 1.8.7-3.7-2.7-2.6 3.7-.5Z" fill="#132844"/></svg>';
 const brand = '<span class="brand">' + shield + '캡아메리카뱅크</span>';
-const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products", "signup", "menu", "search"]);
+const pages = new Set(["login", "home", "account", "manage", "chat", "transfer", "cards", "products", "signup", "menu", "search", "budget"]);
 const stepOrder = ["recipient", "amount", "review"];
 const hidden = "••••••";
 
@@ -35,10 +36,10 @@ let unmountChat;
 let transfer;
 let unmountCards;
 let unmountProducts;
+let unmountBudget;
+let budget;
 
-const button = (action, label, className = "") =>
-  '<button type="button" class="' + className + '" data-action="' + action + '"'
-  + (className === "back" ? ' aria-label="뒤로 가기"' : "") + '>' + label + "</button>";
+const button = (action, label, className = "") => uiButton(label, { action, variant: className === "primary" ? "primary" : className === "outline" ? "outline" : "quiet", className });
 const accountById = (id) => accounts?.find((account) => String(account.account_id) === String(id));
 const currentPage = () => {
   const route = location.hash.slice(1);
@@ -56,6 +57,7 @@ async function loadAccounts() {
     ({ accounts, total_balance: total } = list.data);
     recent = latest.data.transactions;
     accountsError = "";
+    budget = await api("/budget").then(({ data }) => data).catch(() => undefined);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return;
     accountsError = error.message;
@@ -105,6 +107,7 @@ function go(route) {
 function reset() {
   accounts = detail = accountId = undefined;
   total = 0;
+  budget = undefined;
   accountsError = "";
   recent = [];
   txs = { rows: [], next: null, loading: false, error: "" };
@@ -117,8 +120,7 @@ function reset() {
 }
 
 function header(title, back = "", right = "") {
-  return '<header class="topbar"><div>' + (back ? button(back, "←", "back") : "") + title
-    + '</div><div>' + right + "</div></header>";
+  return uiHeader({ title, back, rightHtml: right });
 }
 
 function transactions(rows) {
@@ -130,13 +132,14 @@ function transactions(rows) {
 }
 
 function campaignContent() {
-  return '<div class="ui-campaign-copy"><small>' + (campaign ? "WELCOME" : "GRAND OPEN")
-    + '</small><h2>' + (campaign ? "처음 만나는<br>나의 은행" : "새로운 금융의 시작<br>캡아메리카뱅크")
-    + '</h2><a id="home-bank-intro" href="#products">은행 소개 보기 →</a></div>'
-    + '<img class="ui-campaign-art" src="./assets/event-bank.webp" alt="" width="170" height="142">'
-    + '<div class="ui-campaign-controls">'
-    + uiButton((campaign + 1) + " / 2", { action: "campaign", variant: "pill", ariaLabel: "이벤트 " + (campaign + 1) + " / 2, 다음 이벤트 보기", className: "ui-campaign-page" })
-    + uiButton("", { action: "campaign-pause", variant: "pill", icon: campaignPaused ? "play" : "pause", ariaLabel: campaignPaused ? "이벤트 자동 넘김 재생" : "이벤트 자동 넘김 일시정지", pressed: campaignPaused }) + '</div>';
+  const [image, alt] = campaign
+    ? ["banner-welcome.webp", "첫 만남을 위한 특별한 환영. 신규가입 이벤트 둘러보기"]
+    : ["banner-opening.webp", "새로운 금융의 시작, 캡아메리카뱅크. 은행 소개 보기"];
+  return '<a id="home-bank-intro" href="#products"><img src="./assets/' + image
+    + '" alt="' + escape(alt) + '" width="1989" height="791"></a>'
+    + carouselPager(campaign + 1, 2, { previous: "campaign-prev", next: "campaign" })
+    + '<div class="ui-carousel-controls ui-campaign-playback">'
+    + uiButton("", { action: "campaign-pause", icon: campaignPaused ? "play" : "pause", ariaLabel: campaignPaused ? "이벤트 자동 넘김 재생" : "이벤트 자동 넘김 일시정지", pressed: campaignPaused }) + '</div>';
 }
 
 function updateCampaign() {
@@ -163,6 +166,7 @@ function home() {
     + '<section class="balance ui-balance" aria-label="내 총자산"><div><p>내 총자산</p>'
     + uiButton("", { action: "privacy", icon: privateBalance ? "eyeOff" : "eye", ariaLabel: privateBalance ? "잔액 보기" : "잔액 숨기기", pressed: privateBalance })
     + '</div><h1>' + (privateBalance ? hidden : money(total)) + '</h1></section>'
+    + cardBox('<h2>예산 가드</h2><p>' + (budget?.enrolled ? '지금 더 쓸 수 있는 돈 <strong>' + (privateBalance ? hidden : money(budget.free_to_spend)) + '</strong>' : '남은 생활비와 저축 목표를 함께 확인해요.') + '</p>' + uiButton(budget?.enrolled ? '내 예산 보기' : '예산 설정하기', { action: 'budget', variant: 'outline' }))
     + '<section class="ui-campaign" aria-roledescription="캐러셀" aria-label="은행 이벤트">' + campaignContent() + '</section>'
     + (accountsError ? stateBlock("error", { message: accountsError, retryAction: "reload" }) : "")
     + groups.map(([kind, label, tone, glyph]) => {
@@ -186,11 +190,15 @@ function accountPage(manage) {
   const account = accountById(accountId);
   const checking = account.account_type === "CHECKING";
   const name = accountName(account);
+  const terms = detail?.terms;
   if (manage) {
     const { closing, error, busy } = manageState;
     return header("계좌 관리", "account") + '<main><section class="card"><h1>' + escape(name)
       + '</h1><dl><dt>계좌번호</dt><dd>' + escape(account.account_num) + '</dd><dt>상품</dt><dd>'
-      + escape(account.product_name) + '</dd></dl></section>'
+      + escape(account.product_name) + '</dd><dt>개설일</dt><dd>' + escape(account.opened_at?.slice(0, 10)) + '</dd>'
+      + (checking && detail ? '<dt>1회 이체 한도</dt><dd>' + (detail.per_transfer_limit == null ? '제한 없음' : money(detail.per_transfer_limit)) + '</dd><dt>1일 이체 한도</dt><dd>' + (detail.daily_transfer_limit == null ? '제한 없음' : money(detail.daily_transfer_limit)) + '</dd>' : '') + '</dl>'
+      + (terms ? '<h2>상품 정보</h2><dl><dt>적용 금리</dt><dd>연 ' + escape(terms.applied_rate) + '%</dd><dt>만기일</dt><dd>' + escape(terms.maturity_date) + '</dd>'
+        + (terms.monthly_payment ? '<dt>월 납입금</dt><dd>' + money(terms.monthly_payment) + ' (매월 ' + escape(terms.payment_day) + '일)</dd>' : '') + '</dl>' : '') + '</section>'
       + '<form data-form="rename"><label>계좌 별칭<input name="alias" maxlength="50" required value="'
       + escape(name) + '"></label><button class="primary"' + (busy ? " disabled" : "") + '>별칭 저장</button><p class="error" role="alert">'
       + (closing ? "" : escape(error)) + '</p></form>'
@@ -202,16 +210,11 @@ function accountPage(manage) {
       + (closing ? '<p class="error" role="alert">' + escape(error) + "</p>" : "") + "</section></main>";
   }
   const rows = txs.rows.filter((tx) => filter === "all" || (filter === "in" ? tx.amount > 0 : tx.amount < 0));
-  const terms = detail?.terms;
   return header("계좌 상세", "home", button("manage", "관리", "quiet")) + '<main>'
     + '<section class="hero"><div class="spread"><h1>' + escape(name) + '</h1>'
-    + button("privacy", privateBalance ? "금액 보기" : "금액 숨기기", "quiet") + "</div>"
-    + '<small>' + escape(account.account_num) + '</small><div class="spread balance-line"><span>잔액</span><strong>'
+    + uiButton('', { action: 'privacy', icon: privateBalance ? 'eyeOff' : 'eye', ariaLabel: privateBalance ? '금액 보기' : '금액 숨기기', pressed: privateBalance }) + "</div>"
+    + '<p>' + escape(account.product_name) + '</p><small>' + escape(account.account_num) + '</small><div class="spread balance-line"><span>잔액</span><strong>'
     + (privateBalance ? hidden : money(account.balance)) + '</strong></div></section>'
-    + (terms ? '<section class="card"><dl><dt>적용 금리</dt><dd>연 ' + escape(terms.applied_rate) + '%</dd><dt>만기일</dt><dd>'
-      + escape(terms.maturity_date) + "</dd>"
-      + (terms.monthly_payment ? "<dt>월 납입금</dt><dd>" + money(terms.monthly_payment) + " (매월 " + terms.payment_day + "일)</dd>" : "")
-      + "</dl></section>" : "")
     + '<section><h2>거래내역</h2><div class="segments" aria-label="거래 구분">'
     + [["all", "전체"], ["in", "입금"], ["out", "출금"]].map(([value, label]) =>
       '<button type="button" data-action="filter-' + value + '" aria-pressed="' + (filter === value) + '">' + label + "</button>").join("")
@@ -243,46 +246,82 @@ function startTransfer(source, draft, from = currentPage()) {
   go("transfer");
 }
 
-function step(next) {
+async function step(next) {
+  const draft = transfer;
+  if (transfer.busy) return;
+  await cancelTransferAction();
+  if (transfer !== draft) return;
+  transfer.action = undefined;
   transfer.step = next;
   transfer.error = "";
   transfer.key = undefined; // 내용이 바뀔 수 있으니 확인 단계로 다시 오면 새 멱등키를 쓴다
   render();
 }
 
-function finishTransfer() {
+async function finishTransfer() {
+  const draft = transfer;
+  if (transfer.busy) return;
+  await cancelTransferAction();
+  if (transfer !== draft) return;
   const from = transfer.from;
   transfer = undefined;
   go(from);
 }
 
 // 서버가 만든 승인 요청을 PIN 창으로 승인한다. 잔액·한도 검사는 서버가 요청 때와 승인 때 모두 한다
-async function submitTransfer() {
-  if (transfer.busy) return;
-  transfer.busy = true;
-  transfer.error = "";
+async function cancelTransferAction() {
+  const action = transfer?.action;
+  if (action?.status === "PENDING") await api("/approvals/" + encodeURIComponent(action.action_id) + "/reject", { method: "POST" }).catch(() => {});
+}
+
+async function prepareTransfer() {
+  const draft = transfer;
+  if (draft.busy) return;
+  draft.busy = true;
+  draft.error = "";
   render();
   try {
-    transfer.key ??= idempotencyKey();
-    const { data: action } = await api("/transfers", { method: "POST", body: {
-      from_account_id: transfer.source, to_account_num: transfer.number, amount: transfer.amount, idempotency_key: transfer.key,
+    draft.key ??= idempotencyKey();
+    const { data } = await api("/transfers", { method: "POST", body: {
+      from_account_id: draft.source, to_account_num: draft.number, amount: draft.amount, idempotency_key: draft.key,
     } });
-    transfer.key = undefined;
-    const result = action.status === "PENDING" ? await openApproval(action.action_id) : { status: action.status };
-    if (!transfer) return;
-    if (result.status === "EXECUTED") {
-      transfer.step = "done";
-      loadAccounts();
-    } else if (result.status === "REJECTED") transfer.error = "이체를 취소했어요. 돈은 빠져나가지 않았어요.";
-    else transfer.error = result.error?.message ?? action.failure_reason ?? "이체가 처리되지 않았어요.";
+    if (transfer !== draft) {
+      if (data.status === 'PENDING') await api('/approvals/' + encodeURIComponent(data.action_id) + '/reject', { method: 'POST' }).catch(() => {});
+      return;
+    }
+    draft.action = data;
+    draft.key = undefined;
+    draft.step = data.status === "EXECUTED" ? "done" : "review";
   } catch (error) {
-    if (!transfer) return;
-    // 서버가 답한 오류는 같은 키로 다시 보내면 같은 답이 오므로 키를 버린다. 연결 실패만 키를 유지한다
-    if (!(error instanceof ApiError) || error.status !== 0) transfer.key = undefined;
-    transfer.error = error.message;
+    if (!(error instanceof ApiError) || error.status !== 0) draft.key = undefined;
+    draft.error = error.message;
   }
-  transfer.busy = false;
+  draft.busy = false;
+  if (transfer === draft) render();
+}
+
+async function submitTransfer() {
+  const draft = transfer;
+  if (draft.busy) return;
+  if (!draft.action || draft.action.status !== "PENDING") return prepareTransfer();
+  draft.busy = true;
+  draft.error = "";
   render();
+  try {
+    const result = await openApproval(draft.action.action_id);
+    if (transfer !== draft) return;
+    if (result.status === "EXECUTED") {
+      draft.action = result.action;
+      draft.step = "done";
+      draft.balanceAfter = await api("/accounts/" + draft.source).then(({ data }) => data.balance).catch(() => undefined);
+      loadAccounts();
+    } else {
+      draft.action = undefined;
+      draft.error = result.status === "REJECTED" ? "이체를 취소했어요. 돈은 빠져나가지 않았어요." : result.error?.message ?? "이체가 처리되지 않았어요. 다시 확인해 주세요.";
+    }
+  } catch (error) { draft.error = error.message; }
+  draft.busy = false;
+  if (transfer === draft) render();
 }
 
 function transferPage() {
@@ -290,9 +329,9 @@ function transferPage() {
   const fromAccount = accountById(source);
   const close = header("이체", "transfer-back", button("transfer-close", "닫기", "quiet"));
   const sourceCard = '<div class="card spread"><div><small>출금 계좌</small><strong>'
-    + escape(accountName(fromAccount)) + '</strong></div><div class="right"><small>잔액</small><strong>'
+    + escape(accountName(fromAccount)) + '</strong><small>' + escape(maskAccountNumber(fromAccount.account_num)) + '</small></div><div class="right"><small>잔액</small><strong>'
     + money(fromAccount.balance) + "</strong></div></div>";
-  const review = '<dl><dt>받는 계좌</dt><dd>' + escape(number) + '</dd><dt>보낼 금액</dt><dd>' + money(amount) + "</dd></dl>";
+  const review = '<p class="transfer-summary">' + escape(transfer.action?.summary ?? '') + '</p>';
   const progress = '<p class="progress">' + ["받는 계좌", "금액", "확인"].map((label, i) =>
     i === stepOrder.indexOf(active) ? "<strong>" + label + "</strong>" : label).join(" · ") + "</p>";
   let content;
@@ -307,12 +346,12 @@ function transferPage() {
       + '</select></label><label>받는 계좌번호<input name="number" inputmode="numeric" required placeholder="계좌번호를 입력하세요" value="'
       + escape(number) + '"></label><p class="error" role="alert"></p><p class="note">다른 사람의 입출금 계좌번호를 입력하거나 내 계좌를 선택할 수 있어요.</p>'
       + '<div class="chips">' + own.map((account) =>
-        '<button type="button" class="outline" data-recipient="' + escape(account.account_num) + '">' + escape(accountName(account)) + "</button>").join("")
+        '<button type="button" class="outline" data-recipient="' + escape(account.account_num) + '">' + escape(accountName(account)) + '<small>' + (account.account_type === "SAVINGS" ? "적금 납입" : "입출금") + '</small></button>').join("")
       + '</div><div class="dock">' + sourceCard + '<button class="primary">다음</button></div></form>';
   } else if (active === "amount") {
     content = progress + '<h1>얼마를 보낼까요?</h1><p>' + escape(number) + ' 계좌로 보내요.</p>'
       + '<form data-form="amount"><label>보낼 금액<input name="amount" required inputmode="numeric" placeholder="0원" value="'
-      + (amount || "") + '"></label><p class="error" role="alert"></p><div class="dock">' + sourceCard + '<button class="primary">다음</button></div></form>';
+      + (amount || "") + '"></label><p class="error" role="alert">' + escape(error) + '</p><div class="dock">' + sourceCard + '<button class="primary"' + (busy ? ' disabled' : '') + '>' + (busy ? '확인하는 중…' : '다음') + '</button></div></form>';
   } else if (active === "review") {
     content = progress + '<h1>이체 내용을 확인해 주세요</h1><section class="card">' + review + '</section>' + sourceCard
       + (error ? '<p class="error" role="alert">' + escape(error) + "</p>" : "")
@@ -320,13 +359,13 @@ function transferPage() {
       + (busy ? "요청하는 중…" : "PIN으로 승인하기") + "</button></div>";
   } else {
     content = '<p class="success-mark" aria-hidden="true">✓</p><h1>이체를 마쳤어요</h1><section class="card">'
-      + review + '</section><div class="dock">' + button("transfer-close", "확인", "primary") + "</div>";
+      + review + (transfer.balanceAfter === undefined ? '<p class="note">최신 잔액은 계좌에서 확인해 주세요.</p>' : '<dl><dt>이체 후 잔액</dt><dd>' + money(transfer.balanceAfter) + '</dd></dl>') + '</section><div class="dock">' + button("transfer-close", "확인", "primary") + "</div>";
   }
   return close + '<main class="transfer">' + content + "</main>";
 }
 
 // 회원가입·메뉴·검색 모듈에 넘기는 화면 이동·세션 콜백
-const extCtx = { go, onSignedIn: () => go("home"), onLoggedOut: () => { reset(); go("login"); } };
+const extCtx = { go, startTransfer, onSignedIn: () => go("home"), onLoggedOut: () => { reset(); go("login"); } };
 
 function render() {
   const focus = restoreFocus(app);
@@ -337,17 +376,20 @@ function render() {
   unmountChat = undefined;
   unmountProducts?.();
   unmountProducts = undefined;
+  unmountBudget?.();
+  unmountBudget = undefined;
   const page = currentPage();
   const ext = () => '<div id="ext-screen"></div>';
   const body = {
     login, home, account: () => accountPage(false), manage: () => accountPage(true),
     chat: () => '<div class="chat-screen" id="chat-screen"></div>' + nav("chat"), transfer: transferPage,
     cards: () => '<div class="cards-screen" id="cards-screen"></div>' + nav("cards"),
-    signup: ext, menu: () => ext() + nav("menu"), search: ext,
+    budget: ext, signup: ext, menu: () => ext() + nav("menu"), search: ext,
     products: () => '<div class="products-app" id="products-screen"></div>' + nav("products"),
   }[page]();
   app.innerHTML = body;
   app.dataset.page = page;
+  if (page === "budget") unmountBudget = mountBudget(app.querySelector("#ext-screen"), { go, onChanged: loadAccounts });
   if (page === "signup") mountSignup(app.querySelector("#ext-screen"), extCtx);
   if (page === "menu") mountMenu(app.querySelector("#ext-screen"), extCtx);
   if (page === "search") mountSearch(app.querySelector("#ext-screen"), extCtx);
@@ -407,7 +449,7 @@ app.addEventListener("submit", async (event) => {
     case "amount": {
       transfer.amount = parseAmount(data.get("amount"));
       if (!transfer.amount) return formError(form, "1원 이상의 금액을 숫자로 입력해 주세요.");
-      step("review");
+      return prepareTransfer();
       break;
     }
   }
@@ -455,6 +497,7 @@ app.addEventListener("click", async (event) => {
       }
     case "submit-transfer": return submitTransfer();
     case "privacy": privateBalance = !privateBalance; return render();
+    case "campaign-prev":
     case "campaign": campaign = 1 - campaign; updateCampaign(); return syncCampaignTimer();
     case "campaign-pause": campaignPaused = !campaignPaused; updateCampaign(); return syncCampaignTimer();
     case "start-transfer": return startTransfer();
@@ -477,7 +520,7 @@ app.addEventListener("change", (event) => {
 });
 
 window.addEventListener("hashchange", () => {
-  if (location.hash !== "#transfer") transfer = undefined;
+  if (location.hash !== "#transfer" && transfer) { cancelTransferAction(); transfer = undefined; }
   render();
   if (location.hash === "#home" && isSignedIn()) loadAccounts();
   const heading = app.querySelector("h1");

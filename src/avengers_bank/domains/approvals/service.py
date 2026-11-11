@@ -8,22 +8,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from avengers_bank.core.exceptions import BadRequestException, ConflictException, NotFoundException
 from avengers_bank.domains.accounts.money import TransferRejected, execute_transfer
 from avengers_bank.domains.accounts.service import run_open_deposit
-from avengers_bank.domains.cards.service import run_unsuspend_card
+from avengers_bank.domains.cards.service import run_budget_card_payment, run_unsuspend_card
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
+from avengers_bank.domains.budget.models import BudgetDecision
+from avengers_bank.domains.budget.service import run_budget_disable, run_budget_update
 from avengers_bank.domains.users.service import user_service
 
 
-async def run_transfer(db: AsyncSession, action: PendingAction) -> None:
+async def run_transfer(db: AsyncSession, action: PendingAction, emergency: bool = False) -> None:
     p = action.payload
     await execute_transfer(
         db, owner_user_id=action.user_id, from_account_id=p["from_account_id"], to_account_id=p["to_account_id"],
         amount=p["amount"], action_id=action.action_id, memo=p.get("memo"),
+        budget_check=p.get("budget_check"), emergency=emergency,
     )
 
 
-# action_type → 실행 함수. 새 승인 대상(카드 해제 등)은 여기에 추가한다
-EXECUTORS = {"TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit, "UNSUSPEND_CARD": run_unsuspend_card}
+# action_type → 실행 함수. 새 승인 대상(카드 해제 등)은 여기에 추가한다.
+# 예산을 넘는 건(needs_budget_reason)의 실행 함수는 emergency를 받는다
+EXECUTORS = {
+    "TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit, "UNSUSPEND_CARD": run_unsuspend_card,
+    "BUDGET_CARD_PAYMENT": run_budget_card_payment, "BUDGET_DISABLE": run_budget_disable, "BUDGET_UPDATE": run_budget_update,
+}
 
 
 def as_utc(value: datetime) -> datetime:
@@ -45,12 +52,15 @@ class ApprovalService:
         return await approval_repository.find_pending(db, user_id, datetime.now(UTC))
 
     async def approve(
-        self, db: AsyncSession, user_id: int, action_id: uuid.UUID, pin: str, ip: str | None = None
+        self, db: AsyncSession, user_id: int, action_id: uuid.UUID, pin: str, ip: str | None = None,
+        reason: str | None = None, emergency: bool = False,
     ) -> PendingAction:
         # 남의 작업(404)이나 이미 처리·만료된 작업(409)이면 PIN을 묻기 전에 알린다: PIN 실패로 세지 않게
         action = await self.get(db, user_id, action_id)
         if action.status != "PENDING" or as_utc(action.expires_at) <= datetime.now(UTC):
             await self._explain_not_claimable(db, user_id, action_id, datetime.now(UTC))
+        if action.needs_budget_reason and not reason:  # 사유 누락도 PIN 확인 전에 (PIN 실패로 세지 않게)
+            raise BadRequestException(message="예산을 넘는 지출이라 사유를 적어야 합니다.", code="BUDGET_REASON_REQUIRED")
         await db.rollback()
         await user_service.verify_pin(db, user_id, pin, ip=ip, target=str(action_id))
 
@@ -60,9 +70,15 @@ class ApprovalService:
             action = await approval_repository.claim(db, action_id, user_id, now, "APPROVED")
             if action is None:
                 await self._explain_not_claimable(db, user_id, action_id, now)
+            budget = action.budget_check if action.needs_budget_reason else None
             try:
-                await EXECUTORS[action.action_type](db, action)
+                await EXECUTORS[action.action_type](db, action, **({"emergency": emergency} if budget else {}))
                 action.status, action.executed_at = "EXECUTED", now
+                if budget:  # 사람이 확인한 예산 초과 지출의 기록 (같은 트랜잭션: 실행되면 반드시 남음)
+                    db.add(BudgetDecision(
+                        user_id=user_id, action_id=action.action_id, amount=budget["amount"],
+                        free_to_spend_at_confirm=budget["free_before"], reason=reason, emergency=emergency,
+                    ))
             except TransferRejected as e:
                 # 실행 직전 재검사에서 막힘 (규칙 3). 돈은 움직이지 않고 실패만 남긴다
                 failure = e

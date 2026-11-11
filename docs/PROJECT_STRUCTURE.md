@@ -20,7 +20,7 @@ avengers-bank/
 │   ├── app.mjs             # 화면 이동·로그인·홈·계좌·이체
 │   ├── api.mjs, approval.mjs # API 클라이언트(토큰 갱신·오류 코드), 공통 PIN 승인 창
 │   ├── ui.mjs, ui.css, ui.README.md # 디자인 값, 공통 UI 부품·사용법 (홈·하단 탭부터 이관)
-│   ├── assets/event-bank.webp # 홈 이벤트 배너 그림
+│   ├── assets/*.webp         # 홈 이벤트·추천 상품 배너 전체 이미지
 │   ├── cards.mjs, products.mjs, chat.mjs # 카드, 상품·가입, AI 상담(SSE)
 │   ├── signup.mjs, settings.mjs, search.mjs # 회원가입, 메뉴·PIN 변경, 거래 검색
 │   └── *.test.mjs, integration.browser.mjs # 순수 함수 테스트(node --test), 실제 브라우저 통합 점검
@@ -63,8 +63,9 @@ avengers-bank/
         ├── audit/          # 감사 기록(로그인·PIN 실패 등)         ✅ 기록만
         ├── transfers/      # 이체 요청 (테이블 없음)             ✅ 승인 대기 생성
         ├── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소·대금 출금(/system)
-        ├── agent/          # AI 상담: 라우터 + 계좌·카드·상품 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl) ✅
-        ├── mcp_server/     # MCP 도구 16개(REST를 사용자 토큰으로), HTTP /mcp + 로컬 stdio(login, 토큰 파일) ✅
+        ├── agent/          # AI 상담: 라우터 + 계좌·카드·상품·예산 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl) ✅
+        ├── mcp_server/     # MCP 도구 18개(REST를 사용자 토큰으로, 예산은 읽기만), HTTP /mcp + 로컬 stdio(login, 토큰 파일) ✅
+        ├── budget/         # 월급 주기 계산(calc.py), 신청·조회·검사·변경·해지 API, 결제 잠금·재검사 (ADR 0024) ✅
         └── rag/            # 상품·약관 RAG: 데모 약관(docs/*.md), 청킹, Gemini 연결(ai.py), 하이브리드 검색, 평가(golden.jsonl) ✅
 ```
 

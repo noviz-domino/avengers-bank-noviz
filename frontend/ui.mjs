@@ -27,6 +27,14 @@ export function button(label, { action, variant = "quiet", icon: glyph, ariaLabe
   return `<button type="button" class="ui-button ui-button--${esc(variant)} ${esc(className)}"${action ? ` data-action="${esc(action)}"` : ""}${ariaLabel ? ` aria-label="${esc(ariaLabel)}"` : ""}${pressed === undefined ? "" : ` aria-pressed="${!!pressed}"`}>${glyph ? icon(glyph) : ""}${esc(label)}</button>`;
 }
 
+export function carouselPager(page, count, { previous, next }) {
+  return `<div class="ui-carousel-controls">
+    ${button("", { action: previous, icon: "back", ariaLabel: "이전 배너" })}
+    <span class="ui-carousel-page" role="status">${esc(page)} / ${esc(count)}</span>
+    ${button("", { action: next, icon: "arrow", ariaLabel: "다음 배너" })}
+  </div>`;
+}
+
 export function header({ title = "", brandHtml = "", back, rightHtml = "" } = {}) {
   return `<header class="ui-header">${back ? button("", { action: back, icon: "back", ariaLabel: "뒤로 가기", className: "ui-back" }) : ""}<div class="ui-header-title">${brandHtml || esc(title)}</div><div class="ui-header-actions">${rightHtml}</div></header>`;
 }

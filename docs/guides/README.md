@@ -19,9 +19,10 @@
 | 8 | [신용카드 대금 출금](08-card-bills.md) | 서버 키로 부르는 시스템 API. 결제일 전날까지 쓴 것을 묶어 전액 출금, 못 내면 연체로 결제 막기 |
 | 9 | [계좌 해지](09-account-close.md) | 잔액 0·쓸 수 있는 카드 없음·안 낸 대금 없음일 때만. 해지 뒤 취소는 환불 대기, 상담원이 다른 계좌로 |
 | 10 | [RAG](10-rag.md) | 조항 단위 청크를 pgvector에. 벡터 + BM25를 RRF로 합쳐 근거 5개, Gemini가 근거만으로 답하고 서버가 인용을 검사 |
-| 11 | [MCP 서버](11-mcp.md) | 도구 16개가 사용자 토큰으로 REST만 부른다. HTTP(/mcp)와 로컬 stdio(refresh token 파일, 교체 잠금) |
-| 12 | [AI 상담 Agent](12-agent.md) | 라우터가 담당을 고르고, 담당은 MCP 도구로 REST를 부른다. 토큰은 ContextVar, 대화는 PostgreSQL |
+| 11 | [MCP 서버](11-mcp.md) | 도구 18개가 사용자 토큰으로 REST만 부른다. HTTP(/mcp)와 로컬 stdio(refresh token 파일, 교체 잠금) |
+| 12 | [AI 상담 Agent](12-agent.md) | 라우터가 담당(계좌·카드·상품·예산)을 고르고, 담당은 MCP 도구로 REST를 부른다. 예산 담당은 서버 숫자를 설명만. 토큰은 ContextVar, 대화는 PostgreSQL |
 | 13 | [모바일 데모](13-mobile-demo.md) | 일반 이체와 상담 이체가 하나의 확인·PIN 승인 경로로 합류 |
+| 15 | [예산 관리와 결제 가드](15-budget.md) | 같은 서버 계산을 화면·결제·AI가 사용하며, 초과 결제와 제한 완화는 사람이 PIN으로 확인 |
 
 ## 면접에서 한 문장으로 말한다면
 

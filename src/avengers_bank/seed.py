@@ -27,6 +27,7 @@ from avengers_bank.domains.accounts.categories import classify
 from avengers_bank.domains.accounts.repository import account_repository
 from avengers_bank.domains.accounts.service import DEFAULT_DAILY_TRANSFER_LIMIT, DEFAULT_PER_TRANSFER_LIMIT
 from avengers_bank.domains.accounts.models import Account, AccountTerms, AccountTransaction
+from avengers_bank.domains.budget.models import BudgetProfile, FixedExpense
 from avengers_bank.domains.products.eligibility import add_months
 from avengers_bank.domains.products.models import AccountProduct, ProductPreferentialRate
 from avengers_bank.domains.cards.models import CardProduct
@@ -177,6 +178,19 @@ async def seed_demo_user(db: AsyncSession) -> bool:
             rate_detail=[{"code": "MARKETING_AGREED", "rate": "0.20"}],
             maturity_date=add_months(today, 12), monthly_payment=300_000, payment_day=min(today.day, 28),
         ))
+        # 예산 관리 시연 (ADR 0024). 월급날을 오늘로 둬서 주기가 막 시작된 상태: 위 장부의 지출 65만이 이번 주기에 들어가고
+        # 자유 사용 가능액은 약 87.5만 (300만 - 쓴 65만 - 월세·통신 65.5만 - 생활비 1.9만×30일 - 휴대폰 저축 25만).
+        # 1,000원 이체는 그대로, 100만 원 이체는 승인 화면에서 사유를 받는다
+        db.add(BudgetProfile(
+            user_id=user.user_id, monthly_income=3_000_000, payday=min(today.day, 28),
+            essentials={"식사": 15_000, "교통": 4_000}, always_allow=["의료"],
+            goal_name="휴대폰", goal_target_amount=1_500_000, goal_months=6, goal_monthly_amount=250_000,
+        ))
+        await db.flush()
+        db.add_all([
+            FixedExpense(user_id=user.user_id, name="월세", amount=600_000, day=25),
+            FixedExpense(user_id=user.user_id, name="통신", amount=55_000, day=13),
+        ])
     return True
 
 

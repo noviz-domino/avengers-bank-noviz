@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 async def api_exception_handler(request: Request, exc: ApiException) -> JSONResponse:
-    body = ErrorResponse(error=ErrorDetail(code=exc.code, message=exc.message))
+    body = ErrorResponse(error=ErrorDetail(code=exc.code, message=exc.message, data=exc.data))
     return JSONResponse(
         status_code=exc.status_code,
-        content=body.model_dump(mode="json"),
+        content=body.model_dump(mode="json", exclude_none=True),  # data가 없으면 예전 모양 그대로
         headers=exc.headers,
     )
 

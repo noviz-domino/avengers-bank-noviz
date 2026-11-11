@@ -7,6 +7,13 @@
 .ext-form label.check input { width: 22px; min-height: 22px; }
 .ext-menu > * + *, .ext-search > * + * { margin-top: 14px; }
 .ext-menu .card h2 { margin-bottom: 10px; }
+.menu-group summary { cursor: pointer; list-style: none; font-size: var(--ui-section-size); font-weight: 800; }
+.menu-group summary::-webkit-details-marker { display: none; }
+.menu-group[open] summary > .ui-icon { transform: rotate(180deg); }
+.menu-group-body > * { margin-top: var(--ui-space-md); }
+.menu-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.menu-shortcuts .ui-button { justify-content: flex-start; white-space: normal; text-align: left; }
+.ext-menu [aria-invalid="true"], .ext-form [aria-invalid="true"] { border-color: var(--ui-error); }
 .ext-menu form .primary { margin-top: 14px; }
 .menu-list { padding: 4px 16px; }
 .menu-list button { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 48px; border: 0; background: transparent; text-align: left; }
