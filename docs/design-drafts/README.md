@@ -141,10 +141,9 @@
 - [33-transfer-reference-toss.png](33-transfer-reference-toss.png): 추가 세트 1번. 큰 질문, 간결한 입력 영역과 하단 출금 계좌 요약.
 - [34-transfer-reference-kakaopay.png](34-transfer-reference-kakaopay.png): 추가 세트 2번. 간결한 계좌 정보, 밑줄 입력과 하단 고정 다음 버튼.
 - **추가 시안 1번(토스 참조) 선택**: 33-transfer-reference-toss.png. 번호는 추가 세트의 표시 순서이며 기존 1~3번과 별개.
-- 토스 공식 페이지: https://toss.im/service/easy-remittance (조회 시 영문 소개 페이지로 이동). 실제 화면 이미지: references/toss-official-transfer-contacts.png. 큰 질문과 단일 목적 화면의 계층을 참고. 연락처·카카오톡 송금 기능과 원본 브랜드는 도입하지 않음.
-- 카카오페이 공식 가이드: https://t1.daumcdn.net/kakaopay/static/guide/account-remittance-app-link/index.html (2023-02-13 v1.0). 실제 화면 이미지: references/kakaopay-official-transfer-flow-2023.png. 입력·확인 단계의 간결한 배치만 참고하며 최신 앱 화면으로 주장하지 않음.
-- 참고 폴더의 toss-official-transfer-flow.png는 장식 효과 이미지, toss-official-transfer-screen.png는 비어 있는 기기 목업으로, UI 시안 생성에는 사용하지 않음.
-- 생성 도구: 기본 제공 Imagegen. 기존 이체 2번 이미지와 각 공식 화면 이미지를 실제 입력으로 첨부. 프롬프트 방향: 간결한 질문형 이체 / 차분한 계좌 입력.
+- 토스 공식 페이지: https://toss.im/service/easy-remittance (조회 시 영문 소개 페이지로 이동). 큰 질문과 단일 목적 화면의 계층을 참고. 연락처·카카오톡 송금 기능과 원본 브랜드는 도입하지 않음.
+- 카카오페이 공식 가이드: https://t1.daumcdn.net/kakaopay/static/guide/account-remittance-app-link/index.html (2023-02-13 v1.0). 입력·확인 단계의 간결한 배치만 참고하며 최신 앱 화면으로 주장하지 않음.
+- 생성 도구: 기본 제공 Imagegen. 기존 이체 2번 이미지와 공식 소개 화면을 참고. 프롬프트 방향: 간결한 질문형 이체 / 차분한 계좌 입력.
 - 두 안 모두 정적인 시안이며 입력 공백 상태의 버튼 활성/비활성·계좌번호 지우기 아이콘 노출 조건은 구현 전 정리 필요.
 
 ## 이체 선택 및 팀원 은행 연동 계획 (2026-11-08)
@@ -171,8 +170,8 @@
 - 메모를 변경하면 PIN 승인 전 서버 요청 내용과 다시 일치시켜야 하며, 확정 후 클라이언트 입력으로 승인 내용을 바꾸지 않도록 함.
 - 흐름은 취소·이탈 시 종료. 실행 중 통신 결과 불명은 실제 처리 상태를 조회하여 중복 송금을 피해야 함.
 - 실패·잔액 부족·한도 초과·잘못된 PIN·잠금·처리 중 상태는 다음 설계에서 다뤄야 함. 성공 화면을 낙관적으로 먼저 표시하지 않음.
-- 기존 선택 시안33과 토스 공식 송금 소개의 실제 UI 이미지 references/toss-official-transfer-contacts.png를 네 생성 호출에 첨부. 토스 최신 금액/확인/PIN/완료 화면을 직접 캡처·복제한 것으로 주장하지 않음. 큰 질문, 간결한 입력, 여백을 우리 은행 흐름에 적용한 디자인.
-- 공식 출처: https://toss.im/service/easy-remittance . 이번 추가 다운로드 references/toss-official-transfer-hero.jpg는 인물 홍보 사진으로, UI 생성에는 사용하지 않음.
+- 기존 선택 시안33과 토스 공식 송금 소개 화면을 참고. 토스 최신 금액/확인/PIN/완료 화면을 직접 캡처·복제한 것으로 주장하지 않음. 큰 질문, 간결한 입력, 여백을 우리 은행 흐름에 적용한 디자인.
+- 공식 출처: https://toss.im/service/easy-remittance
 - 생성 도구: 기본 제공 Imagegen. 공통 프롬프트는 기존 브랜드·390x844·24px 여백·큰 질문·단일 업무·일관된 5만 원 시나리오를 지정하고, 역할별로 금액 입력 / 승인 전 내용 확인 / 6자리 PIN / 성공 확인 후 결과를 각각 요청.
 
 ## 이체 로고 크기 수정 (2026-11-08, 최신본)

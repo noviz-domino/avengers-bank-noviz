@@ -257,7 +257,7 @@ Claude Desktop 설정(`claude_desktop_config.json`)에 추가합니다. `--direc
 ```json
 { "mcpServers": { "avengers-bank": {
     "command": "uv",
-    "args": ["--directory", "C:/Users/USER/Desktop/261103미니프로젝트/avengers-bank-noviz", "run", "python", "-m", "avengers_bank.domains.mcp_server"],
+    "args": ["--directory", "<이 레포를 받은 폴더 경로>", "run", "python", "-m", "avengers_bank.domains.mcp_server"],
     "env": { "AVENGERS_API_URL": "http://localhost:8000" } } } }
 ```
 
