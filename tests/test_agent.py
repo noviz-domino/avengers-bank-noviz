@@ -471,3 +471,15 @@ async def test_budget_not_enrolled_and_purchase_check(bank, monkeypatch):
     assert [(r.url.path, r.url.params.get("amount")) for r in budget.seen] == [("/budget", None), ("/budget/check", "300000")]
     # 프롬프트 규칙: 계산하지 않고, 초과 결제를 대신 확인하지 않는다
     assert "계산하지 않는다" in PROMPTS["budget"] and "PIN" in PROMPTS["budget"]
+
+
+async def test_chat_rate_limit_counts_conversations_not_ai_calls(bank):
+    # 1분 한도는 대화 수(6번)로, 하루 한도는 AI 호출 수(상담 1번 = 3)로 센다 (ADR 0026, 개발 기록 2026-11-11)
+    client, me, *_, fake = bank
+    fake.routes = [Plan(reply="안녕하세요.") for _ in range(7)]
+    codes = [(await chat(client, me, "안녕")).status_code for _ in range(7)]
+    assert codes == [200] * 6 + [429]
+    blocked = await chat(client, me, "안녕")
+    assert blocked.json()["error"]["code"] == "AI_RATE_LIMITED" and "1분에 6번" in blocked.json()["error"]["message"]
+    assert sum(rag_router.daily_calls.values()) == 6 * 3  # 비용 상한은 그대로 호출 수 기준
+
