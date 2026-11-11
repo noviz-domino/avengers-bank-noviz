@@ -33,6 +33,7 @@
 | [0025](0025-https-caddy-duckdns.md) | 서버 공개 주소: DuckDNS + Caddy로 HTTPS | 채택 | 2026-11-11 |
 | [0026](0026-ai-daily-limit.md) | 서버 전체 AI 호출 하루 한도 | 채택 | 2026-11-11 |
 | [0027](0027-compact-layout-chat-login.md) | 화면 여백 줄이기, AI 상담 채팅형 개편, 로그인 화면 다시 디자인 (시안 B 선택, A·C는 문서로 보관) | 채택 | 2026-11-11 |
+| [0028](0028-static-no-cache.md) | 모바일 웹 파일은 쓸 때마다 서버에 확인 (Cache-Control: no-cache) | 채택 | 2026-11-11 |
 
 ## 새로 쓰는 법
 
