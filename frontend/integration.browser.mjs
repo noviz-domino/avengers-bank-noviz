@@ -14,7 +14,10 @@ export async function verifyIntegration(win = window) {
       let value;
       try { value = condition(); } catch { value = false; }
       if (value) return value;
-      if (Date.now() > end) throw new Error("시간 초과: " + message);
+      if (Date.now() > end) {  // 실패한 순간의 화면을 함께 남겨 원인을 바로 볼 수 있게
+        const screen = (doc.querySelector("#app")?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+        throw new Error(`시간 초과: ${message} (화면 ${win.location.hash || "#"}: ${screen})`);
+      }
       await sleep(50);
     }
   }
@@ -83,7 +86,7 @@ export async function verifyIntegration(win = window) {
   await waitFor(() => checkingRows().length >= 2, "홈 복귀");
   step("홈 계좌번호 가림·상세의 전체 번호 확인");
   await click(`[data-action="account-${from.id}"]`);
-  await waitFor(() => q(".rows li") || q(".empty"), "거래내역 목록");
+  await waitFor(() => q(".tx-list li") || q(".ui-state--empty"), "거래내역 목록");  // #38: 날짜별 목록·공통 빈 상태
   await waitText("잔액");
   step("계좌 상세와 거래내역 표시");
   fits("계좌 상세");
