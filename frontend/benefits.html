@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>내 혜택 찾기 · 캡아메리카뱅크</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./benefits.mjs"></script>
+</head>
+<body class="app">
+  <main>
+    <a href="./">은행 홈</a>
+    <h1>내 혜택 찾기</h1>
+    <p>평소 소비에 맞는 혜택을 고르고, 오늘 쓸 수 있는 주변 코스를 찾아보세요.</p>
+    <p id="status" role="status" aria-live="polite"></p>
+    <form id="login">
+      <label>아이디<input name="login_id" autocomplete="username" required></label>
+      <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="primary">로그인</button>
+    </form>
+    <div id="benefits" hidden>
+      <p><label><span><input id="demo" type="checkbox" checked> 예시 소비·매장 데이터로 시연</span></label></p>
+      <section class="card benefit-panel">
+        <h2>100크레딧 혜택 조합</h2>
+        <p>최근 완료된 3개월의 카드 이용 패턴으로 추천해요. 데모 상품의 구성안은 코스에서 미리 볼 수 있어요.</p>
+        <form id="bundle-form">
+          <label>요청<textarea name="message" rows="2" maxlength="1000" required>내 소비 패턴을 분석해서 혜택 조합을 추천해줘.</textarea></label>
+          <button class="primary">혜택 추천 받기</button>
+        </form>
+        <div id="bundle-result" aria-live="polite"></div>
+        <form id="selection-form">
+          <fieldset>
+            <legend>저장할 혜택 구성</legend>
+            <div id="options"></div>
+          </fieldset>
+          <p id="credits" aria-live="polite"></p>
+          <button class="outline">구성안 저장</button>
+        </form>
+      </section>
+      <section class="card benefit-panel">
+        <h2>근처 식사·카페 코스</h2>
+        <p>돌아오는 시간까지 추정해요. 실제 매장 모드에서 위치를 공유하면 주변 검색에 카카오맵을 사용해요.</p>
+        <form id="plan-form">
+          <label>예산 (원)<input name="budget" type="number" min="1000" max="500000" value="20000" required></label>
+          <label>가용 시간 (분)<input name="minutes" type="number" min="1" max="240" value="45" required></label>
+          <fieldset id="live-inputs" hidden disabled>
+            <legend>실제 매장 검색</legend>
+            <label>식사 예상 가격 (원)<input name="meal" type="number" min="1000" max="500000" value="12000" required></label>
+            <label>카페 예상 가격 (원)<input name="cafe" type="number" min="1000" max="500000" value="5000" required></label>
+            <button id="share-location" class="outline" type="button">현재 위치 공유</button>
+          </fieldset>
+          <label><span><input name="allow_channel" type="checkbox"> 채널 추가 조건이 있는 쿠폰도 포함</span></label>
+          <label><span><input name="preview" type="checkbox"> 저장한 100크레딧 조합 미리보기</span></label>
+          <label>요청<textarea name="message" rows="2" maxlength="1000" required>지금 근처에서 밥 먹고 커피까지 마시고 돌아오는 코스를 짜줘.</textarea></label>
+          <button class="primary">코스 찾아보기</button>
+        </form>
+        <div id="plan-result" aria-live="polite"></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

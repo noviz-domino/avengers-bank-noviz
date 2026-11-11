@@ -112,8 +112,8 @@ class AccountTransaction(Base):
     tx_type: Mapped[str] = mapped_column(String(20), nullable=False)
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)
     balance_after: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    counterparty_name: Mapped[str | None] = mapped_column(String(50))
-    counterparty_account: Mapped[str | None] = mapped_column(String(30))
+    counterparty_name: Mapped[str | None] = mapped_column(String(101))
+    counterparty_account: Mapped[str | None] = mapped_column(String(50))
     memo: Mapped[str | None] = mapped_column(String(100))
     category: Mapped[str | None] = mapped_column(String(30))  # 예산 기능에서 categories FK로 바꿈
     created_at: Mapped[datetime] = mapped_column(

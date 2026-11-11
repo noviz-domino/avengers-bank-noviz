@@ -12,7 +12,8 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; }
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
+input[type="checkbox"] { width: auto; }
 button { color: inherit; cursor: pointer; }
 button:disabled { opacity: .5; cursor: wait; }
 :focus-visible { outline: 3px solid #5482b1; outline-offset: 3px; }
@@ -54,6 +55,10 @@ svg { display: block; width: 100%; height: auto; }
 .quiet { padding: 0 7px; font-size: .84rem; color: var(--blue); font-weight: 700; }
 main { flex: 1; padding: 22px 24px 28px; }
 main > * + * { margin-top: 20px; }
+.benefit-panel { margin-top: 16px; }
+.benefit-panel > * + *, .benefit-panel article > * + * { margin-top: 10px; }
+.benefit-panel fieldset { margin: 10px 0; border: 1px solid var(--line); }
+.benefit-panel article { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .right { text-align: right; }
 .right strong, .card strong { display: block; }
@@ -124,7 +129,7 @@ main > * + * { margin-top: 20px; }
 .bank .brand svg { width: 18px; }
 label { display: grid; gap: 8px; font-weight: 700; }
 label + label { margin-top: 12px; }
-input, select {
+input, select, textarea {
   width: 100%;
   min-width: 0;
   min-height: 48px;

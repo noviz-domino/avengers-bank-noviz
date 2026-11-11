@@ -4,15 +4,33 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
+from avengers_bank.core.dependencies import get_current_user
 from avengers_bank.core.responses import SuccessResponse, error_responses
+from avengers_bank.domains.products.benefit_schemas import BenefitBundle, BenefitSettings, BundleUpdate
+from avengers_bank.domains.products.benefits import get_benefits, save_benefits
 from avengers_bank.domains.products.schemas import (
     AccountProductDetailResponse,
     AccountProductResponse,
     AccountProductType,
 )
 from avengers_bank.domains.products.service import product_service
+from avengers_bank.domains.users.schemas import UserResponse
 
 router = APIRouter(prefix="/products", tags=["products"], responses=error_responses(422))
+DB = Annotated[AsyncSession, Depends(get_db)]
+Me = Annotated[UserResponse, Depends(get_current_user)]
+
+
+@router.get("/benefits", response_model=SuccessResponse[BenefitSettings], responses=error_responses(401))
+async def get_benefit_settings(db: DB, me: Me):
+    """은행의 혜택 카탈로그와 내 100크레딧 구성안."""
+    return SuccessResponse[BenefitSettings](data=await get_benefits(db, me.user_id))
+
+
+@router.put("/benefits", response_model=SuccessResponse[BenefitBundle], responses=error_responses(400, 401))
+async def save_benefit_settings(data: BundleUpdate, db: DB, me: Me):
+    """내 혜택 미리보기 구성을 저장한다. 할인율과 비용은 은행의 카탈로그로 검증한다."""
+    return SuccessResponse[BenefitBundle](data=await save_benefits(db, me.user_id, data.offer_ids))
 
 
 @router.get("/accounts", response_model=SuccessResponse[list[AccountProductResponse]])

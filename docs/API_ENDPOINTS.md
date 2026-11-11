@@ -77,6 +77,8 @@
 | ✅ | GET | `/products/accounts?type=` | | **판매 중인** 계좌·대출 상품 목록 (`type` = CHECKING·DEPOSIT·SAVINGS·LOAN, 생략하면 전체) |
 | ✅ | GET | `/products/accounts/{product_id}` | | 상품 상세: 설명, 가입 조건, 우대금리 조건. 판매 중이 아니면 `404 PRODUCT_NOT_FOUND` |
 | ✅ | GET | `/products/cards?type=` | | 카드 상품 목록 (아래 cards 절) |
+| ✅ | GET | `/products/benefits` | 🔒 | 은행 혜택 카탈로그(`catalogue`)와 내가 저장한 100크레딧 구성(`saved`). 저장한 구성이 지금 카탈로그와 맞지 않으면 빈 구성 + `needs_review: true` ([ADR 0023](decisions/0023-card-protection-and-benefits.md)) |
+| ✅ | PUT | `/products/benefits` | 🔒 | 혜택 구성 저장(`offer_ids`, 6개까지). **미리보기**이고 실제 결제 금액에는 적용 안 함. 실패: `400 UNKNOWN_BENEFIT`(카탈로그에 없는 혜택), `400 BENEFIT_CONSTRAINT`(100크레딧 초과 또는 같은 업종 둘) |
 
 <details>
 <summary>응답 예시</summary>
@@ -199,6 +201,7 @@
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
 | ✅ | POST | `/transfers` | 🔒 | 이체 요청 → `202` 승인 대기. 같은 `idempotency_key`로 다시 오면 `200`으로 처음 것을 돌려줌 |
+| ✅ | GET | `/transfers/banks` | 🔒 | ClearingHub에 참가한 다른 은행 목록 |
 
 - 보내는 계좌: 내 **입출금** 계좌만. 받는 계좌: 다른 사람의 **입출금** 계좌, 또는 **내 적금**(납입)
 - 요청 때 잔액·1회 한도·1일 한도(오늘 한국 날짜, `TRANSFER_OUT`만)를 미리 검사하고, **승인 때 같은 검사를 잠금 안에서 다시** 합니다
@@ -219,6 +222,16 @@
 ```
 실패: `400 INSUFFICIENT_BALANCE`, `400 PER_TRANSFER_LIMIT_EXCEEDED`, `400 DAILY_LIMIT_EXCEEDED`, `400 ACCOUNT_NOT_FOUND`(보내는 계좌가 없거나 남의 것), `400 RECEIVER_NOT_FOUND`, `400 ACCOUNT_CANNOT_SEND`(입출금 아님), `400 ACCOUNT_CANNOT_RECEIVE`, `400 SAME_ACCOUNT`, `409 IDEMPOTENCY_KEY_REUSED`(같은 키, 다른 내용. 메모도 비교), `409 DUPLICATE_REQUEST`(같은 키가 동시에 옴)
 </details>
+
+타행 이체는 `POST /transfers`에 허브가 배정한 3자리 `to_bank`를 추가합니다. 서버가 수취인 이름을 조회해 PIN 승인 요약에 넣습니다. 승인 직후 `APPROVED`와 `result.clearing_status: PENDING`을 반환하며, `GET /approvals/{action_id}`에서 `COMPLETED` 또는 `FAILED`를 확인합니다. 타행 설정이 비어 있으면 `503 CLEARING_DISABLED`입니다.
+
+| 메서드 | 허브 콜백 | 역할 |
+|---|---|---|
+| POST | `/interbank/inquiry` | 활성 입출금 계좌 수취인 확인 |
+| POST | `/interbank/receive` | 검증된 타행 입금 한 번 기록 |
+| GET | `/interbank/receive/{transfer_id}` | 이미 반영된 입금 확인 |
+
+콜백은 [ClearingHub 규격](https://github.com/jjh7757/clearing-hub/blob/main/docs/SPEC.md)의 4절 Ed25519 서명과 JSON 응답을 사용합니다.
 
 ## approvals: 승인 (`domains/approvals`)
 
@@ -245,8 +258,12 @@
 | ✅ | GET | `/cards`, `/cards/{card_id}` | 🔒 | 내 카드 목록·상세 |
 | ✅ | POST | `/cards/{card_id}/suspend` | 🔒 | 정지(`reason: SUSPENDED`) 또는 분실 신고(`LOST`). **바로** 적용. 분실은 되돌릴 수 없음 |
 | ✅ | POST | `/cards/{card_id}/unsuspend` | 🔒 | 정지 해제 요청 → `202` 승인 대기(`UNSUSPEND_CARD`). PIN 승인 때 상태를 다시 보고 풂 |
-| ✅ | POST | `/cards/{card_id}/payments` | 🔒 | **가맹점 결제 흉내**(`merchant_name`, `amount`, `idempotency_key`). PIN 없이 바로 `201`. 체크는 결제 계좌에서 출금, 신용은 사용 기록(`UNBILLED`). 같은 요청 번호면 처음 결과 `200`. Agent 도구에 없음 ([ADR 0010](decisions/0010-card-payments.md)) |
-| ✅ | GET | `/cards/{card_id}/transactions` | 🔒 | 사용내역 (최근 순) |
+| ✅ | POST | `/cards/{card_id}/payments` | 🔒 | **가맹점 결제 흉내**(`merchant_name`, `amount`, `idempotency_key`). PIN 없이 바로 `201`. 체크는 결제 계좌에서 출금, 신용은 사용 기록(`UNBILLED`). 같은 요청 번호면 처음 결과 `200`. Agent 도구에 없음 ([ADR 0010](decisions/0010-card-payments.md)). 결제 보호를 켠 사용자는 `409 MERCHANT_CHANNEL_REQUIRED` (가맹점 경로 `POST /system/card-payments/{card_id}`만) |
+| ✅ | GET | `/cards/{card_id}/transactions?payment_date=` | 🔒 | 사용내역 (최근 순). `payment_date`(한국 날짜)를 주면 그날 승인된 거래만 |
+| ✅ | GET | `/cards/protection` | 🔒 | 내 결제 보호 설정: `location_check`, `active_from`·`active_until`(한국 시간 `HH:MM`). 위치 좌표는 돌려주지 않음 ([ADR 0023](decisions/0023-card-protection-and-benefits.md)) |
+| ✅ | PUT | `/cards/protection` | 🔒 | 보호 설정 변경, **거래 PIN 필요**(`pin`). 활동 시작·종료는 둘 다 주거나 둘 다 비움, 같으면 `422`. 위치 확인을 끄면 저장한 위치를 지움. 실패: `400 INVALID_PIN`, `400 PIN_NOT_SET`, `423 PIN_LOCKED` |
+| ✅ | PUT | `/cards/protection/location` | 🔒 | 스마트폰 위치 갱신(`latitude`, `longitude`, `accuracy_m`, `observed_at`). 최근 한 건만, 소수 둘째 자리로 반올림해 저장. 실패: `400 STALE_PHONE_LOCATION`(15분보다 오래됐거나 미래 시각), `409 LOCATION_CHECK_DISABLED`(위치 확인을 안 켬) |
+| ✅ | PUT | `/cards/protection/activity` | 🔒 | 은행 화면 활동 시각을 서버 시간으로 기록(1분에 한 번까지). 활동시간을 정한 사용자만 저장 |
 | ✅ | POST | `/cards/{card_id}/transactions/{card_tx_id}/cancel` | 🔒 | 전액 취소. 체크는 결제 계좌로 환불(`REFUND`), 신용은 기록만 취소. 정지·분실 카드도 됨 |
 | ✅ | GET | `/cards/{card_id}/limits` | 🔒 | `daily_limit`·`daily_used`(오늘, 취소 제외), 신용은 `credit_limit`·`credit_used`(안 갚은 금액) |
 
@@ -266,9 +283,13 @@
 | ✅ | POST | `/chat` | 🔒 | `message`(1000자까지), `session_id`(UUID, 없으면 새 대화) → `session_id`, `reply`, `routed`(일한 담당). 이체 등은 승인 대기까지, PIN은 승인 화면에서 |
 | ✅ | POST | `/chat/stream` | 🔒 | 같은 요청을 **SSE**로: `status`(진행 상태) → `token`(답 글자, `agent`로 담당 구분) → `done`(전체 답) / `error`. 처리 중인 대화방이면 스트림 대신 `409` ([ADR 0018](decisions/0018-chat-stream-router.md)) |
 | ✅ | GET | `/chat/{session_id}` | 🔒 | 내 대화 기록(사람 말과 AI 답). 남의 대화방이면 빈 목록 |
+| ✅ | POST | `/chat/transfer-check` | 🔒 | **송금 전 요청 점검** (읽기 전용). `/chat`과 같은 요청, 별도 대화방. 받은 문자·계좌를 내 최근 180일 송금 기록과 비교(`compare_previous_transfers`), 계좌번호는 끝 4자리만. `routed: ["transfer_check"]`. 이체 도구가 없고 Langfuse로 보내지 않음 |
+| ✅ | POST | `/chat/benefits` | 🔒 | **혜택 상담** (읽기 전용). `mode`: `bundle`(최근 3개월 소비로 100크레딧 구성 추천) / `nearby`(식당 → 카페 → 돌아오는 코스). 응답에 AI 답과 함께 도구가 계산한 `recommendation` 또는 `plan` 원본 ([ADR 0023](decisions/0023-card-protection-and-benefits.md)) |
 
 - 실패: `503 AI_DISABLED`(Gemini 키 없음), `503 AI_UNAVAILABLE`(LLM 실패·90초 초과), `409 CHAT_BUSY`(같은 대화방의 앞 메시지를 처리 중), `429 AI_RATE_LIMITED`(RAG와 같은 한도 1분 10, 채팅 한 번은 3으로 셈)
 - Agent가 만든 승인 대기는 `requested_by = AGENT`
+- `/chat/benefits` 요청: `demo`(예시 데이터), `nearby`는 `budget_won`(1,000~500,000)·`available_minutes`(1~240) 필수. 실제 검색(`demo: false`)은 `location`과 식사·카페 예상 가격(`meal_price_won`, `cafe_price_won`)도 필수, 위치는 실제 `nearby`에서만 받음(아니면 `422`). `allow_channel_coupon`(채널 추가가 필요한 쿠폰 포함), `preview_bundle`(저장한 혜택 구성으로 할인 미리보기). AI가 정한 예산·시간은 요청 값을 넘지 못함
+- `/chat/benefits` 실패: 위 공통 실패 + `503 PLACE_SEARCH_DISABLED`(`KAKAO_LOCAL_API_KEY` 없음, 시연 모드는 됨), `503 PLACE_SEARCH_UNAVAILABLE`(카카오 응답 실패), `503 COUPONS_UNAVAILABLE`(쿠폰 파일 오류)
 
 ```json
 { "success": true, "data": { "session_id": "6f1c…", "reply": "피터님 계좌로 50,000원 이체를 요청했어요. 은행 앱 승인 화면에서 PIN을 입력해 주세요.", "routed": ["account"] } }
@@ -317,7 +338,7 @@ MCP(Model Context Protocol) 서버. 도구 16개가 아래 REST API를 사용자
 
 ### 요청한 곳 (`X-Requested-By`)
 
-승인 대기를 만드는 API(`POST /transfers`, `POST /accounts/deposits`, `POST /cards/{id}/unsuspend`)는 `X-Requested-By: WEB | AGENT | MCP` 헤더를 받아 `requested_by`에 남깁니다(없으면 `WEB`). 승인 화면이 "AI가 만든 요청"이라고 보여 주는 **정보용**이고, 보안은 PIN 승인이 맡습니다.
+승인 대기를 만드는 API(`POST /transfers`, `POST /accounts/deposits`, `POST /cards/{id}/unsuspend`)는 `X-Requested-By: WEB | AGENT | MCP` 헤더를 받아 `requested_by`에 남깁니다(없으면 `WEB`). `SYSTEM`은 헤더로 보낼 수 없고, 가맹점 결제가 보호 규칙에 걸렸을 때 서버가 직접 씁니다. 승인 화면이 "AI가 만든 요청"이라고 보여 주는 **정보용**이고, 보안은 PIN 승인이 맡습니다.
 
 ## rag: 상품·약관 질문 (`domains/rag`)
 
@@ -339,6 +360,7 @@ MCP(Model Context Protocol) 서버. 도구 16개가 아래 REST API를 사용자
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|
+| ✅ | POST | `/system/card-payments/{card_id}` | 🔑 | **가맹점 결제 시뮬레이터**: `/cards/{id}/payments`의 본문 + `channel`(`IN_PERSON`·`ONLINE`), 오프라인만 `terminal_location`. 보호 규칙을 통과하면 `201` 결제, 걸리면 **`202` 승인 대기**(`CARD_PAYMENT`, `requested_by = SYSTEM`, 아직 결제 안 함). 같은 요청 번호로 재전송: 대기 중이면 같은 대기 `202`, 결제됐으면 `200`. 실패: `404 CARD_NOT_FOUND`, `409 CARD_PAYMENT_NOT_APPROVABLE`(거절·만료·실패한 대기), `409 IDEMPOTENCY_KEY_REUSED` + 결제 실패 코드 ([ADR 0023](decisions/0023-card-protection-and-benefits.md)) |
 | ✅ | GET | `/system/card-refunds` | 🔑 | 상담원용: 환불 대기 목록 (결제 계좌를 쓸 수 없어 못 돌려준 결제 취소). 카드 주인 `user_id`, 원래 결제 계좌 `linked_account_id` 포함 |
 | ✅ | POST | `/system/card-refunds/{card_tx_id}` | 🔑 | 상담원용: 고객 확인 후 `to_account_id`(카드 주인의 입출금 계좌)로 환불. 실패: `400 ACCOUNT_NOT_FOUND`, `404 CARD_TX_NOT_FOUND`, `409 REFUND_NOT_PENDING` |
 | ✅ | POST | `/system/rag/reindex` | 🔑 | RAG 색인 갱신: 데모 약관과 판매 중인 상품(특판 기간 포함)을 다시 자르고, 본문 해시나 임베딩 모델·차원·입력 형식이 바뀐 청크만 임베딩. 상품을 바꾸거나 특판이 끝나면 부른다(매일 부르면 됨). 동시에 두 번 오면 차례로 처리. `total`, `embedded`, `deleted` |

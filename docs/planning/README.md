@@ -53,12 +53,14 @@
 |---|---|---|---|
 | 회원가입·인증 | ✅ 기능 트리, 흐름 ① | ✅ `users` 확장, `refresh_tokens` (+ 예정: `passkeys`) | ADR 0005. ✅ 회원가입(생년월일), 로그인, **5회 실패 잠금**, refresh token(교체·도난 감지)·로그아웃. 휴대폰 본인확인은 뺌 |
 | 계좌·이체 | ✅ 명세, 흐름 ②③ | ✅ `accounts`, `account_terms`, `account_transactions`, `pending_actions` | ADR 0003. ✅ 입출금·적금 개설(가입 조건, 적용 금리), 목록·총자산, 상세, 거래내역, 별칭, **이체(승인 대기 → PIN → 실행 함수)**, **예금 개설(승인 후 계좌 생성 + 맡길 돈 이동)**, 입출금 계좌 해지(잔액 0·연결 카드 검사, 해지 뒤 환불은 상담원) |
+| 타행 이체 | ✅ ClearingHub 연동 | ✅ `clearing_receipts`, `pending_actions` 재사용 | 참가 은행 목록, 수취 확인, PIN 승인, 결과 복구 및 서명된 입금 API |
 | 상품 가입 조건 | ✅ 명세(예·적금 1번) | ✅ 기간·금액·나이·조건·우대(`product_preferential_rates`)·특판 | ✅ 상품 목록·상세 API, 데모 상품 seed. 가입 조건 검사는 계좌 개설 PR |
 | 거래내역 검색·카테고리 | ✅ 명세(계좌 4·5번) | ✅ `account_transactions.category` | ✅ 기간(한국 날짜)·금액·키워드·방향·카테고리 검색과 전체 합계, 규칙 기반 카테고리, 사용자 수정 |
-| 카드 | ✅ 명세, 흐름 ④ | ✅ `card_products`, `cards`, `card_transactions` | ✅ 발급, 목록·상세(가린 번호), 정지·분실(바로), 정지 해제(PIN), 결제·취소·사용내역·한도, 신용 대금 출금(연체 시 결제 막기) |
+| 카드 | ✅ 명세, 흐름 ④ | ✅ `card_products`, `cards`, `card_transactions` | ✅ 발급, 목록·상세(가린 번호), 정지·분실(바로), 정지 해제(PIN), 결제·취소·사용내역·한도, 신용 대금 출금(연체 시 결제 막기), **결제 보호**(스마트폰 위치·온라인 활동시간·처음 보는 가맹점 고액 결제 → 승인 대기 + PIN, ADR 0023) |
+| 카드 혜택 (추가 기능) | ✅ ADR 0023 | ✅ `users.benefit_bundle` | ✅ 은행 카탈로그 안에서 100크레딧 혜택 구성(미리보기 저장), 최근 3개월 소비로 추천, 주변 식사·카페 코스(카카오 로컬 API, 키 없으면 예시 매장). AI 상담 `POST /chat/benefits`는 읽기 전용 |
 | 대출 | ✅ 명세 16개 중 9개, 흐름 ⑤ | 📐 `loans`, `loan_schedules` | 가볍게 구현 ([scope.md](scope.md)) |
 | 수취인·알림 | ✅ 명세 | 📐 `recipients`, `notifications` | 자동이체는 예산의 저축 이체만 |
-| 자연어 입력 | ⚠️ 흐름 ⑥만 있음, 기능 명세 없음 | 📐 `chat_messages`, `pending_actions` | ADR 0004. ✅ MCP 서버(도구 16개, HTTP + 로컬, ADR 0014), ✅ AI 상담 `POST /chat`(라우터 + 계좌·카드·상품 Agent, 맥락 유지·되묻기, ADR 0015). 예산·대출 Agent는 그 기능과 함께 |
+| 자연어 입력 | ⚠️ 흐름 ⑥만 있음, 기능 명세 없음 | 📐 `chat_messages`, `pending_actions` | ADR 0004. ✅ MCP 서버(도구 16개, HTTP + 로컬, ADR 0014), ✅ AI 상담 `POST /chat`(라우터 + 계좌·카드·상품 Agent, 맥락 유지·되묻기, ADR 0015), ✅ 송금 전 요청 점검 `POST /chat/transfer-check`(읽기 전용). 예산·대출 Agent는 그 기능과 함께 |
 | RAG | ⚠️ 흐름 ⑥만 있음 | ✅ `rag_chunks` (pgvector) | ✅ 상품 DB + 데모 약관, 하이브리드 검색(RRF), 근거 인용 답변, 정답 세트 38문항 (ADR 0013). Agent 연결은 MCP·Agent PR |
 | **예산 관리** (추가 기능) | ✅ budget.md, 흐름 ⑦⑧ | 📐 예산 테이블 6개 (우대금리 표는 상품으로 옮겨 구현) | |
 

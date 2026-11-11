@@ -1,7 +1,9 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+
+from avengers_bank.domains.approvals.schemas import ApproveRequest
 
 
 class CardProductResponse(BaseModel):
@@ -55,6 +57,49 @@ class CardPayment(BaseModel):
     merchant_name: str = Field(min_length=1, max_length=100)
     amount: int = Field(gt=0, le=100_000_000)
     idempotency_key: str = Field(min_length=8, max_length=100)  # 가맹점이 다시 보내도 한 번만 결제
+
+
+class Location(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class PhoneLocation(Location):
+    accuracy_m: float = Field(gt=0, le=100_000)
+    observed_at: AwareDatetime
+
+
+class MerchantPayment(CardPayment):
+    channel: Literal["IN_PERSON", "ONLINE"]
+    terminal_location: Location | None = None
+
+    @model_validator(mode="after")
+    def validate_terminal_location(self):
+        if (self.channel == "IN_PERSON") != (self.terminal_location is not None):
+            raise ValueError("오프라인 결제에만 단말기 위치를 보내야 합니다.")
+        return self
+
+
+class CardProtection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    location_check: bool = False
+    active_from: str | None = Field(default=None, pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+    active_until: str | None = Field(default=None, pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+
+    @model_validator(mode="after")
+    def validate_activity_window(self):
+        if (self.active_from is None) != (self.active_until is None):
+            raise ValueError("활동 시작과 종료 시간을 함께 입력해 주세요.")
+        if self.active_from is not None and self.active_from == self.active_until:
+            raise ValueError("활동 시작과 종료 시간은 달라야 합니다.")
+        return self
+
+
+class CardProtectionUpdate(CardProtection, ApproveRequest):
+    pass
 
 
 class CardTransactionResponse(BaseModel):

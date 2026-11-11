@@ -21,6 +21,8 @@ from avengers_bank.domains.mcp_server.server import mcp
 from avengers_bank.domains.rag.router import router as rag_router
 from avengers_bank.domains.rag.router import system_router as rag_system_router
 from avengers_bank.domains.products.router import router as product_router
+from avengers_bank.domains.transfers.callbacks import router as clearing_callback_router
+from avengers_bank.domains.transfers.clearing import clearing_worker
 from avengers_bank.domains.transfers.router import router as transfer_router
 from avengers_bank.domains.users.router import router as user_router
 
@@ -29,7 +31,7 @@ from avengers_bank.domains.users.router import router as user_router
 async def lifespan(app: FastAPI):
     try:
         # /mcp 요청을 받는 동안 MCP 세션 관리자가 돌고, 대화는 PostgreSQL 체크포인터에 남는다
-        async with mcp.session_manager.run(), postgres_saver():
+        async with mcp.session_manager.run(), postgres_saver(), clearing_worker():
             yield
     finally:
         await tracing.flush()  # 남은 Langfuse 추적을 보낸다 (최대 5초, 실패해도 아래 정리는 한다)
@@ -51,6 +53,7 @@ app.include_router(product_router)
 app.include_router(account_router)
 app.include_router(transaction_router)
 app.include_router(transfer_router)
+app.include_router(clearing_callback_router)
 app.include_router(approval_router)
 app.include_router(card_router)
 app.include_router(card_product_router)

@@ -55,6 +55,11 @@ def check_transfer(
     receivable = dst.account_type == "CHECKING" or (internal and dst.account_type == "SAVINGS")
     if not (receivable or (opening_deposit and internal and dst.account_type == "DEPOSIT")):
         raise TransferRejected("ACCOUNT_CANNOT_RECEIVE", "이 계좌로는 보낼 수 없습니다.")
+    check_transfer_amount(src, amount, sent_today, internal)
+    return internal
+
+
+def check_transfer_amount(src: Account, amount: int, sent_today: int, internal: bool = False) -> None:
     if amount > src.balance:
         raise TransferRejected("INSUFFICIENT_BALANCE", "잔액이 부족합니다.")
     if not internal:  # 이체 한도는 다른 사람에게 보낼 때만
@@ -63,7 +68,20 @@ def check_transfer(
         if sent_today + amount > src.daily_transfer_limit:
             left = max(src.daily_transfer_limit - sent_today, 0)
             raise TransferRejected("DAILY_LIMIT_EXCEEDED", f"오늘 더 보낼 수 있는 금액은 {left:,}원입니다.")
-    return internal
+
+
+def record_clearing_entry(
+    db: AsyncSession, account: Account, *, transfer_id: uuid.UUID, tx_type: str,
+    amount: int, counterparty_name: str, counterparty_account: str, memo: str | None,
+    action_id: uuid.UUID | None = None,
+) -> None:
+    """잠근 계좌에 타행 출금·입금·되돌림 한 건을 기록한다."""
+    account.balance += amount
+    db.add(AccountTransaction(
+        account_id=account.account_id, transfer_id=transfer_id, action_id=action_id, tx_type=tx_type,
+        amount=amount, balance_after=account.balance, counterparty_name=counterparty_name,
+        counterparty_account=counterparty_account, memo=memo, category=classify(tx_type, memo, counterparty_name),
+    ))
 
 
 async def execute_transfer(

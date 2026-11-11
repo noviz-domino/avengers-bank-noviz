@@ -47,6 +47,8 @@ erDiagram
         date birth_date "가입 조건(나이) 검사"
         bool marketing_agreed "우대금리 조건"
         string transaction_pin_hash "NULL, 거래 PIN"
+        json card_protection "NULL, 카드 결제 보호 설정·최근 위치 (ADR 0023)"
+        json benefit_bundle "NULL, 고른 혜택 offer_id 목록 (ADR 0023)"
         smallint pin_fail_count
         smallint login_fail_count
         datetime login_locked_until "NULL, 로그인 5회 실패"
@@ -176,11 +178,11 @@ erDiagram
     pending_actions {
         uuid action_id PK
         int user_id FK
-        string action_type "TRANSFER / CARD_PAYMENT / LOAN_EXECUTE / BUDGET_CONFIRM …"
+        string action_type "TRANSFER / INTERBANK_TRANSFER / OPEN_DEPOSIT / UNSUSPEND_CARD / CARD_PAYMENT (예정 LOAN_EXECUTE / BUDGET_CONFIRM …)"
         json payload "실행할 내용, 만든 뒤 안 바꿈"
         json result "NULL, 실행 결과 (예금이면 새 account_id)"
         text summary "승인 화면 문장, 서버가 payload로 생성"
-        string requested_by "WEB / AGENT / MCP"
+        string requested_by "WEB / AGENT / MCP / SYSTEM"
         string status "PENDING / APPROVED / REJECTED / EXPIRED / EXECUTED / FAILED"
         string approval_method "NULL, PIN / PASSKEY"
         string idempotency_key "user_id와 함께 unique"
@@ -207,6 +209,7 @@ erDiagram
 | 이체·출금 (**웹에서 시작해도** PIN) | 예산 안 카드 결제, 항상 통과 업종의 카드 결제 ([budget.md](planning/budget.md) "결제 검사") |
 | 대출 **실행** (계좌로 입금) | 대출 **신청**·자동 심사 (돈이 움직이지 않음) |
 | 예산 초과 확인 (카드 결제는 따로, 이체는 이체 승인과 같은 PIN 한 번) | 월급·이자 같은 시스템 입금, 주기 끝 목표 저축 이체 (사용자가 예산 신청 때 정함) |
+| 보호 규칙에 걸린 카드 결제 ✅ (`CARD_PAYMENT`, `requested_by = SYSTEM`, ADR 0023) | 보호를 켜지 않았거나 규칙을 통과한 카드 결제 ✅ |
 | 카드 정지 **해제** ✅ | 카드 **정지**·분실 신고 ✅ (분실은 되돌릴 수 없음, ADR 0009) |
 | 예산 검사를 **약하게** 하는 변경 (목록: [ADR 0007](decisions/0007-money-execution-and-budget-guard.md#가드를-약하게-하는-변경)) | 예산 검사를 **강하게** 하는 변경 (같은 표) |
 | 잔액이 남은 계좌 해지: 남은 돈을 먼저 이체(승인) | 잔액 0인 계좌 해지 |
@@ -216,10 +219,21 @@ erDiagram
 1. 승인 요청은 **`action_id` + PIN만** 받습니다. payload는 받지 않습니다(바꿔치기 방지).
 2. 승인은 조건부 UPDATE 하나로 시작합니다: `UPDATE pending_actions SET status='APPROVED' WHERE action_id=:id AND user_id=:me AND status='PENDING' AND expires_at > now()`. 바뀐 행이 0이면 거절합니다. 동시에 두 번 승인해도 한 번만 통과하고, 만료를 따로 처리하는 배치가 없어도 시간이 지나면 승인되지 않습니다.
 3. 같은 트랜잭션 안에서 **실행 직전에 다시 검사**합니다: 계좌 소유권·상태·잔액·한도. 실패하면 `FAILED` + `failure_reason`.
-4. 실행하면 장부 줄에 `action_id`를 남기고 `EXECUTED`로 바꿉니다. 승인 → 실행이 **한 트랜잭션**이어서 서버가 중간에 죽으면 통째로 되돌아가 `PENDING`으로 남습니다. `APPROVED`로 멈춘 행은 생기지 않습니다.
+4. 실행하면 장부 줄에 `action_id`를 남깁니다. 은행 내 이체는 같은 트랜잭션에서 `EXECUTED`로 바뀝니다. 타행 이체는 출금과 `APPROVED` 상태를 함께 저장하고, 허브 결과에 따라 완료하거나 반환합니다.
 5. `summary`는 Agent가 쓴 문장이 아니라 **서버가 payload로 만듭니다** ("5만 원"이라 적고 실제로 500만 원을 보내는 것 방지).
 6. `idempotency_key`는 **요청한 쪽**(웹·Agent·MCP)이 만들고, `(user_id, idempotency_key)`가 unique입니다. 같은 키가 다시 오면 새 행을 만들지 않고 기존 행을 돌려줍니다. 예산을 넘는 건이 실행 때 승인 때보다 나빠지면 `FAILED`로 끝나고, 사용자가 새 키로 다시 요청합니다([ADR 0007](decisions/0007-money-execution-and-budget-guard.md)).
 7. PIN을 5번 틀리면 `pin_locked_until`만 잠깁니다. **로그인은 잠기지 않아서** 토큰을 가진 Agent가 PIN을 틀려도 사용자를 쫓아낼 수 없습니다. PIN 실패 횟수는 PIN이 맞으면 0으로 돌아갑니다.
+
+### 카드 결제 보호·혜택 칸 (`users`, ADR 0023)
+
+- `card_protection`: `{"settings": {"location_check", "active_from", "active_until"}, "location": {...}, "activity_at", "movement_at"}`. 위치는 최근 한 건만, 좌표는 소수 둘째 자리로 반올림해 저장합니다. 위치 확인을 끄면 `location`을 지웁니다. 갱신은 사용자 행을 잠그고 합니다.
+- `benefit_bundle`: 고른 혜택의 `offer_id` 목록. 할인율·크레딧은 저장하지 않고 코드의 카탈로그에서 읽습니다.
+- 두 칸 모두 JSON이라 DB CHECK가 없습니다. 읽을 때 Pydantic으로 검증합니다.
+- `pending_actions.requested_by = SYSTEM`은 가맹점 결제가 보호 규칙에 걸려 서버가 만든 승인 대기입니다. CHECK는 마이그레이션 `0910c4d93eb1`에 직접 적었습니다.
+
+### 타행 입금 영수증
+
+`clearing_receipts`는 허브의 `transfer_id`를 기본키로 사용합니다. 예금주 이름과 입금 시각을 저장하며, 고객 계좌 잔액 및 `TRANSFER_IN` 거래와 한 트랜잭션으로 반영합니다. 타행 장부의 상대 이름은 은행명과 보낸 사람 이름을 합쳐 최대 101자, 상대 계좌번호는 최대 50자입니다.
 
 ### 거래 종류 (`tx_type`)
 

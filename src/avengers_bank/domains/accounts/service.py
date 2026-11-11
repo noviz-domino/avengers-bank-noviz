@@ -1,13 +1,13 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.clock import today_kst
 from avengers_bank.core.exceptions import ApiException, BadRequestException, ConflictException, NotFoundException
 from avengers_bank.domains.accounts.account_number import BANK_CODE, TYPE_CODES, make_account_num
-from avengers_bank.domains.accounts.models import Account, AccountTerms
+from avengers_bank.domains.accounts.models import Account, AccountTerms, AccountTransaction
 from avengers_bank.domains.accounts.money import TransferRejected, execute_transfer
 from avengers_bank.domains.accounts.repository import account_repository
 from avengers_bank.domains.approvals.models import PendingAction
@@ -28,6 +28,7 @@ from avengers_bank.domains.accounts.schemas import (
 from avengers_bank.domains.products.eligibility import add_months, applied_rate, check_eligibility
 from avengers_bank.domains.products.models import AccountProduct
 from avengers_bank.domains.products.service import product_service
+from avengers_bank.domains.transfers.clearing import ACTION_TYPE
 from avengers_bank.domains.users.models import User
 from avengers_bank.domains.users.schemas import UserResponse
 
@@ -275,6 +276,12 @@ class AccountService:
                 raise ConflictException(message="이미 해지했거나 쓸 수 없는 계좌입니다.", code="ACCOUNT_NOT_ACTIVE")
             if account.balance != 0:
                 raise ConflictException(message=f"남은 돈 {account.balance:,}원을 먼저 옮겨 주세요.", code="BALANCE_REMAINING")
+            if await db.scalar(select(exists().where(
+                AccountTransaction.account_id == account_id,
+                AccountTransaction.action_id == PendingAction.action_id,
+                PendingAction.action_type == ACTION_TYPE, PendingAction.status == "APPROVED",
+            ))):
+                raise ConflictException(message="처리 중인 타행 송금이 있습니다.", code="CLEARING_PENDING")
             if await db.scalar(select(func.count()).where(
                     Card.linked_account_id == account_id, Card.status.in_(("ACTIVE", "SUSPENDED")))):
                 raise ConflictException(

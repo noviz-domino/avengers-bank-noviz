@@ -8,8 +8,9 @@ from langchain_core.language_models import BaseChatModel
 
 from avengers_bank.core.dependencies import bearer_scheme, get_current_user
 from avengers_bank.core.responses import SuccessResponse, error_responses
+from avengers_bank.domains.agent.benefits import ask_benefits
 from avengers_bank.domains.agent.llm import get_llm
-from avengers_bank.domains.agent.schemas import ChatRequest, ChatResponse, ChatTurn
+from avengers_bank.domains.agent.schemas import BenefitsChatRequest, BenefitsChatResponse, ChatRequest, ChatResponse, ChatTurn
 from avengers_bank.domains.agent.service import agent_service
 from avengers_bank.domains.rag.router import spend_ai_calls
 from avengers_bank.domains.users.schemas import UserResponse
@@ -32,6 +33,27 @@ async def chat(data: ChatRequest, me: Me, token: Token, _: Annotated[None, Depen
     session_id = str(data.session_id or uuid.uuid4())
     result = await agent_service.chat(llm, me.user_id, token.credentials, session_id, data.message)
     return SuccessResponse[ChatResponse](data=result)
+
+
+@router.post("/transfer-check", response_model=SuccessResponse[ChatResponse])
+async def check_transfer_request(
+    data: ChatRequest, me: Me, token: Token, _: Annotated[None, Depends(limit_chat)],
+    llm: Annotated[BaseChatModel, Depends(get_llm)],
+):
+    """내 거래내역과 받은 송금 요청을 읽기 전용으로 점검한다. 일반 상담과는 별도 대화다."""
+    session_id = str(data.session_id or uuid.uuid4())
+    result = await agent_service.chat(llm, me.user_id, token.credentials, session_id, data.message, transfer_check=True)
+    return SuccessResponse[ChatResponse](data=result)
+
+
+@router.post("/benefits", response_model=SuccessResponse[BenefitsChatResponse])
+async def chat_benefits(
+    data: BenefitsChatRequest, me: Me, _: Annotated[None, Depends(limit_chat)],
+    llm: Annotated[BaseChatModel, Depends(get_llm)],
+):
+    """혜택 조합 또는 주변 코스를 읽기 전용으로 계산하고 근거와 함께 설명한다."""
+    session_id = str(data.session_id or uuid.uuid4())
+    return SuccessResponse[BenefitsChatResponse](data=await ask_benefits(llm, me.user_id, session_id, data))
 
 
 @router.post("/stream", responses={200: {"content": {"text/event-stream": {}}}})

@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from avengers_bank.core.exceptions import BadRequestException, ConflictException, NotFoundException
 from avengers_bank.domains.accounts.money import TransferRejected, execute_transfer
 from avengers_bank.domains.accounts.service import run_open_deposit
-from avengers_bank.domains.cards.service import run_unsuspend_card
+from avengers_bank.domains.cards.service import run_card_payment, run_unsuspend_card
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
+from avengers_bank.domains.transfers import clearing
 from avengers_bank.domains.users.service import user_service
 
 
@@ -23,7 +24,11 @@ async def run_transfer(db: AsyncSession, action: PendingAction) -> None:
 
 
 # action_type → 실행 함수. 새 승인 대상(카드 해제 등)은 여기에 추가한다
-EXECUTORS = {"TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit, "UNSUSPEND_CARD": run_unsuspend_card}
+EXECUTORS = {
+    "TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit, "UNSUSPEND_CARD": run_unsuspend_card,
+    "CARD_PAYMENT": run_card_payment,
+    clearing.ACTION_TYPE: clearing.stage_transfer,
+}
 
 
 def as_utc(value: datetime) -> datetime:
@@ -62,7 +67,8 @@ class ApprovalService:
                 await self._explain_not_claimable(db, user_id, action_id, now)
             try:
                 await EXECUTORS[action.action_type](db, action)
-                action.status, action.executed_at = "EXECUTED", now
+                if action.action_type != clearing.ACTION_TYPE:
+                    action.status, action.executed_at = "EXECUTED", now
             except TransferRejected as e:
                 # 실행 직전 재검사에서 막힘 (규칙 3). 돈은 움직이지 않고 실패만 남긴다
                 failure = e

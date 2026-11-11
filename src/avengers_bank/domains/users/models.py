@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, SmallInteger, String, Uuid, false, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, SmallInteger, String, Uuid, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from avengers_bank.core.database import Base
@@ -22,6 +22,8 @@ class User(Base):
         Boolean, default=False, server_default=false(), nullable=False
     )
     transaction_pin_hash: Mapped[str | None] = mapped_column(String(255))  # 거래 PIN (ADR 0005)
+    card_protection: Mapped[dict | None] = mapped_column(JSON)
+    benefit_bundle: Mapped[list[str] | None] = mapped_column(JSON)
     # 로그인 잠금과 PIN 잠금은 따로: PIN을 틀려도 로그인은 잠기지 않는다 (ADR 0005)
     login_fail_count: Mapped[int] = mapped_column(
         SmallInteger, default=0, server_default="0", nullable=False
