@@ -298,7 +298,7 @@
 | ✅ | POST | `/chat/transfer-check` | 🔒 | **송금 전 요청 점검** (읽기 전용). `/chat`과 같은 요청, 별도 대화방. 받은 문자·계좌를 내 최근 180일 송금 기록과 비교(`compare_previous_transfers`), 계좌번호는 끝 4자리만. `routed: ["transfer_check"]`. 이체 도구가 없고 Langfuse로 보내지 않음 |
 | ✅ | POST | `/chat/benefits` | 🔒 | **혜택 상담** (읽기 전용). `mode`: `bundle`(최근 3개월 소비로 100크레딧 구성 추천) / `nearby`(식당 → 카페 → 돌아오는 코스). 응답에 AI 답과 함께 도구가 계산한 `recommendation` 또는 `plan` 원본 ([ADR 0023](decisions/0023-card-protection-and-benefits.md)) |
 
-- 실패: `503 AI_DISABLED`(Gemini 키 없음), `503 AI_UNAVAILABLE`(LLM 실패·90초 초과), `409 CHAT_BUSY`(같은 대화방의 앞 메시지를 처리 중), `429 AI_RATE_LIMITED`(RAG와 같은 한도 1분 10, 채팅 한 번은 3으로 셈)
+- 실패: `503 AI_DISABLED`(Gemini 키 없음), `503 AI_UNAVAILABLE`(LLM 실패·90초 초과), `409 CHAT_BUSY`(같은 대화방의 앞 메시지를 처리 중), `429 AI_RATE_LIMITED`(RAG와 같은 한도 1분 10, 채팅 한 번은 3으로 셈), `429 AI_DAILY_LIMIT`(서버 전체 하루 한도, [ADR 0026](decisions/0026-ai-daily-limit.md))
 - Agent가 만든 승인 대기는 `requested_by = AGENT`
 - `/chat/benefits` 요청: `demo`(예시 데이터), `nearby`는 `budget_won`(1,000~500,000)·`available_minutes`(1~240) 필수. 실제 검색(`demo: false`)은 `location`과 식사·카페 예상 가격(`meal_price_won`, `cafe_price_won`)도 필수, 위치는 실제 `nearby`에서만 받음(아니면 `422`). `allow_channel_coupon`(채널 추가가 필요한 쿠폰 포함), `preview_bundle`(저장한 혜택 구성으로 할인 미리보기). AI가 정한 예산·시간은 요청 값을 넘지 못함
 - `/chat/benefits` 실패: 위 공통 실패 + `503 PLACE_SEARCH_DISABLED`(`KAKAO_LOCAL_API_KEY` 없음, 시연 모드는 됨), `503 PLACE_SEARCH_UNAVAILABLE`(카카오 응답 실패), `503 COUPONS_UNAVAILABLE`(쿠폰 파일 오류)
@@ -354,7 +354,7 @@ MCP(Model Context Protocol) 서버. 도구 18개가 아래 REST API를 사용자
 
 ## rag: 상품·약관 질문 (`domains/rag`)
 
-상품 DB와 데모 약관을 근거로 답합니다. Gemini 키(`GEMINI_API_KEY`)가 없으면 `503 AI_DISABLED`, Gemini가 실패하면(한도 초과·시간 초과 등) `503 AI_UNAVAILABLE`, 답이 형식에 안 맞으면 `503 AI_BAD_RESPONSE`. 사용자당 1분에 10번(검색·답변 합쳐), 넘으면 `429 AI_RATE_LIMITED`. 결정 이유: [ADR 0013](decisions/0013-agent-rag-plan.md), 코드 설명: [가이드 10](guides/10-rag.md)
+상품 DB와 데모 약관을 근거로 답합니다. Gemini 키(`GEMINI_API_KEY`)가 없으면 `503 AI_DISABLED`, Gemini가 실패하면(한도 초과·시간 초과 등) `503 AI_UNAVAILABLE`, 답이 형식에 안 맞으면 `503 AI_BAD_RESPONSE`. 사용자당 1분에 10번(검색·답변 합쳐), 넘으면 `429 AI_RATE_LIMITED`. 서버 전체로 하루 100번(`AI_DAILY_LIMIT`, 채팅과 합쳐), 넘으면 `429 AI_DAILY_LIMIT`([ADR 0026](decisions/0026-ai-daily-limit.md)). 결정 이유: [ADR 0013](decisions/0013-agent-rag-plan.md), 코드 설명: [가이드 10](guides/10-rag.md)
 
 | 상태 | 메서드 | 경로 | 인증 | 설명 |
 |---|---|---|---|---|

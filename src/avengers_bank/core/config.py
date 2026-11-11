@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = "gemini-embedding-2"
     # Gemini 3의 생각 수준. 낮을수록 빠르다. low가 p50 15→8초 (ADR 0016 측정). minimal은 3.8 Flash가 지원하지 않음
     gemini_thinking: Literal["low", "medium", "high"] = "low"
+    # 서버 전체 AI 호출 하루 한도(한국 날짜 기준, 채팅 1번 = 3). 공개 서버에서 계정을 여러 개 만들어도 비용이 묶이게 (ADR 0026)
+    ai_daily_limit: int = Field(default=100, gt=0)
     kakao_local_api_key: SecretStr | None = None
     # Agent 실행 추적 (ADR 0016). 키가 없으면 꺼진다
     langfuse_public_key: str | None = None

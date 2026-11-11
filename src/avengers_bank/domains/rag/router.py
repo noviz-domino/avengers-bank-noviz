@@ -1,10 +1,13 @@
 import time
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from avengers_bank.core.clock import today_kst
+from avengers_bank.core.config import get_settings
 from avengers_bank.core.database import get_db
 from avengers_bank.core.dependencies import get_current_user, require_system_key
 from avengers_bank.core.exceptions import ApiException
@@ -25,6 +28,7 @@ AIDep = Annotated[AI, Depends(get_ai)]
 
 LIMIT, WINDOW = 10, 60.0  # 사용자당 1분에 10번: 한 사람이 무료 한도를 다 써서 모두의 RAG가 멈추지 않게
 calls: dict[int, deque[float]] = defaultdict(deque)
+daily_calls: Counter[date] = Counter()  # 서버 전체 하루 사용량. 재시작하면 0부터 (한 대·평일 낮 운영 기준)
 
 
 def spend_ai_calls(user_id: int, cost: int) -> None:
@@ -34,7 +38,14 @@ def spend_ai_calls(user_id: int, cost: int) -> None:
         recent.popleft()
     if len(recent) + cost > LIMIT:
         raise ApiException(status_code=429, code="AI_RATE_LIMITED", message="잠시 후 다시 물어봐 주세요(1분에 10번까지).")
+    today = today_kst()
+    if today not in daily_calls:
+        daily_calls.clear()  # 날짜가 바뀌면 새로 센다
+    if daily_calls[today] + cost > get_settings().ai_daily_limit:
+        raise ApiException(status_code=429, code="AI_DAILY_LIMIT",
+                           message="오늘 준비한 AI 사용량을 모두 썼습니다. 내일 다시 이용해 주세요.")
     recent.extend([now] * cost)
+    daily_calls[today] += cost
 
 
 def limit_ai_calls(me: Me) -> None:

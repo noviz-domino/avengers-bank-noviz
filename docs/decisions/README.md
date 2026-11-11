@@ -31,6 +31,7 @@
 | [0023](0023-card-protection-and-benefits.md) | 카드 결제 보호(위치·활동시간 확인 → PIN 승인)와 혜택 구성·주변 코스 상담 | 채택 | 2026-11-11 |
 | [0024](0024-budget-guard.md) | 예산 계산, 결제 가드와 사람의 PIN 확인 | 채택 | 2026-11-09 |
 | [0025](0025-https-caddy-duckdns.md) | 서버 공개 주소: DuckDNS + Caddy로 HTTPS | 채택 | 2026-11-11 |
+| [0026](0026-ai-daily-limit.md) | 서버 전체 AI 호출 하루 한도 | 채택 | 2026-11-11 |
 
 ## 새로 쓰는 법
 
