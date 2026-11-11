@@ -271,9 +271,25 @@ function startTransfer(source, draft, from = currentPage()) {
   if (!accounts) return go("home");
   const checking = accounts.filter((account) => account.account_type === "CHECKING");
   // draft는 상담 화면이 미리 채워 줄 때 쓴다: { number, amount }
-  transfer = { source: source ?? checking[0]?.account_id, from, step: draft?.number ? "amount" : "recipient", number: "", amount: 0, ...draft };
+  transfer = { source: source ?? checking[0]?.account_id, from, step: draft?.number ? "amount" : "recipient", number: "", amount: 0, bank: "", ...draft };
   go("transfer");
+  loadBanks();
 }
+
+// 타행 이체: ClearingHub 참가 은행 목록 (한 번만 부른다. 실패하면 우리 은행 이체만 보여 준다)
+let hubBanks;
+async function loadBanks() {
+  if (hubBanks) return;
+  hubBanks = { list: [], note: "" };
+  try { hubBanks.list = (await api("/transfers/banks")).data; }
+  catch { hubBanks = { list: [], note: "지금은 다른 은행 목록을 불러올 수 없어요. 우리 은행 계좌로는 보낼 수 있어요." }; }
+  if (currentPage() === "transfer" && transfer?.step === "recipient") {
+    const number = app.querySelector('[name="number"]')?.value;
+    render();
+    if (number !== undefined) app.querySelector('[name="number"]').value = number;
+  }
+}
+const bankName = (code) => code ? hubBanks?.list.find((bank) => bank.bank_code === code)?.name ?? code : "캡아메리카뱅크";
 
 async function step(next) {
   const draft = transfer;
@@ -313,6 +329,7 @@ async function prepareTransfer() {
     draft.key ??= idempotencyKey();
     const { data } = await api("/transfers", { method: "POST", body: {
       from_account_id: draft.source, to_account_num: draft.number, amount: draft.amount, idempotency_key: draft.key,
+      ...(draft.bank ? { to_bank: draft.bank } : {}),
     } });
     if (transfer !== draft) {
       if (data.status === 'PENDING') await api('/approvals/' + encodeURIComponent(data.action_id) + '/reject', { method: 'POST' }).catch(() => {});
@@ -367,8 +384,13 @@ function transferPage() {
   if (active === "recipient") {
     // 내 다른 입출금 계좌와 적금(납입)을 빠른 선택으로 보여 준다. 예금은 받을 수 없다
     const own = accounts.filter((account) => account.account_id !== source && account.account_type !== "DEPOSIT");
-    content = progress + '<h1>어디로 보낼까요?</h1><div class="bank">' + brand + '</div>'
-      + '<form data-form="recipient"><label>출금 계좌<select name="source">'
+    const bankOptions = [{ bank_code: "", name: "캡아메리카뱅크" }, ...(hubBanks?.list ?? [])].map((bank) =>
+      '<option value="' + escape(bank.bank_code) + '"' + (transfer.bank === bank.bank_code ? " selected" : "") + ">"
+      + escape(bank.name) + "</option>").join("");
+    content = progress + '<h1>어디로 보낼까요?</h1>'
+      + '<form data-form="recipient"><label>받는 은행<select name="bank">' + bankOptions + "</select></label>"
+      + (hubBanks?.note ? '<p class="note">' + escape(hubBanks.note) + "</p>" : "")
+      + '<label>출금 계좌<select name="source">'
       + accounts.filter((account) => account.account_type === "CHECKING").map((account) =>
         '<option value="' + account.account_id + '"' + (source === account.account_id ? " selected" : "") + ">"
         + escape(accountName(account)) + "</option>").join("")
@@ -378,7 +400,7 @@ function transferPage() {
         '<button type="button" class="outline" data-recipient="' + escape(account.account_num) + '">' + escape(accountName(account)) + '<small>' + (account.account_type === "SAVINGS" ? "적금 납입" : "입출금") + '</small></button>').join("")
       + '</div><div class="dock">' + sourceCard + '<button class="primary">다음</button></div></form>';
   } else if (active === "amount") {
-    content = progress + '<h1>얼마를 보낼까요?</h1><p>' + escape(number) + ' 계좌로 보내요.</p>'
+    content = progress + '<h1>얼마를 보낼까요?</h1><p>' + escape(bankName(transfer.bank)) + " " + escape(number) + ' 계좌로 보내요.</p>'
       + '<form data-form="amount"><label>보낼 금액<input name="amount" required inputmode="numeric" placeholder="0원" value="'
       + (amount || "") + '"></label><p class="error" role="alert">' + escape(error) + '</p><div class="dock">' + sourceCard + '<button class="primary"' + (busy ? ' disabled' : '') + '>' + (busy ? '확인하는 중…' : '다음') + '</button></div></form>';
   } else if (active === "review") {
@@ -472,7 +494,8 @@ app.addEventListener("submit", async (event) => {
     case "recipient": {
       const number = normalizeAccountNum(data.get("number"));
       if (!number) return formError(form, "받는 계좌번호를 입력해 주세요.");
-      if (number === accountById(transfer.source).account_num) return formError(form, "출금 계좌와 다른 계좌를 입력해 주세요.");
+      transfer.bank = data.get("bank") ?? "";
+      if (!transfer.bank && number === accountById(transfer.source).account_num) return formError(form, "출금 계좌와 다른 계좌를 입력해 주세요.");
       transfer.number = number;
       step("amount");
       break;
@@ -492,6 +515,7 @@ app.addEventListener("click", async (event) => {
   const { action, recipient } = clicked.dataset;
   if (recipient) {
     app.querySelector('[name="number"]').value = recipient;
+    app.querySelector('[name="bank"]').value = transfer.bank = ""; // 내 계좌는 우리 은행
     return;
   }
   if (!action) return;
@@ -542,6 +566,7 @@ app.addEventListener("click", async (event) => {
 });
 
 app.addEventListener("change", (event) => {
+  if (event.target.name === "bank") { transfer.bank = event.target.value; return; }
   if (event.target.name !== "source") return;
   const number = app.querySelector('[name="number"]').value;
   transfer.source = Number(event.target.value);
