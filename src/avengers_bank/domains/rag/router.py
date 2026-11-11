@@ -26,25 +26,28 @@ DB = Annotated[AsyncSession, Depends(get_db)]
 Me = Annotated[UserResponse, Depends(get_current_user)]
 AIDep = Annotated[AI, Depends(get_ai)]
 
-LIMIT, WINDOW = 10, 60.0  # 사용자당 1분에 10번: 한 사람이 무료 한도를 다 써서 모두의 RAG가 멈추지 않게
+# 사용자당 1분에 6번: 상담 한 번(또는 검색·답변 한 번)을 1번으로 센다 (2026-11-12, ADR 0026).
+# 사용자가 세는 단위(대화 횟수)와 같게 해야 "1분에 6번" 안내가 맞는다. 비용 상한은 아래 하루 한도가 AI 호출 수로 따로 막는다
+LIMIT, WINDOW = 6, 60.0
 calls: dict[int, deque[float]] = defaultdict(deque)
 daily_calls: Counter[date] = Counter()  # 서버 전체 하루 사용량. 재시작하면 0부터 (한 대·평일 낮 운영 기준)
 
 
 def spend_ai_calls(user_id: int, cost: int) -> None:
-    """shortcut: 서버 메모리에 기록한다(서버 한 대 기준). 여러 대가 되면 Redis 같은 공용 저장소로"""
+    """요청 한 번을 기록한다. 1분 한도는 요청(대화) 수로, 하루 한도는 AI 호출 수(cost, 상담 = 3)로 센다.
+    shortcut: 서버 메모리에 기록한다(서버 한 대 기준). 여러 대가 되면 Redis 같은 공용 저장소로"""
     now, recent = time.monotonic(), calls[user_id]
     while recent and now - recent[0] > WINDOW:
         recent.popleft()
-    if len(recent) + cost > LIMIT:
-        raise ApiException(status_code=429, code="AI_RATE_LIMITED", message="잠시 후 다시 물어봐 주세요(1분에 10번까지).")
+    if len(recent) + 1 > LIMIT:
+        raise ApiException(status_code=429, code="AI_RATE_LIMITED", message=f"잠시 후 다시 물어봐 주세요(1분에 {LIMIT}번까지).")
     today = today_kst()
     if today not in daily_calls:
         daily_calls.clear()  # 날짜가 바뀌면 새로 센다
     if daily_calls[today] + cost > get_settings().ai_daily_limit:
         raise ApiException(status_code=429, code="AI_DAILY_LIMIT",
                            message="오늘 준비한 AI 사용량을 모두 썼습니다. 내일 다시 이용해 주세요.")
-    recent.extend([now] * cost)
+    recent.append(now)
     daily_calls[today] += cost
 
 

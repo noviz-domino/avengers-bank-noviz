@@ -188,8 +188,8 @@ async def test_rate_limit_and_concurrent_reindex(rag):
     results = await asyncio.gather(reindex(client), reindex(client))  # 동시에 두 번 와도
     embedded = sorted(r.json()["data"]["embedded"] for r in results)
     assert embedded[0] == 0 and embedded[1] > 25  # 한 번만 임베딩
-    codes = [(await client.get("/rag/search", params={"q": "한도"}, headers=me)).status_code for _ in range(11)]
-    assert codes[:10] == [200] * 10 and codes[10] == 429
+    codes = [(await client.get("/rag/search", params={"q": "한도"}, headers=me)).status_code for _ in range(7)]
+    assert codes[:6] == [200] * 6 and codes[6] == 429  # 1분에 6번
 
 
 async def test_daily_limit_is_shared_by_everyone_and_resets_next_day(rag, monkeypatch):

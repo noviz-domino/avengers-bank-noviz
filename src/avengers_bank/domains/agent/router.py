@@ -19,7 +19,8 @@ router = APIRouter(prefix="/chat", tags=["chat"], responses=error_responses(401,
 
 Me = Annotated[UserResponse, Depends(get_current_user)]
 Token = Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
-CHAT_COST = 3  # 채팅 한 번 = LLM 호출 3번 이상(라우터, 담당의 도구 선택, 담당의 답). RAG 검색·답변과 같은 한도(1분 10)를 나눠 쓴다
+# 채팅 한 번 = LLM 호출 3번 이상(라우터, 담당의 도구 선택, 담당의 답). 1분 한도에는 대화 1번으로, 하루 한도(비용 상한)에는 3으로 센다
+CHAT_COST = 3
 
 
 def limit_chat(me: Me) -> None:
