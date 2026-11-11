@@ -3,8 +3,8 @@ import { header } from "./ui.mjs";
 export { esc } from "./ui.mjs";
 export { money as won } from "./format.mjs";
 
-export function topbar(title, backAct) {
-  return header({ title, back: backAct }).replace('data-action="' + backAct + '"', 'data-act="' + backAct + '"');
+export function topbar(title, backAct, heading = false) {
+  return header({ title, back: backAct, heading }).replace('data-action="' + backAct + '"', 'data-act="' + backAct + '"');
 }
 
 // 서버 422 details를 { 필드: 메시지 }로 바꾼다. 서버 문구는 영어라 필드별 안내만 보여 준다.

@@ -139,7 +139,7 @@ export async function verifyIntegration(win = window) {
 
   // 7. 카드
   await action("cards");
-  await waitSel('[data-card-action^="select-"]');
+  await waitSel(".cards-art");
   step("카드 목록 표시");
   fits("카드");
   await click('[data-card-action="issue"]');
@@ -184,7 +184,7 @@ export async function verifyIntegration(win = window) {
   await waitText("내 정보");
   step("메뉴에 내 정보 표시");
   fits("메뉴");
-  await click('[data-act="to-search"]');
+  await action("search");
   await submit("#search-form", { keyword: "이체" });
   await waitText("입금 합계");
   step("거래 검색 결과에 합계 표시");

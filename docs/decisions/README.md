@@ -32,6 +32,7 @@
 | [0024](0024-budget-guard.md) | 예산 계산, 결제 가드와 사람의 PIN 확인 | 채택 | 2026-11-09 |
 | [0025](0025-https-caddy-duckdns.md) | 서버 공개 주소: DuckDNS + Caddy로 HTTPS | 채택 | 2026-11-11 |
 | [0026](0026-ai-daily-limit.md) | 서버 전체 AI 호출 하루 한도 | 채택 | 2026-11-11 |
+| [0027](0027-compact-layout-chat-login.md) | 화면 여백 줄이기, AI 상담 채팅형 개편, 로그인 화면 다시 디자인 (시안 B 선택, A·C 보관) | 채택 | 2026-11-11 |
 
 ## 새로 쓰는 법
 

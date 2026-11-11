@@ -2,15 +2,16 @@
   --ui-cream: #fbf5e9;
   --ui-white: #fff;
   --ui-navy: #10233b;
-  --ui-blue: #235b91;
-  --ui-blue-soft: #eef5fc;
+  --ui-blue: #1d5fa8;
+  --ui-blue-soft: #edf4fd;
+  --ui-surface: #f4f6f8;
   --ui-sage: #487657;
   --ui-sage-soft: #eef6f0;
   --ui-amber: #96611c;
   --ui-amber-soft: #fcf3e3;
   --ui-error: #a22938;
   --ui-muted: #647083;
-  --ui-line: #edf0f3;
+  --ui-line: #e6eaef;
   --ui-title-size: 26px;
   --ui-section-size: 18px;
   --ui-body-size: 15px;
@@ -24,8 +25,10 @@
   --ui-radius: 16px;
   --ui-shadow: 0 4px 18px #10233b0a;
   --ui-touch: 44px;
+  --ui-tabs-height: calc(61px + max(8px, env(safe-area-inset-bottom)));
 }
 [hidden] { display: none !important; }
+.ui-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .ui-icon { display: block; width: 24px; height: 24px; flex: 0 0 24px; }
 .ui-button {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--ui-space-sm);
@@ -39,10 +42,17 @@
 .ui-button--quiet { background: transparent; }
 .ui-button--pill { background: #10233bb3; color: var(--ui-white); border-radius: 999px; padding-inline: 10px; font-size: var(--ui-small-size); }
 .ui-button:disabled { opacity: .5; }
-.ui-header { display: flex; align-items: center; gap: var(--ui-space-sm); min-height: 64px; padding: 8px var(--ui-page-gutter); background: var(--ui-white); }
-.ui-header-title { flex: 1; min-width: 0; font-size: var(--ui-section-size); font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
-.ui-header-actions { display: flex; align-items: center; }
-.ui-header .brand { font-size: 20px; letter-spacing: -.04em; }
+.ui-header { display: flex; align-items: center; gap: var(--ui-space-sm); min-height: 52px; padding: 4px var(--ui-page-gutter); background: var(--ui-white); }
+.ui-header-title { flex: 1; min-width: 0; margin: 0; font-size: var(--ui-section-size); line-height: 1.35; letter-spacing: -.02em; font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
+h1.ui-header-title { font-size: 22px; }
+.ui-header-actions { display: flex; align-items: center; gap: var(--ui-space-xs); margin-right: -8px; }
+.ui-header-actions .ui-button { padding-inline: 8px; }
+.ui-header .brand { font-size: 15px; letter-spacing: -.02em; color: var(--ui-navy); }
+.ui-header .brand svg { width: 20px; }
+.ui-icon-toggle { display: inline-flex; padding: 2px; border-radius: var(--ui-radius-sm); background: var(--ui-surface); }
+.ui-icon-toggle button { display: grid; place-items: center; width: var(--ui-touch); height: var(--ui-touch); padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ui-muted); }
+.ui-icon-toggle .ui-icon { width: 20px; height: 20px; }
+.ui-icon-toggle [aria-pressed="true"] { background: var(--ui-white); color: var(--ui-blue); box-shadow: 0 1px 3px #10233b24; }
 .ui-back { width: var(--ui-touch); height: var(--ui-touch); padding: 0; margin-left: -12px; color: var(--ui-navy); }
 .ui-page-title { color: var(--ui-navy); font-size: var(--ui-title-size); line-height: 1.35; letter-spacing: -.035em; word-break: keep-all; overflow-wrap: anywhere; }
 .ui-section-head { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space-sm); width: 100%; min-height: var(--ui-touch); padding: 0 12px; border-radius: var(--ui-radius-sm); }
@@ -99,12 +109,12 @@ button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; backgr
 /* 홈만 새 값으로 맞춰, 2단계 이전의 화면별 CSS에는 영향을 주지 않는다. */
 .ui-home { padding: 0 var(--ui-page-gutter) 24px; color: var(--ui-navy); font-size: var(--ui-body-size); }
 .ui-home > * + * { margin-top: var(--ui-space-md); }
-.ui-home .ui-balance { margin-inline: calc(-1 * var(--ui-page-gutter)); padding: 8px var(--ui-page-gutter) 13px; background: #f4f5f6; }
+.ui-home .ui-balance { margin-inline: calc(-1 * var(--ui-page-gutter)); padding: 8px var(--ui-page-gutter) 13px; background: var(--ui-surface); }
 .ui-balance > div { display: flex; justify-content: space-between; align-items: center; }
 .ui-balance p { color: var(--ui-navy); font-size: var(--ui-section-size); font-weight: 800; }
 .ui-balance .ui-button { padding: 0; color: var(--ui-muted); }
 .ui-balance h1 { font-size: 36px; line-height: 1.3; letter-spacing: -.035em; font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
-.ui-campaign { position: relative; isolation: isolate; overflow: hidden; margin-block: 24px 16px; border-radius: var(--ui-radius); background: var(--ui-cream); }
+.ui-campaign { position: relative; isolation: isolate; overflow: hidden; border-radius: var(--ui-radius); background: var(--ui-cream); }
 .ui-campaign-playback { right: calc(4px + 2 * var(--ui-touch)); }
 .ui-campaign-playback::before { inset: 10px; }
 .ui-campaign a { display: block; }
@@ -112,12 +122,28 @@ button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; backgr
 .ui-campaign img { display: block; width: 100%; height: auto; }
 .ui-home ul { margin: 0; padding: 0; list-style: none; }
 .ui-home .account-group .ui-row { padding-block: 10px; }
-.ui-home .account-group .ui-row-end { gap: 0; }
+/* 금액과 이체 버튼을 한 줄에 둔다 (좁은 화면에서는 아래 미디어쿼리에서 다시 세로로) */
+.ui-home .account-group .ui-row { align-items: center; }
+.ui-home .account-group .ui-row-icon { margin-top: 0; }
+.ui-home .account-group .ui-row-end { flex-direction: row; align-items: center; gap: 10px; }
+.ui-home .account-group .ui-row-end .ui-button { padding: 6px 14px; }
 .ui-home .ui-section-head > .ui-button { padding: 0; color: var(--ui-amber); font-size: var(--ui-small-size); }
 .ui-home .ui-section-head h2 { white-space: nowrap; }
 .ui-home .ui-section-head h2 .ui-icon { color: var(--ui-amber); }
 .ui-home .ui-recent .ui-row { align-items: center; padding-block: 4px; }
-.ui-ai { background: #f3f5f6; }
+/* 한 줄 바로가기 카드: 아이콘 + 설명(왼쪽) + 값(오른쪽) */
+.ui-link-card { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 12px 10px 16px; border: 0; border-radius: var(--ui-radius); background: var(--ui-cream); color: var(--ui-navy); text-align: left; }
+.ui-link-card > .ui-icon:first-child { color: var(--ui-amber); }
+.ui-link-card > .ui-icon:last-child { width: 16px; height: 16px; flex-basis: 16px; color: var(--ui-muted); }
+.ui-link-card > span { flex: 1; min-width: 0; }
+.ui-link-card strong { display: block; font-size: var(--ui-body-size); line-height: 1.4; }
+.ui-link-card small { display: block; color: var(--ui-muted); font-size: var(--ui-small-size); line-height: 1.4; word-break: keep-all; }
+.ui-link-card b { font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui-link-card .ui-link-card-cta { color: var(--ui-blue); font-size: var(--ui-small-size); }
+.ui-quick-links { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ui-space-sm); }
+.ui-quick-links a { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--ui-touch); padding: 6px 8px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius-sm); color: var(--ui-navy); font-size: var(--ui-small-size); font-weight: 700; text-decoration: none; word-break: keep-all; }
+.ui-quick-links .ui-icon { width: 20px; height: 20px; flex-basis: 20px; color: var(--ui-blue); }
+.ui-ai { background: var(--ui-surface); box-shadow: none; }
 .ui-ai h2 { display: flex; align-items: center; gap: var(--ui-space-sm); font-size: var(--ui-section-size); word-break: keep-all; }
 .ui-ai h2 .ui-icon { width: 28px; height: 28px; }
 .ui-ai-prompt { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space-sm); width: 100%; margin-top: 12px; padding: 8px 12px; border: 0; border-radius: var(--ui-radius-sm); background: var(--ui-white); color: var(--ui-muted); font-size: var(--ui-body-size); font-weight: 500; text-align: left; white-space: normal; word-break: keep-all; }
@@ -134,4 +160,5 @@ button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; backgr
   .ui-row-copy small { font-size: 12px; }
   .ui-row-end > strong { font-size: 16px; }
   .ui-balance h1 { font-size: 32px; }
+  .ui-home .account-group .ui-row-end { flex-direction: column; align-items: flex-end; gap: 0; }
 }

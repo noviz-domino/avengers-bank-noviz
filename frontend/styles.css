@@ -92,6 +92,8 @@ main > * + * { margin-top: 20px; }
 .segments [aria-pressed="true"] { background: var(--blue); color: white; border-color: var(--blue); }
 .empty { padding: 20px 0; color: var(--muted); }
 .app > .cards-screen, .app > .products-app { flex: 1; }
+/* 내용이 짧은 화면(전체 메뉴 등)에서도 하단 탭이 바닥에 붙게 한다 */
+.app > #ext-screen { flex: 1; display: flex; flex-direction: column; }
 .primary {
   width: 100%;
   min-height: 49px;
@@ -111,21 +113,38 @@ main > * + * { margin-top: 20px; }
 .login {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 36px;
-  padding-top: clamp(28px, 8vh, 80px);
-  background: linear-gradient(150deg, #faf2e3, #fff 67%);
+  gap: 18px;
+  padding: clamp(24px, 6vh, 64px) 28px max(24px, env(safe-area-inset-bottom));
+  background: linear-gradient(170deg, #fdf5e6, #fff 58%);
 }
-.login-head { display: grid; justify-items: center; gap: 14px; margin: auto 0; } /* 머리말은 남는 공간 가운데, 폼과 데모·가입은 아래에 붙여 둔다 */
-.login .mascot { width: clamp(140px, 46vw, 190px); }
+.login > * + * { margin-top: 0; }
+.login-head { display: grid; justify-items: center; gap: 12px; margin: auto 0; } /* 머리말은 남는 공간 가운데, 폼과 간편 로그인은 아래에 붙여 둔다 */
+.login .mascot { width: clamp(120px, 38vw, 160px); }
 .login-brand {
-  display: flex; align-items: center; gap: 10px; margin: 0;
-  font-size: clamp(1.9rem, 9vw, 2.5rem); font-weight: 800; letter-spacing: -.05em; color: var(--navy);
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  font-size: clamp(1.6rem, 7.5vw, 2rem); font-weight: 800; letter-spacing: -.05em; color: var(--navy);
 }
-.login-brand svg { width: 1.15em; flex: none; }
-.login .note { text-align: center; margin-top: 9px; }
-.login-extra { display: grid; justify-items: center; gap: 4px; margin-top: -20px; }
-.login-extra .link { border: 0; background: transparent; color: var(--blue); font-weight: 700; text-decoration: underline; min-height: 44px; }
+.login-brand svg { width: 1.1em; flex: none; }
+.login form { display: grid; gap: 12px; }
+.login label + label, .login label + button { margin-top: 0; }
+/* 입력칸·버튼은 같은 높이의 알약 모양으로 맞추고, 서로 12px 띄운다 */
+.login input, .login form > .primary, .login-social button { min-height: 54px; border-radius: 999px; }
+.login input { padding-inline: 22px; border-color: #e1e6ed; background: var(--ui-white); }
+.login input::placeholder { color: #8a95a5; }
+.login input:focus-visible { outline: none; border-color: var(--ui-blue); box-shadow: 0 0 0 3px #1d5fa830; }
+.login form > .primary { margin-top: 4px; font-size: 16px; }
+.login .note, .login .error { margin: 0; text-align: center; }
+.login-links { display: flex; justify-content: center; align-items: center; gap: 14px; }
+.login-links i { width: 1px; height: 12px; background: #c5cfda; }
+.login-links .link { min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--ui-muted); font-size: var(--ui-small-size); font-weight: 700; }
+.login-or { display: flex; align-items: center; gap: 12px; color: var(--ui-muted); font-size: var(--ui-small-size); }
+.login-or::before, .login-or::after { content: ""; flex: 1; height: 1px; background: var(--ui-line); }
+/* 간편 로그인은 세로로, Google이 위. 주 버튼보다 낮고 글자도 작게 해서 덜 눈에 띄게 한다 */
+.login-social > div { display: grid; gap: 8px; margin-top: 12px; }
+.login-social button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; border: 1px solid #e6eaef; background: var(--ui-white); color: var(--ui-navy); font-size: 14px; font-weight: 600; }
+.login-social svg { width: 18px; flex: none; }
+.login-social .note:empty { display: none; }
+.login-social .note { margin-top: 10px; }
 .note { font-size: .84rem; }
 .progress { color: var(--muted); font-size: .84rem; }
 .progress strong { color: var(--navy); }
@@ -154,22 +173,39 @@ dt { color: var(--muted); }
 dd { margin: 0; text-align: right; font-weight: 750; }
 .success-mark { border-radius: 100%; display: grid; place-items: center; width: 58px; height: 58px; background: #eaf3e9; color: #24633a; font-size: 1.65rem; }
 
-.chat { display: flex; flex-direction: column; }
+/* AI 상담: 대화 영역은 옅은 회색, 입력줄은 흰색 + 윗선으로 구분한다 */
 .chat-screen { display: contents; }
-.chat-art { width: 42px; flex-shrink: 0; transform: rotate(9deg); }
-.chat-feed > * + * { margin-top: 15px; }
-.question-group { border-bottom: 1px solid var(--line); padding: 14px 0 4px; }
-.question-group button { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 44px; padding: 6px 0; border: 0; background: transparent; text-align: left; }
-.question-group h3 { color: var(--blue); }
-.bubble { max-width: 90%; padding: 11px 13px; border-radius: 13px; background: #f2f5f7; overflow-wrap: anywhere; }
+main.chat { display: flex; flex-direction: column; padding: 0; background: var(--ui-surface); }
+main.chat > * + * { margin-top: 0; }
+.chat-feed { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: var(--ui-space-md) var(--ui-page-gutter) var(--ui-space-lg); }
+.chat-feed > * { scroll-margin-bottom: 90px; }
+.chat-row { display: flex; align-items: flex-start; gap: var(--ui-space-sm); }
+.chat-avatar { flex: 0 0 28px; display: grid; place-items: center; height: 28px; margin-top: 2px; }
+.chat-avatar svg { width: 22px; }
+.bubble { max-width: 84%; margin: 0; padding: 10px 14px; border-radius: 18px; overflow-wrap: anywhere; line-height: 1.6; }
 .bubble p { white-space: pre-wrap; }
-.bubble.user { margin-left: auto; background: #eaf2fa; }
-.bubble .outline { margin-top: 8px; }
+.bubble.assistant { border-top-left-radius: 6px; background: var(--ui-white); box-shadow: 0 1px 2px #10233b14; }
+.bubble.user { align-self: flex-end; border-bottom-right-radius: 6px; background: var(--ui-blue); color: var(--ui-white); }
+.chat-hint { margin-top: var(--ui-space-sm); text-align: right; color: var(--ui-muted); font-size: var(--ui-small-size); }
+/* 예시는 "아직 보내지 않은 내 말풍선"처럼 점선으로 그린다 */
+.bubble.user.chat-example { min-height: var(--ui-touch); border: 1.5px dashed #8fb1d6; background: var(--ui-white); color: var(--ui-blue); font-weight: 600; text-align: left; }
+.bubble.status { color: var(--ui-muted); font-size: var(--ui-small-size); }
+.chat-dots { display: inline-flex; gap: 3px; margin-left: 6px; }
+.chat-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: chat-dot 1.2s infinite ease-in-out; }
+.chat-dots i:nth-child(2) { animation-delay: .15s; }
+.chat-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes chat-dot { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .chat-dots i { animation: none; } }
+.chat-action { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ui-line); }
+.chat-action .ui-button { margin-top: 6px; }
 .status { color: var(--muted); font-size: .88rem; }
-.composer { position: sticky; bottom: 77px; z-index: 1; margin-top: auto; padding: var(--ui-space-md) 0; background: var(--ui-white); }
-.composer > div { display: flex; gap: 6px; margin-top: 6px; }
-.composer input { font-weight: 400; }
-.composer .primary { flex: 0 0 48px; padding: 0; font-size: 1.3rem; }
+.composer { position: sticky; bottom: var(--ui-tabs-height); z-index: 1; padding: 10px var(--ui-page-gutter); border-top: 1px solid #d5dce4; background: var(--ui-white); box-shadow: 0 -4px 12px #10233b0a; }
+.composer > div { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 6px; border: 1px solid #cbd5df; border-radius: 999px; background: var(--ui-surface); }
+.composer > div:focus-within { border-color: var(--ui-blue); background: var(--ui-white); }
+.composer input { min-height: 40px; border: 0; border-radius: 999px; background: transparent; font-weight: 400; }
+.composer input:focus-visible { outline: none; }
+.composer .primary { flex: 0 0 40px; width: 40px; min-width: 40px; min-height: 40px; padding: 0; border-radius: 50%; }
+.composer .primary .ui-icon { width: 20px; height: 20px; }
 
 .app[data-page="account"] h1, .app[data-page="manage"] h1, .transfer h1, .login h1 { font-size: var(--ui-title-size); line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
 .spread > div, .spread h1, .rows li > div, dd { min-width: 0; overflow-wrap: anywhere; }
@@ -183,13 +219,6 @@ h1[tabindex="-1"]:focus { outline: none; }
 .chips button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .transfer .card.spread > div { flex: 1; }
 .transfer .card.spread .right { flex: 0 0 auto; }
-.chat .hero h2 { font-size: var(--ui-section-size); }
-.chat .question-group .ui-section-head { background: transparent; padding: 0; }
-.chat .question-group button { gap: var(--ui-space-sm); }
-.chat .question-group button span { min-width: 0; overflow-wrap: anywhere; }
-.composer > div { border: 1px solid var(--ui-line); padding: 4px; border-radius: 999px; }
-.composer input { border: 0; border-radius: 999px; background: var(--ui-white); }
-.composer .primary { border-radius: 50%; }
 
 @media (max-width: 350px) {
   main { padding-inline: 16px; }
