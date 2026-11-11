@@ -1,0 +1,4 @@
+# 서버용 HTTPS 입구 (ADR 0025). 인증서는 Caddy가 Let's Encrypt에서 자동으로 받고 갱신한다
+{$DUCKDNS_SUBDOMAIN}.duckdns.org {
+	reverse_proxy app:8000
+}
