@@ -8,14 +8,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.clock import today_kst
-from avengers_bank.core.exceptions import BadRequestException, ConflictException, NotFoundException
+from avengers_bank.core.exceptions import ApiException, BadRequestException, ConflictException, NotFoundException
 from avengers_bank.domains.accounts.categories import classify
 from avengers_bank.domains.accounts.models import Account
-from avengers_bank.domains.accounts.money import TransferRejected, execute_card_ledger
+from avengers_bank.domains.accounts.money import TransferRejected, check_budget_confirmed, execute_card_ledger
 from avengers_bank.domains.accounts.repository import kst_midnight_utc
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
 from avengers_bank.domains.audit.repository import audit_repository
+from avengers_bank.domains.budget.calc import impact_text
+from avengers_bank.domains.budget.models import BudgetDecision
+from avengers_bank.domains.budget.service import lock_cycle
 from avengers_bank.domains.cards.card_number import make_card_num, mask, prefix
 from avengers_bank.domains.cards.models import Card, CardProduct, CardTransaction
 from avengers_bank.domains.cards.repository import card_repository
@@ -62,6 +65,30 @@ async def run_unsuspend_card(db: AsyncSession, action: PendingAction) -> None:
     if card.status != "SUSPENDED":
         raise TransferRejected("CARD_NOT_SUSPENDED", "정지된 카드가 아닙니다.")
     card.status = "ACTIVE"
+
+
+def budget_confirmation_required(action: PendingAction) -> ApiException:
+    """409 + 승인 대기 번호와 예산 숫자. 사용자가 승인 화면에서 사유를 적고 PIN을 넣어야 결제된다 (AI는 확인 못 함)"""
+    b = action.budget_check
+    return ApiException(
+        409, "BUDGET_CONFIRMATION_REQUIRED", "예산을 넘는 결제입니다. 승인 화면에서 사유를 적고 PIN으로 확인해 주세요.",
+        data={"action_id": str(action.action_id), "free_to_spend": b["free_before"],
+              "after": b["free_before"] - b["amount"], "shortage": b["amount"] - b["free_before"], "impact": b["impact"]},
+    )
+
+
+async def run_budget_card_payment(db: AsyncSession, action: PendingAction, emergency: bool = False) -> None:
+    """사람이 확인한 예산 초과 카드 결제 (approvals EXECUTORS). 같은 결제 함수를 지나며 잠금 안에서 다시 검사한다"""
+    p = action.payload
+    try:
+        tx, _ = await card_service.pay_in_tx(
+            db, action.user_id, p["card_id"],
+            CardPayment(merchant_name=p["merchant_name"], amount=p["amount"], idempotency_key=p["idempotency_key"]),
+            budget_check=p["budget_check"], emergency=emergency,
+        )
+    except ApiException as e:  # 그사이 카드 정지·한도 초과·잔액 부족 → FAILED, 돈은 안 움직임
+        raise TransferRejected(e.code, e.message) from None
+    action.result = {"card_tx_id": tx.card_tx_id}
 
 
 def tx_not_found() -> NotFoundException:
@@ -171,51 +198,116 @@ class CardService:
         return found[0]
 
     async def pay(self, db: AsyncSession, user_id: int, card_id: int, data: CardPayment) -> tuple[CardTransaction, bool]:
-        """가맹점 결제 흉내 (ADR 0010). 카드 행을 잠가서 같은 카드의 결제·취소를 한 줄로 세운다
-        (한도 합계와 요청 번호 검사가 동시 결제에 뚫리지 않게)"""
+        """가맹점 결제 흉내 (ADR 0010). 예산을 넘으면 결제하지 않고 예산 확인용 승인 대기를 남긴 뒤
+        409 BUDGET_CONFIRMATION_REQUIRED (승인 대기는 커밋돼야 해서 트랜잭션이 끝난 뒤에 알린다)"""
         async with db.begin():
-            card = await self._my_card(db, user_id, card_id, lock=True)
-            existing = await card_repository.find_tx_by_key(db, card_id, data.idempotency_key)
-            if existing is not None:
-                if (existing.merchant_name, existing.amount) != (data.merchant_name, data.amount):
-                    raise ConflictException(
-                        message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
-                    )
-                return existing, False
-            if card.status != "ACTIVE":
-                raise ConflictException(message="쓸 수 없는 카드입니다(정지·분실).", code="CARD_NOT_ACTIVE")
-            used_today = await card_repository.spent_since(db, card_id, kst_midnight_utc(today_kst()))
-            if used_today + data.amount > card.daily_limit:
-                left = max(card.daily_limit - used_today, 0)
-                raise BadRequestException(
-                    message=f"오늘 더 쓸 수 있는 금액은 {left:,}원입니다.", code="CARD_DAILY_LIMIT_EXCEEDED"
+            result = await self.pay_in_tx(db, user_id, card_id, data)
+        if isinstance(result, PendingAction):
+            raise budget_confirmation_required(result)
+        return result
+
+    async def pay_in_tx(
+        self, db: AsyncSession, user_id: int, card_id: int, data: CardPayment,
+        budget_check: dict | None = None, emergency: bool = False,
+    ) -> tuple[CardTransaction, bool] | PendingAction:
+        """호출한 쪽 트랜잭션 안에서 결제. 카드 행을 잠가서 같은 카드의 결제·취소를 한 줄로 세운다
+        (한도 합계와 요청 번호 검사가 동시 결제에 뚫리지 않게). budget_check가 있으면 사람이 확인한 예산 초과 건의 실행
+        (run_budget_card_payment): 다시 확인을 만들지 않고 나빠졌는지만 본다 (ADR 0007).
+        예산 확인이 필요하면 결제 대신 승인 대기(PendingAction)를 돌려준다"""
+        card = await self._my_card(db, user_id, card_id, lock=True)
+        existing = await card_repository.find_tx_by_key(db, card_id, data.idempotency_key)
+        if existing is not None:
+            if (existing.merchant_name, existing.amount) != (data.merchant_name, data.amount):
+                raise ConflictException(
+                    message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
                 )
-            category = classify("CARD_PAYMENT", None, data.merchant_name)
-            tx = CardTransaction(
-                card_id=card_id, idempotency_key=data.idempotency_key, merchant_name=data.merchant_name,
-                category=category, amount=data.amount, status="APPROVED",
+            return existing, False
+        if budget_check is None and (waiting := await approval_repository.find_by_key(db, user_id, data.idempotency_key)):
+            return self._same_budget_request(waiting, card_id, data)
+        if card.status != "ACTIVE":
+            raise ConflictException(message="쓸 수 없는 카드입니다(정지·분실).", code="CARD_NOT_ACTIVE")
+        used_today = await card_repository.spent_since(db, card_id, kst_midnight_utc(today_kst()))
+        if used_today + data.amount > card.daily_limit:
+            left = max(card.daily_limit - used_today, 0)
+            raise BadRequestException(
+                message=f"오늘 더 쓸 수 있는 금액은 {left:,}원입니다.", code="CARD_DAILY_LIMIT_EXCEEDED"
             )
-            if card.card_type == "CREDIT":
-                if await card_repository.has_overdue(db, card_id):
-                    raise ConflictException(message="밀린 카드 대금이 있어 결제할 수 없습니다.", code="CARD_OVERDUE")
-                unpaid = await card_repository.unpaid_credit(db, card_id)
-                if unpaid + data.amount > card.credit_limit:
-                    left = max(card.credit_limit - unpaid, 0)
-                    raise BadRequestException(message=f"남은 신용 한도는 {left:,}원입니다.", code="CREDIT_LIMIT_EXCEEDED")
-                tx.billing_status = "UNBILLED"  # 돈은 대금 출금일에 나간다 (대금 출금 PR)
-            else:
-                try:
-                    ledger = await execute_card_ledger(
-                        db, owner_user_id=user_id, account_id=card.linked_account_id, tx_type="CARD_PAYMENT",
-                        amount=-data.amount, merchant_name=data.merchant_name, category=category,
-                    )
-                except TransferRejected as e:
-                    raise rejected(e) from None
-                tx.account_tx_id = ledger.tx_id
-            db.add(tx)
-            await db.flush()
-            await db.refresh(tx)
-            return tx, True
+        category = classify("CARD_PAYMENT", None, data.merchant_name)  # 업종은 서버가 가맹점 이름으로 (ADR 0007)
+        if card.card_type == "CREDIT":
+            if await card_repository.has_overdue(db, card_id):
+                raise ConflictException(message="밀린 카드 대금이 있어 결제할 수 없습니다.", code="CARD_OVERDUE")
+            unpaid = await card_repository.unpaid_credit(db, card_id)
+            if unpaid + data.amount > card.credit_limit:
+                left = max(card.credit_limit - unpaid, 0)
+                raise BadRequestException(message=f"남은 신용 한도는 {left:,}원입니다.", code="CREDIT_LIMIT_EXCEEDED")
+        # 예산 가드 (ADR 0007): 체크·신용 모두. 잠금 순서 카드 → 예산 주기 → 계좌 (ERD 규칙 5)
+        if locked := await lock_cycle(db, user_id):
+            profile, budget = locked
+            if budget_check is not None:
+                check_budget_confirmed(budget, data.amount, budget_check, emergency)
+            elif data.amount > budget.free_to_spend:
+                if category not in profile.always_allow:
+                    return await self._request_budget_confirmation(db, user_id, card, data, profile, budget)
+                db.add(BudgetDecision(  # 항상 통과 업종: 결제하고 기록. 자유 사용 가능액에서는 그대로 빠진다
+                    user_id=user_id, amount=data.amount, free_to_spend_at_confirm=budget.free_to_spend,
+                    reason=f"항상 통과 업종({category})",
+                ))
+        tx = CardTransaction(
+            card_id=card_id, idempotency_key=data.idempotency_key, merchant_name=data.merchant_name,
+            category=category, amount=data.amount, status="APPROVED",
+        )
+        if card.card_type == "CREDIT":
+            tx.billing_status = "UNBILLED"  # 돈은 대금 출금일에 나간다 (대금 출금 PR)
+        else:
+            try:
+                ledger = await execute_card_ledger(
+                    db, owner_user_id=user_id, account_id=card.linked_account_id, tx_type="CARD_PAYMENT",
+                    amount=-data.amount, merchant_name=data.merchant_name, category=category,
+                )
+            except TransferRejected as e:
+                raise rejected(e) from None
+            tx.account_tx_id = ledger.tx_id
+        db.add(tx)
+        await db.flush()
+        await db.refresh(tx)
+        return tx, True
+
+    async def _request_budget_confirmation(
+        self, db: AsyncSession, user_id: int, card: Card, data: CardPayment, profile, budget,
+    ) -> PendingAction:
+        """예산을 넘는 카드 결제: 결제 대신 승인 대기. 멱등키는 처음 결제 요청의 키 그대로 (budget.md 동시성과 중복)"""
+        impact = impact_text(budget, data.amount, profile.goal_name)
+        kind = "신용카드" if card.card_type == "CREDIT" else "체크카드"
+        action = PendingAction(
+            user_id=user_id, action_type="BUDGET_CARD_PAYMENT", requested_by="WEB",
+            idempotency_key=data.idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
+            payload={
+                "card_id": card.card_id, "merchant_name": data.merchant_name, "amount": data.amount,
+                "idempotency_key": data.idempotency_key,
+                "budget_check": {"free_before": budget.free_to_spend, "amount": data.amount, "over": True, "impact": impact},
+            },
+            summary=f"{card.nickname or kind}({mask(card.card_num)})로 {data.merchant_name}에서 {data.amount:,}원 결제\n{impact}",
+        )
+        try:
+            await approval_repository.save(db, action)
+        except IntegrityError as e:
+            if "idempotency_key" not in str(e.orig):
+                raise
+            raise ConflictException(message="같은 요청을 처리하고 있습니다.", code="DUPLICATE_REQUEST") from None
+        return action
+
+    def _same_budget_request(self, waiting: PendingAction, card_id: int, data: CardPayment) -> PendingAction:
+        """같은 결제 요청 번호로 다시 옴: 기다리는 예산 확인이 있으면 그것을 다시 알려 준다"""
+        p = waiting.payload
+        if (waiting.action_type != "BUDGET_CARD_PAYMENT"
+                or (p.get("card_id"), p.get("merchant_name"), p.get("amount")) != (card_id, data.merchant_name, data.amount)):
+            raise ConflictException(message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED")
+        expires = waiting.expires_at if waiting.expires_at.tzinfo else waiting.expires_at.replace(tzinfo=UTC)
+        if waiting.status == "PENDING" and expires > datetime.now(UTC):
+            return waiting
+        raise ConflictException(
+            message="이 결제의 예산 확인은 이미 끝났습니다. 새 요청 번호로 다시 결제해 주세요.", code="ACTION_NOT_PENDING"
+        )
 
     async def cancel(self, db: AsyncSession, user_id: int, card_id: int, card_tx_id: int) -> CardTransaction:
         """전액 취소. 이미 돈이 나간 것(체크카드, 대금을 낸 신용카드)은 결제 계좌로 환불(REFUND),

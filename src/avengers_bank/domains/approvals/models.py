@@ -42,3 +42,17 @@ class PendingAction(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    @property
+    def budget_check(self) -> dict:
+        """요청 때 저장한 예산 미리 계산 {"free_before", "amount", "over", "impact"} (ADR 0007). 없으면 {}"""
+        return self.payload.get("budget_check") or {}
+
+    @property
+    def needs_budget_reason(self) -> bool:
+        """예산을 넘는 건: 승인할 때 사유를 받아야 한다"""
+        return bool(self.budget_check.get("over"))
+
+    @property
+    def budget_impact(self) -> str | None:
+        return self.budget_check.get("impact") if self.needs_budget_reason else None

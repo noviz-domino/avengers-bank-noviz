@@ -11,6 +11,8 @@ from avengers_bank.domains.accounts.models import Account
 from avengers_bank.domains.accounts.money import TransferRejected, check_transfer, today_transfer_out
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
+from avengers_bank.domains.budget.calc import impact_text
+from avengers_bank.domains.budget.service import preview
 from avengers_bank.domains.transfers.schemas import TransferCreate
 from avengers_bank.domains.users.models import User
 
@@ -42,15 +44,26 @@ class TransferService:
 
             receiver = await db.get(User, dst.user_id)
             to_whom = label(dst) if internal else f"{receiver.name}님({dst.account_num})"
+            payload = {
+                "from_account_id": src.account_id, "to_account_id": dst.account_id,
+                "to_account_num": dst.account_num, "amount": data.amount, "memo": data.memo,
+            }
+            # 승인 화면 문장은 서버가 payload로 만든다 (규칙 5)
+            summary = f"{label(src)}에서 {to_whom}에게 {data.amount:,}원 보내기"
+            # 예산 미리 계산 (ADR 0007): 넘으면 같은 승인 화면에서 사유를 받는다. 실행 때 잠금 안에서 다시 검사.
+            # 409로 막지 않는다: 이체는 원래 승인 화면이 확인 단계라 PIN 한 번으로 이체와 예산 확인을 같이 받는다
+            if not internal and (found := await preview(db, user_id)):
+                profile, budget = found
+                check = {"free_before": budget.free_to_spend, "amount": data.amount,
+                         "over": data.amount > budget.free_to_spend}
+                if check["over"]:
+                    check["impact"] = impact_text(budget, data.amount, profile.goal_name)
+                    summary += "\n" + check["impact"]
+                payload["budget_check"] = check
             action = PendingAction(
                 user_id=user_id, action_type="TRANSFER", requested_by=requested_by,
                 idempotency_key=data.idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
-                payload={
-                    "from_account_id": src.account_id, "to_account_id": dst.account_id,
-                    "to_account_num": dst.account_num, "amount": data.amount, "memo": data.memo,
-                },
-                # 승인 화면 문장은 서버가 payload로 만든다 (규칙 5)
-                summary=f"{label(src)}에서 {to_whom}에게 {data.amount:,}원 보내기",
+                payload=payload, summary=summary,
             )
             try:
                 await approval_repository.save(db, action)

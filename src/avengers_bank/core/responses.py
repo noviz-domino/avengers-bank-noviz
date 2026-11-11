@@ -18,6 +18,7 @@ class ErrorDetail(BaseModel):
     code: str
     message: str
     details: list[ValidationIssue] = Field(default_factory=list)
+    data: dict[str, Any] | None = None  # 오류에 딸린 값 (예: 409 BUDGET_CONFIRMATION_REQUIRED의 action_id). 없으면 안 보냄
 
 
 class ErrorResponse(BaseModel):

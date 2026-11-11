@@ -36,7 +36,9 @@ async def get_action(action_id: uuid.UUID, db: DB, me: Me):
     responses=error_responses(400, 409, 423),
 )
 async def approve(action_id: uuid.UUID, data: ApproveRequest, request: Request, db: DB, me: Me):
-    action = await approval_service.approve(db, me.user_id, action_id, data.pin, ip=client_ip(request))
+    action = await approval_service.approve(
+        db, me.user_id, action_id, data.pin, ip=client_ip(request), reason=data.reason, emergency=data.emergency
+    )
     return SuccessResponse[ActionResponse](data=action, message="처리되었습니다.")
 
 
