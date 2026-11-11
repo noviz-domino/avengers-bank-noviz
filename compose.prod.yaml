@@ -1,10 +1,41 @@
 # 서버용 덮어쓰기: docker compose -f compose.yaml -f compose.prod.yaml up -d --build
 # 개발용 설정(DB 포트 공개, 마이그레이션 폴더 연결)을 끄고, 서버가 켜질 때 자동으로 다시 올라오게 한다
+# 밖에서는 Caddy(80·443)로만 들어온다 (ADR 0025)
 services:
   db:
     ports: !reset []
     restart: unless-stopped
 
   app:
+    ports: !reset []
     volumes: !reset []
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DUCKDNS_SUBDOMAIN: ${DUCKDNS_SUBDOMAIN:?서버 .env에 DUCKDNS_SUBDOMAIN이 필요합니다}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # 받은 인증서. 지우면 다시 발급받는다 (발급 횟수 제한 주의)
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # 서버를 켤 때마다 공인 IP가 바뀌므로 5분마다 DuckDNS 주소를 지금 IP로 맞춘다 (ip= 를 비우면 요청 보낸 IP로)
+  duckdns:
+    image: curlimages/curl:8.14.1
+    environment:
+      DUCKDNS_SUBDOMAIN: ${DUCKDNS_SUBDOMAIN:?}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?서버 .env에 DUCKDNS_TOKEN이 필요합니다}
+    entrypoint:
+      - sh
+      - -c
+      - 'while :; do echo "$$(date) $$(curl -sS "https://www.duckdns.org/update?domains=$$DUCKDNS_SUBDOMAIN&token=$$DUCKDNS_TOKEN&ip=")"; sleep 300; done'
+    restart: unless-stopped
+
+volumes:
+  caddy_data:

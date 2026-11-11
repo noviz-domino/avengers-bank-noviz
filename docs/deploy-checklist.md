@@ -21,6 +21,15 @@
 4. **RAG 색인**: 첫 배포 뒤 한 번 `POST /system/rag/reindex` (헤더 `X-System-Key`)
 5. **확인**: `https://<주소>/app/` → 데모 계정 로그인 → 이체(PIN 등록·승인) → AI 상담 한 번 → `/docs` 열림
 
+## 지금 서버 구성 (AWS)
+
+- 서울 EC2 t3.small 한 대에 `docker compose -p avengers-bank -f compose.yaml -f compose.prod.yaml up -d --build` (app·db·caddy·duckdns)
+- 주소: `https://<DUCKDNS_SUBDOMAIN>.duckdns.org/app/`, HTTPS는 Caddy가 자동 발급 ([ADR 0025](decisions/0025-https-caddy-duckdns.md))
+- 보안 그룹 인바운드는 TCP 80·443만. 서버 관리는 SSM Session Manager (SSH 안 씀)
+- 비밀 값은 서버 `/opt/avengers-bank/.env`(root 600)에만 둠. 앱 폴더의 `.env`는 그 파일을 가리키는 링크
+- **main에 머지된 커밋만 배포**하고, 배포한 커밋 해시를 서버 `app/REVISION`에 남김 (서버에 git이 없어서 어느 버전인지 알 수 있게)
+- 평일 11:25~18:00에만 켜짐 (EventBridge Scheduler). 그 밖의 시간에는 주소가 열리지 않음
+
 ## 배포 뒤 점검
 
 - 실제 휴대폰에서: 키보드가 하단 고정 버튼을 가리지 않는지, 새로고침 후 로그인 유지
