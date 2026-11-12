@@ -48,9 +48,10 @@
   background: var(--ui-white); color: var(--ui-navy); font-size: 12px; font-weight: 600;
 }
 .ui-social svg { width: 24px; }
-.ui-header { display: flex; align-items: center; gap: var(--ui-space-sm); min-height: 52px; padding: 16px var(--ui-page-gutter) 4px; background: var(--ui-white); }
+/* 머리글은 모든 화면에서 같은 높이·같은 제목 크기: 오른쪽 위 버튼(알림·전체 메뉴)이 탭마다 같은 자리에 오게 (2026-11-12) */
+.ui-header { box-sizing: border-box; display: flex; align-items: center; gap: var(--ui-space-sm); height: 64px; padding: 16px var(--ui-page-gutter) 4px; background: var(--ui-white); }
 .ui-header-title { flex: 1; min-width: max-content; margin: 0; font-size: var(--ui-section-size); line-height: 1.35; letter-spacing: -.02em; font-weight: 800; word-break: keep-all; overflow-wrap: anywhere; }
-h1.ui-header-title { font-size: 22px; }
+.ui-header h1.ui-header-title { font-size: 22px; line-height: 1.35; } /* 화면별 CSS의 h1 규칙(.cards-screen h1 등)이 덮어쓰지 못하게 */
 .ui-header-actions { display: flex; align-items: center; gap: var(--ui-space-xs); margin-right: -8px; }
 .ui-header-actions .ui-button { padding-inline: 8px; }
 .ui-header .brand { font-size: 15px; letter-spacing: -.02em; color: var(--ui-navy); }
@@ -58,6 +59,7 @@ h1.ui-header-title { font-size: 22px; }
 .ui-icon-toggle { display: inline-flex; padding: 2px; border-radius: var(--ui-radius-sm); background: var(--ui-surface); }
 .ui-icon-toggle button { display: grid; place-items: center; width: var(--ui-touch); height: var(--ui-touch); padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ui-muted); }
 .ui-icon-toggle .ui-icon { width: 20px; height: 20px; }
+.ui-header .ui-icon-toggle button { width: 40px; height: 40px; } /* 머리글 안에서는 44px(버튼과 같은 높이)에 맞춤 */
 .ui-icon-toggle [aria-pressed="true"] { background: var(--ui-white); color: var(--ui-blue); box-shadow: 0 1px 3px #10233b24; }
 .ui-back { width: var(--ui-touch); height: var(--ui-touch); padding: 0; margin-left: -12px; color: var(--ui-navy); }
 .ui-page-title { color: var(--ui-navy); font-size: var(--ui-title-size); line-height: 1.35; letter-spacing: -.035em; word-break: keep-all; overflow-wrap: anywhere; }

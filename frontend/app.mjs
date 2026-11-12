@@ -7,7 +7,7 @@ import { mountBudget } from "./budget.mjs";
 import { mountProducts } from "./products.mjs";
 import { mountSignup } from "./signup.mjs";
 import { mountMenu } from "./settings.mjs";
-import { mountSearch } from "./search.mjs";
+import { mountSearch, buildQuery, CATEGORIES } from "./search.mjs";
 import { mountEvent } from "./events.mjs";
 import { mountCardSearch } from "./card-search.mjs";
 import { mountNotifications } from "./notifications.mjs";
@@ -33,6 +33,7 @@ let accountId;
 let privateBalance = false;
 let expanded = { checking: true, savings: false };
 let filter = "all";
+let txQuery = {}; // 계좌 상세 거래 검색: 키워드(바로 입력) + 필터 창(기간·카테고리·금액)
 let campaign = 0;
 let campaignPaused = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 let campaignTimer;
@@ -81,11 +82,11 @@ async function loadTransactions(more = false) {
   else txs.loading = true;
   render();
   try {
-    const before = more ? "&before=" + txs.next : "";
-    const { data } = await api("/accounts/" + id + "/transactions?limit=20" + before);
+    const built = buildQuery({ ...txQuery, direction: filter === "all" ? "" : filter.toUpperCase() }, more ? txs.next : null);
+    if (built.error) throw new Error(built.error);
+    const { data } = await api("/transactions?account_id=" + id + "&" + built.query);
     if (id !== accountId) return;
-    // 서버는 다음 쪽 커서를 따로 주지 않아서, 한 쪽이 꽉 차면 마지막 tx_id로 더 있는지 본다
-    txs = { rows: [...txs.rows, ...data], next: data.length === 20 ? data.at(-1).tx_id : null, loading: false, error: "" };
+    txs = { rows: [...txs.rows, ...data.transactions], next: data.next_before, loading: false, error: "", totalIn: data.total_in, totalOut: data.total_out };
   } catch (error) {
     if (id === accountId) txs = { ...txs, loading: false, error: error.message };
   }
@@ -100,6 +101,7 @@ async function openAccount(id) {
   accountId = id;
   detail = undefined;
   filter = "all";
+  txQuery = {};
   manageState = { closing: false, error: "", busy: false };
   go("account");
   loadDetail(id);
@@ -199,7 +201,7 @@ function accountGroups() {
 
 // 계좌 탭: 내 계좌 전체와 합계. 새 계좌는 상품에서 가입한다
 function accountsPage() {
-  const head = uiHeader({ title: "계좌", heading: true, menu: true, rightHtml: uiButton("", { action: "search", icon: "search", ariaLabel: "계좌 검색" }) });
+  const head = uiHeader({ title: "계좌", heading: true, menu: true });
   if (!accounts) return head + '<main class="ui-home">' + stateBlock(accountsError ? "error" : "loading", accountsError ? { message: accountsError, retryAction: "reload" } : {}) + '</main>' + nav("accounts");
   return head + '<main class="ui-home ui-accounts">'
     + '<section class="ui-balance" aria-label="계좌 합계"><div><p>계좌 ' + accounts.length + '개 합계</p>'
@@ -236,6 +238,17 @@ function home() {
     + '</main>' + nav("home");
 }
 
+// 계좌 상세의 작은 필터 창: 기간·카테고리·금액. 적용하면 서버 검색(GET /transactions?account_id=)으로 다시 불러온다
+function filterSheet() {
+  const v = (k) => escape(txQuery[k] ?? "");
+  return '<dialog class="tx-filter-sheet" aria-labelledby="tx-filter-title"><form data-form="tx-filter"><h2 id="tx-filter-title">거래 필터</h2>'
+    + '<div class="two"><label>시작일<input name="from_date" type="date" value="' + v("from_date") + '"></label><label>종료일<input name="to_date" type="date" value="' + v("to_date") + '"></label></div>'
+    + '<label>카테고리<select name="category"><option value="">전체</option>' + CATEGORIES.map((c) => "<option" + (txQuery.category === c ? " selected" : "") + ">" + c + "</option>").join("") + "</select></label>"
+    + '<div class="two"><label>최소 금액<input name="min_amount" inputmode="numeric" placeholder="0" value="' + v("min_amount") + '"></label><label>최대 금액<input name="max_amount" inputmode="numeric" value="' + v("max_amount") + '"></label></div>'
+    + '<p class="error" role="alert"></p><div class="tx-filter-actions">' + button("tx-filter-reset", "초기화", "outline") + button("tx-filter-close", "닫기", "outline")
+    + '<button class="ui-button ui-button--primary">적용</button></div></form></dialog>';
+}
+
 function accountPage(manage) {
   const account = accountById(accountId);
   const checking = account.account_type === "CHECKING";
@@ -259,18 +272,27 @@ function accountPage(manage) {
         : '<p>잔액이 0원일 때만 해지할 수 있어요.</p>' + button("close-start", "계좌 해지", "outline"))
       + (closing ? '<p class="error" role="alert">' + escape(error) + "</p>" : "") + "</section></main>";
   }
-  const rows = txs.rows.filter((tx) => filter === "all" || (filter === "in" ? tx.amount > 0 : tx.amount < 0));
+  const rows = txs.rows;
+  const filterCount = ["from_date", "to_date", "category", "min_amount", "max_amount"].filter((k) => txQuery[k]).length;
+  const searching = filterCount || txQuery.keyword;
   return header("계좌 상세", "back", button("manage", "관리", "quiet")) + '<main>'
     + '<section class="hero"><div class="spread"><h1>' + escape(name) + '</h1>'
     + uiButton('', { action: 'privacy', icon: privateBalance ? 'eyeOff' : 'eye', ariaLabel: privateBalance ? '금액 보기' : '금액 숨기기', pressed: privateBalance }) + "</div>"
     + '<p>' + escape(account.product_name) + '</p><small>' + escape(account.account_num) + '</small><div class="spread balance-line"><span>잔액</span><strong>'
     + (privateBalance ? hidden : money(account.balance)) + '</strong></div></section>'
-    + '<section><h2>거래내역</h2><div class="segments" aria-label="거래 구분">'
+    + '<section><h2>거래내역</h2>'
+    // 키워드는 필터를 열지 않고 바로 입력(엔터로 검색), 기간·카테고리·금액은 필터 창에서
+    + '<form class="tx-search" data-form="tx-search" role="search"><label><span class="ui-sr-only">거래 검색</span>' + icon("search")
+    + '<input name="keyword" type="search" maxlength="50" placeholder="메모·상대방 검색" value="' + escape(txQuery.keyword ?? "") + '"></label>'
+    + '<button type="button" class="tx-filter-open" data-action="tx-filter"' + (filterCount ? ' aria-pressed="true"' : "") + '>' + icon("filter") + "필터" + (filterCount ? " " + filterCount : "") + "</button></form>"
+    + '<div class="segments" aria-label="거래 구분">'
     + [["all", "전체"], ["in", "입금"], ["out", "출금"]].map(([value, label]) =>
       '<button type="button" data-action="filter-' + value + '" aria-pressed="' + (filter === value) + '">' + label + "</button>").join("")
-    + "</div>" + (txs.loading && !txs.rows.length ? '<p class="status" role="status">거래내역을 불러오고 있어요…</p>' : transactions(rows))
+    + "</div>" + (searching && !txs.loading ? '<p class="tx-sum">찾은 거래 · 입금 +' + money(txs.totalIn ?? 0) + " · 출금 −" + money(txs.totalOut ?? 0) + "</p>" : "")
+    + (txs.loading && !txs.rows.length ? '<p class="status" role="status">거래내역을 불러오고 있어요…</p>' : transactions(rows))
     + (txs.error ? '<p class="error" role="alert">' + escape(txs.error) + "</p>" : "")
     + (txs.next ? button("more-tx", txs.loading ? "불러오는 중…" : "더 보기", "outline") : "") + "</section>"
+    + filterSheet()
     + (checking ? '<div class="dock">' + button("send-" + account.account_id, "이체하기", "primary") + "</div>" : "") + "</main>";
 }
 
@@ -493,6 +515,18 @@ app.addEventListener("submit", async (event) => {
         return render();
       }
     }
+    case "tx-search":
+      txQuery = { ...txQuery, keyword: String(data.get("keyword") ?? "").trim() };
+      return loadTransactions();
+    case "tx-filter": {
+      const next = { keyword: txQuery.keyword };
+      for (const k of ["from_date", "to_date", "category", "min_amount", "max_amount"]) next[k] = String(data.get(k) ?? "").trim();
+      const built = buildQuery(next);
+      if (built.error) return formError(form, built.error);
+      txQuery = next;
+      form.closest("dialog").close();
+      return loadTransactions();
+    }
     case "rename": {
       const name = data.get("alias").trim();
       if (!name) return formError(form, "계좌 별칭을 입력해 주세요.");
@@ -543,7 +577,7 @@ app.addEventListener("click", async (event) => {
   if (action.startsWith("send-")) return startTransfer(Number(action.slice(5)));
   if (action.startsWith("filter-")) {
     filter = action.slice(7);
-    return render();
+    return loadTransactions(); // 입금·출금도 서버가 거른다 (불러온 쪽만 거르면 다음 쪽에 있는 거래가 빠짐)
   }
   if (action.startsWith("toggle-")) {
     const kind = action.slice(7);
@@ -559,6 +593,9 @@ app.addEventListener("click", async (event) => {
     case "logout": apiLogout(); reset(); loginState = { error: "", notice: "", busy: false }; return go("login");
     case "reload": accountsError = ""; render(); return loadAccounts();
     case "more-tx": return loadTransactions(true);
+    case "tx-filter": return app.querySelector(".tx-filter-sheet").showModal();
+    case "tx-filter-close": return app.querySelector(".tx-filter-sheet").close();
+    case "tx-filter-reset": txQuery = { keyword: txQuery.keyword }; app.querySelector(".tx-filter-sheet").close(); return loadTransactions();
     case "close-start": manageState = { closing: true, error: "", busy: false }; return render();
     case "close-cancel": manageState = { closing: false, error: "", busy: false }; return render();
     case "close-confirm":

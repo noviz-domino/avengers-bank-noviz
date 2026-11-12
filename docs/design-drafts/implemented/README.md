@@ -5,7 +5,7 @@
 ## 찍는 방법 (다음 버전도 같은 조건으로)
 
 - 화면 크기 **384×760**: 갤럭시 S23+(CSS 384×832)에서 위 상태바와 아래 내비게이션바를 뺀 크기 (v4부터. v3까지는 375×812), 데모 계정(`demo`)으로 로그인한 상태
-- 화면 순서와 파일 이름은 고정: `01-login` → `02-home-top` → `03-home-bottom` → `04-products` → `05-ai-chat` → `06-cards-large` → `07-cards-list` → `08-menu` → `09-accounts`(v4부터) → `10-products-list` → `11-event-opening` → `12-event-welcome` → `13-card-search` → `14-notifications` → `15-notifications-notice` → `16-budget-essentials`(v4부터)
+- 화면 순서와 파일 이름은 고정: `01-login` → `02-home-top` → `03-home-bottom` → `04-products` → `05-ai-chat` → `06-cards-large` → `07-cards-list` → `08-menu` → `09-accounts`(v4부터) → `10-products-list` → `11-event-opening` → `12-event-welcome` → `13-card-search` → `14-notifications` → `15-notifications-notice` → `16-budget-essentials` → `17-account-search` → `18-account-filter` → `19-all-transactions`(v4부터)
 - 폴더 이름: `v<번호>-<날짜>-<한 단어 설명>`
 - 금액·거래내역은 찍은 날의 데모 데이터라 버전마다 다를 수 있습니다. 파일마다 해상도가 다른 것(375 또는 750px 폭)은 캡처 도구 차이이며 같은 화면 크기입니다.
 
@@ -56,6 +56,8 @@ v3는 375×812, v4는 384×760이라 폭이 9px 다릅니다. 여백 비교는 �
 | 계좌 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/09-accounts.png) | 계좌 합계, 입출금·예금적금 묶음, 새 계좌 만들기 |
 | 알림 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/14-notifications.png) ![v4](v4-2026-11-11-layout-tabs/15-notifications-notice.png) | 홈 머리글 종 버튼. 하위 메뉴 입출금내역·카드내역·혜택(광고)·공지사항 |
 | 예산 생활비 | 하루 금액만 | ![v4](v4-2026-11-11-layout-tabs/16-budget-essentials.png) | 업종마다 금액 + 주기(매일·주 N회·월 N회), ADR 0024 |
+| 계좌 상세 검색 (새로) | 별도 계좌 검색 화면 | ![v4](v4-2026-11-11-layout-tabs/17-account-search.png) ![v4](v4-2026-11-11-layout-tabs/18-account-filter.png) | 거래내역 위 키워드 칸(바로 입력) + 필터 작은 창(기간·카테고리·금액) |
+| 전체 거래내역 | 검색 폼 | ![v4](v4-2026-11-11-layout-tabs/19-all-transactions.png) | 홈 "최근 거래 전체보기"는 목록만 |
 | 카드 검색 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/13-card-search.png) | 카드 탭 머리글 돋보기. 가맹점·카드·카테고리·기간, 합계는 취소 제외 |
 | 이벤트 상세 (새 화면) | 배너가 상품 목록으로만 감 | ![v4](v4-2026-11-11-layout-tabs/11-event-opening.png) ![v4](v4-2026-11-11-layout-tabs/12-event-welcome.png) | 홈 배너를 누르면 설명 페이지. 신규가입 이벤트는 추천 상품(서버 정보)과 "바로 가입하기" |
 

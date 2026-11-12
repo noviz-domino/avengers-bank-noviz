@@ -1,4 +1,4 @@
-// 계좌 검색 화면 (#search, 계좌 탭 머리글): GET /transactions 조건 검색 + 조건 전체 합계. 카드 사용내역은 card-search.mjs
+// 전체 거래내역 화면 (#search)과 거래 검색 조건 만들기(buildQuery). 계좌별 검색은 app.mjs 계좌 상세, 카드 사용내역은 card-search.mjs
 import { api } from "./api.mjs";
 import { esc, won } from "./ext-ui.mjs";
 import { header } from "./ui.mjs";
@@ -27,35 +27,16 @@ const kst = (iso) => new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seo
 const rowHtml = (t) => '<li><div><strong>' + esc(t.counterparty_name || t.memo || t.tx_type) + '</strong><small>' + kst(t.created_at) + (t.category ? " · " + esc(t.category) : "")
   + (t.counterparty_name && t.memo ? " · " + esc(t.memo) : "") + '</small></div><strong class="' + (t.amount > 0 ? "credit" : "") + '">' + (t.amount > 0 ? "+" : "−") + won(Math.abs(t.amount)) + "</strong></li>";
 
-/** ctx: { go } */
-export function mountSearch(container, ctx) {
-  // 뒤로는 열기 전 화면으로 (홈·메뉴 어디서 왔든). 메뉴로 고정하면 메뉴의 뒤로와 서로 오가며 갇힌다
-  container.innerHTML = header({ title: "계좌 검색", back: "back", heading: true }) + '<main class="ext-search"><form id="search-form" novalidate>'
-    + '<label>검색어<input name="keyword" maxlength="50" placeholder="메모·상대방 이름"></label>'
-    + '<div class="two"><label>시작일<input name="from_date" type="date"></label><label>종료일<input name="to_date" type="date"></label></div>'
-    + '<div class="two"><label>구분<select name="direction"><option value="">전체</option><option value="IN">입금</option><option value="OUT">출금</option></select></label>'
-    + '<label>카테고리<select name="category"><option value="">전체</option>' + CATEGORIES.map((c) => "<option>" + c + "</option>").join("") + "</select></label></div>"
-    + '<div class="two"><label>최소 금액<input name="min_amount" inputmode="numeric" placeholder="0"></label><label>최대 금액<input name="max_amount" inputmode="numeric"></label></div>'
-    + '<p class="error" id="e-form" role="alert"></p><button class="primary">검색</button></form>'
-    + '<section id="result" aria-live="polite"></section></main>';
-  const form = container.querySelector("#search-form");
+/** 전체 거래내역 (#search, 홈 "최근 거래"의 전체보기): 모든 계좌의 거래를 최근 것부터. 검색은 계좌 상세에서 한다 */
+export function mountSearch(container) {
+  container.innerHTML = header({ title: "전체 거래내역", back: "back", heading: true }) + '<main class="ext-search"><section id="result" aria-live="polite"><p class="status" role="status">불러오는 중이에요…</p></section></main>';
   const result = container.querySelector("#result");
-  const err = container.querySelector("#e-form");
-  let values;
 
   async function load(before) {
-    const built = buildQuery(values, before);
-    err.textContent = built.error ?? "";
-    if (built.error) return;
-    if (!before) result.innerHTML = '<p class="status" role="status">검색하는 중이에요…</p>';
     try {
-      const { data } = await api("/transactions?" + built.query);
-      const rows = data.transactions.map(rowHtml).join("");
-      if (!before) {
-        result.innerHTML = '<div class="card sum"><dl><dt>입금 합계</dt><dd class="credit">+' + won(data.total_in) + "</dd><dt>출금 합계</dt><dd>−" + won(data.total_out) + "</dd></dl></div>"
-          + (rows ? '<ul class="rows"></ul>' : '<p class="empty">조건에 맞는 거래가 없어요.</p>');
-      }
-      result.querySelector(".rows")?.insertAdjacentHTML("beforeend", rows);
+      const { data } = await api("/transactions?" + buildQuery({}, before).query);
+      if (!before) result.innerHTML = data.transactions.length ? '<ul class="rows"></ul>' : '<p class="empty">아직 거래가 없어요.</p>';
+      result.querySelector(".rows")?.insertAdjacentHTML("beforeend", data.transactions.map(rowHtml).join(""));
       result.querySelector("#more")?.remove();
       if (data.next_before) {
         result.insertAdjacentHTML("beforeend", '<button type="button" class="outline" id="more">더 보기</button>');
@@ -65,9 +46,5 @@ export function mountSearch(container, ctx) {
       result.innerHTML = '<p class="error" role="alert">' + esc(error.message) + "</p>";
     }
   }
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    values = Object.fromEntries(new FormData(form));
-    load();
-  });
+  load();
 }

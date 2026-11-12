@@ -41,7 +41,7 @@ test("메뉴 검색: 띄어쓰기·대소문자 무시, 이름과 같이 찾을 
   assert.deepEqual(names("이 체"), ["이체"]);
   assert.ok(names("pin").includes("거래 PIN 설정·변경"));
   assert.deepEqual(names("분실"), ["카드"]); // "같이 찾을 말"로 찾음
-  assert.deepEqual(names("검색"), ["계좌 검색", "카드 검색"]);
+  assert.deepEqual(names("검색"), ["전체 거래내역", "카드 검색"]); // 계좌 검색은 화면이 아니라 계좌 상세 안에 있어서 "전체 거래내역"이 찾힘
   assert.deepEqual(names("없는메뉴"), []);
 });
 

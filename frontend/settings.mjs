@@ -19,12 +19,12 @@ const pw = (name, label, extra = "") => '<label for="menu-' + name + '">' + labe
 const group = (title, tone, content, open) => '<details class="menu-group"' + (open ? ' open' : '') + '><summary class="ui-section-head ui-tone-' + tone + '">' + title + icon('down') + '</summary><div class="menu-group-body">' + content + '</div></details>';
 
 // 바로가기 타일 (2줄 x 4칸). 누르면 app.mjs의 data-action 라우팅이 처리한다
-const SHORTCUTS = [['accounts', '계좌', 'wallet'], ['start-transfer', '이체', 'transfer'], ['search', '계좌 검색', 'search'], ['card-search', '카드 검색', 'search'],
+const SHORTCUTS = [['accounts', '계좌', 'wallet'], ['start-transfer', '이체', 'transfer'], ['search', '거래내역', 'clock'], ['card-search', '카드 검색', 'search'],
   ['budget', '예산', 'target'], ['products', '상품', 'products'], ['cards', '카드', 'cards'], ['chat', 'AI 상담', 'chat']];
 // 메뉴 검색 대상: [액션, 이름, 아이콘, 같이 찾을 말]. "act:"로 시작하면 이 화면 안의 동작
 export const MENUS = [
   ['home', '홈', 'home', '총자산 처음'], ['accounts', '계좌', 'wallet', '잔액 통장 목록'], ['start-transfer', '이체', 'transfer', '송금 보내기 돈'],
-  ['search', '계좌 검색', 'search', '거래내역 입금 출금 조회'], ['card-search', '카드 검색', 'search', '카드 사용내역 결제 가맹점'],
+  ['search', '전체 거래내역', 'clock', '계좌 검색 거래내역 입금 출금 조회 (계좌 상세에서 검색)'], ['card-search', '카드 검색', 'search', '카드 사용내역 결제 가맹점'],
   ['budget', '예산', 'target', '예산 가드 생활비 저축 목표'], ['products', '상품', 'products', '예금 적금 가입 금리 계좌 만들기'],
   ['cards', '카드', 'cards', '발급 분실 정지 한도 이용내역'], ['chat', 'AI 상담', 'chat', '챗봇 질문 물어보기'],
   ['event/opening', '그랜드 오픈 이벤트', 'gift', '은행 소개 이벤트'], ['event/welcome', '신규가입 이벤트', 'gift', '환영 이벤트 추천 적금'],

@@ -90,6 +90,15 @@ export async function verifyIntegration(win = window) {
   await waitFor(() => q(".tx-list li") || q(".ui-state--empty"), "거래내역 목록");  // #38: 날짜별 목록·공통 빈 상태
   await waitText("잔액");
   step("계좌 상세와 거래내역 표시");
+  // 계좌 상세에서 바로 키워드 검색, 필터 창은 열고 닫기만
+  await submit('[data-form="tx-search"]', { keyword: "zz-없는-거래" });
+  await waitFor(() => q(".tx-sum") && q(".ui-state--empty"), "키워드 검색 결과(없음)");
+  await submit('[data-form="tx-search"]', { keyword: "" });
+  await waitFor(() => !q(".tx-sum"), "키워드 지우면 전체 목록");
+  await action("tx-filter");
+  if (!q(".tx-filter-sheet[open]")) throw new Error("필터 창이 열리지 않음");
+  await action("tx-filter-close");
+  step("계좌 상세 키워드 검색·필터 창");
   fits("계좌 상세");
   await action("manage");
   const original = await waitFor(() => q('[data-form="rename"] [name="alias"]')?.value, "별칭 입력칸");
@@ -191,10 +200,9 @@ export async function verifyIntegration(win = window) {
   step("메뉴에 내 정보 표시");
   fits("메뉴");
   await action("search");
-  await submit("#search-form", { keyword: "이체" });
-  await waitText("입금 합계");
-  step("거래 검색 결과에 합계 표시");
-  fits("거래 검색");
+  await waitFor(() => q(".ext-search .rows li") || q(".ext-search .empty"), "전체 거래내역 목록");
+  step("전체 거래내역 목록");
+  fits("전체 거래내역");
   await click('[data-action="back"]'); // 열기 전 화면(전체 메뉴)으로
   await waitText("내 정보");
   await action("budget");
