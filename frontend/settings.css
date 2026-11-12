@@ -26,6 +26,24 @@
 .menu-search-results .ui-icon { color: var(--ui-blue); }
 .menu-search-results .ui-icon:last-child { width: 14px; height: 14px; color: var(--ui-muted); }
 .menu-search-results .note { padding: 12px 4px; }
+/* 계좌 상세 거래 검색: 키워드 칸 + 필터 버튼, 필터는 작은 창 */
+.tx-search { display: flex; gap: 8px; margin-top: 12px; }
+.tx-search label { flex: 1; display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 14px; border-radius: 999px; background: var(--ui-surface); color: var(--ui-muted); }
+.tx-search .ui-icon { width: 18px; height: 18px; flex: none; }
+.tx-search input { flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; background: transparent; font-size: 15px; }
+.tx-search input:focus-visible { outline: none; }
+.tx-search label:focus-within { box-shadow: 0 0 0 2px #b4c0ce; }
+.tx-filter-open { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 14px; border: 1px solid var(--ui-line); border-radius: 999px; background: #fff; color: var(--ui-navy); font-size: 14px; font-weight: 700; white-space: nowrap; }
+.tx-filter-open .ui-icon { width: 16px; height: 16px; }
+.tx-filter-open[aria-pressed="true"] { border-color: var(--ui-blue); color: var(--ui-blue); }
+.tx-sum { margin-top: 10px; color: var(--ui-muted); font-size: 13px; }
+.tx-filter-sheet { width: min(92vw, 380px); border: 0; border-radius: 18px; padding: 20px; color: var(--ui-navy); box-shadow: 0 20px 80px #10233b50; }
+.tx-filter-sheet::backdrop { background: #10233b70; }
+.tx-filter-sheet form > * + * { margin-top: 12px; }
+.tx-filter-sheet .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tx-filter-sheet .two label + label { margin-top: 0; }
+.tx-filter-sheet .error:empty { display: none; }
+.tx-filter-actions { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; }
 .ext-search .canceled { color: var(--ui-muted); text-decoration: line-through; }
 .menu-logout { display: flex; align-items: center; justify-content: center; gap: var(--ui-space-sm); width: 100%; min-height: 48px; border: 1px solid var(--ui-line); border-radius: var(--ui-radius-sm); background: var(--ui-white); color: var(--ui-muted); font-weight: 700; }
 .menu-logout .ui-icon { width: 20px; height: 20px; flex-basis: 20px; }

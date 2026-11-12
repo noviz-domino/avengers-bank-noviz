@@ -28,6 +28,7 @@ const paths = {
   single: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18"/>',
   list: '<path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
   send: '<path d="M12 19V5m-6 6 6-6 6 6"/>',
+  filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
   bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4Z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M3 13h18M12 9v12M12 9C8 9 6 4 9 4s3 5 3 5Zm0 0c4 0 6-5 3-5s-3 5-3 5Z"/>',
   shield: '<path d="M12 3 20 6v6c0 5-3 8-8 10-5-2-8-5-8-10V6Z"/><path d="m9 12 2 2 4-4"/>',
