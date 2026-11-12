@@ -196,8 +196,8 @@ export function mountProducts(root, route = "") {
 
   function handleClick(event) {
     const target = event.target.closest("button");
-    // 머리글의 전체 메뉴처럼 data-action 버튼은 앱 라우팅에 넘긴다
-    if (!target || !root.contains(target) || target.dataset.action) return;
+    // 머리글의 전체 메뉴 버튼만 앱 라우팅에 넘긴다. 배너 화살표도 data-action이라 넓게 넘기면 홈으로 가 버린다
+    if (!target || !root.contains(target) || target.dataset.action === "menu") return;
     event.stopPropagation();
     const filter = target.dataset.productFilter;
     if (filter !== undefined && Object.hasOwn(kinds, filter)) {

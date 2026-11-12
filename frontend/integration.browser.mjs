@@ -160,6 +160,11 @@ export async function verifyIntegration(win = window) {
   // 8. 상품
   await action("products");
   await waitSel("[data-product-filter]");
+  // 배너 화살표는 상품 화면 안에서 넘기기만 해야 함 (#48에서 홈으로 가 버린 회귀)
+  await action("product-banner-next");
+  await sleep(300);
+  if (win.location.hash !== "#products") throw new Error("상품 배너 다음 화살표가 상품 화면을 떠남: " + win.location.hash);
+  step("상품 배너 화살표는 상품 화면에 머묾");
   await click('[data-product-filter="SAVINGS"]');
   await waitText("적금 상품");
   step("상품 목록 종류 필터");
