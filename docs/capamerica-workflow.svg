@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1200" viewBox="0 0 1440 1200" role="img" aria-labelledby="title description">
+<title id="title">CapAmericaBank Multi-Agent Architecture</title>
+<desc id="description">START에서 LangGraph Supervisor로 진입한다. Router는 첫 도메인 Agent 또는 END로 이동한다. 계좌, 카드, 예산, 상품 Agent마다 별도의 모델·도구 반복이 실행된다. 각 Agent는 남은 계획의 다음 담당으로 직접 이동하거나 END에서 턴을 마친다. 추가 사용자 메시지는 체크포인트의 상태를 읽고 새 턴을 시작한다. 하단은 결제, 이체, 예산과 PIN 승인 서버 흐름이다.</desc>
+<defs>
+ <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#343943" stroke-opacity=".29"/></pattern>
+ <radialGradient id="blue"><stop stop-color="#174c84" stop-opacity=".13"/><stop offset="1" stop-color="#174c84" stop-opacity="0"/></radialGradient>
+ <radialGradient id="violet"><stop stop-color="#492287" stop-opacity=".08"/><stop offset="1" stop-color="#492287" stop-opacity="0"/></radialGradient>
+ <radialGradient id="green"><stop stop-color="#0a604d" stop-opacity=".07"/><stop offset="1" stop-color="#0a604d" stop-opacity="0"/></radialGradient>
+ <filter id="glow" x="-100%" y="-400%" width="300%" height="900%"><feGaussianBlur stdDeviation="1.2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <marker id="c" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" viewBox="0 0 10 10"><path d="M0 0L10 5L0 10Z" fill="#92b5c4"/></marker>
+ <marker id="b" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" viewBox="0 0 10 10"><path d="M0 0L10 5L0 10Z" fill="#a0abd1"/></marker>
+ <marker id="p" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" viewBox="0 0 10 10"><path d="M0 0L10 5L0 10Z" fill="#bbabd0"/></marker>
+ <marker id="g" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" viewBox="0 0 10 10"><path d="M0 0L10 5L0 10Z" fill="#9bbca9"/></marker>
+ <marker id="a" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" viewBox="0 0 10 10"><path d="M0 0L10 5L0 10Z" fill="#c6b49a"/></marker>
+ <marker id="m" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" viewBox="0 0 10 10"><path d="M0 0L10 5L0 10Z" fill="#a1a5af"/></marker>
+</defs>
+<rect width="1440" height="1200" fill="#0c0d10"/>
+<ellipse cx="430" cy="245" rx="640" ry="360" fill="url(#blue)"/>
+<ellipse cx="1190" cy="425" rx="600" ry="450" fill="url(#violet)"/>
+<ellipse cx="470" cy="1030" rx="770" ry="320" fill="url(#green)"/>
+<rect width="1440" height="1200" fill="url(#grid)"/>
+<g font-family="Inter, Segoe UI, Malgun Gothic, Noto Sans KR, sans-serif">
+<text x="44" y="55" font-size="17" fill="#92b5c4" font-weight="740" text-anchor="start">CAPAMERICABANK / AI ENGINEERING</text>
+<text x="44" y="112" font-size="50" fill="#f2f2f3" font-weight="760" text-anchor="start">Multi-Agent Architecture</text>
+<text x="46" y="144" font-size="21" fill="#a8acb6" font-weight="500" text-anchor="start">LangGraph Supervisor · Domain Agents · MCP · Banking Execution</text>
+<rect x="32" y="170" width="1376" height="590" rx="16" fill="#171a20" fill-opacity=".95" stroke="#92b5c4" stroke-opacity=".33"/>
+<text x="52" y="202" font-size="15" fill="#92b5c4" font-weight="700" text-anchor="start">01  LANGGRAPH STATEGRAPH / USER TURN</text>
+<rect x="52" y="241" width="180" height="46" rx="9" fill="#171a20" fill-opacity=".95" stroke="#92b5c4" stroke-opacity=".33"/>
+<text x="65" y="268" font-size="14" fill="#b9bdc7" font-weight="600" text-anchor="start">START</text>
+<text x="121" y="268" font-size="14" fill="#b9bdc7" font-weight="500" text-anchor="start">사용자 메시지</text>
+<path d="M232 264H470" fill="none" stroke="#92b5c4" stroke-width="2" marker-end="url(#c)"/>
+<rect x="470" y="218" width="487" height="83" rx="16" fill="#171a20" fill-opacity=".95" stroke="#92b5c4" stroke-opacity=".33"/>
+<text x="490" y="247" font-size="25" fill="#92b5c4" font-weight="720" text-anchor="start">Supervisor / router</text>
+<text x="490" y="272" font-size="17" fill="#e4e6eb" font-weight="500" text-anchor="start">구조화된 계획 생성 · 턴당 1회 · 최대 3개 담당</text>
+<text x="490" y="291" font-size="14" fill="#a8bad1" font-weight="500" text-anchor="start">Command(goto=agents_in_order[0])</text>
+<path d="M957 262H1095" fill="none" stroke="#a1a5af" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#m)"/>
+<rect x="1095" y="221" width="291" height="76" rx="16" fill="#171a20" fill-opacity=".95" stroke="#bbabd0" stroke-opacity=".33"/>
+<text x="1112" y="248" font-size="22" fill="#bbabd0" font-weight="700" text-anchor="start">END / 대화 응답</text>
+<text x="1112" y="275" font-size="14" fill="#e4e6eb" font-weight="500" text-anchor="start">계획이 비었으면 router에서 바로 종료</text>
+<path d="M1386 259h11v-48H143v29" fill="none" stroke="#a1a5af" stroke-width="1.5" stroke-dasharray="4 6" marker-end="url(#m)"/>
+<text x="1377" y="201" font-size="14" fill="#aeb3bf" text-anchor="end">사용자가 다시 답하면 · 체크포인트를 읽어 새 턴 시작</text>
+<text x="1025" y="250" font-size="14" fill="#adbfda" font-weight="600" text-anchor="middle">계획 없음</text>
+<path d="M714 301V329H213 M714 329H1224" fill="none" stroke="#92b5c4" stroke-width="2"/>
+<text x="732" y="322" font-size="14" fill="#a8bad1" font-weight="600">첫 담당 1개 선택</text>
+<path d="M213 329V358" fill="none" stroke="#92b5c4" stroke-width="2" marker-end="url(#c)"/>
+<rect x="52" y="358" width="322" height="245" rx="16" fill="#171a20" fill-opacity=".95" stroke="#92b5c4" stroke-opacity=".33"/>
+<text x="70" y="385" font-size="15" fill="#92b5c4" font-weight="700" text-anchor="start">account</text>
+<text x="70" y="413" font-size="23" fill="#92b5c4" font-weight="730" text-anchor="start">Account Agent</text>
+<text x="70" y="439" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">잔액·계좌·거래 내역</text>
+<text x="70" y="460" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">이체·정기예금 승인 요청</text>
+<rect x="70" y="484" width="113" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#92b5c4" stroke-opacity=".33"/>
+<rect x="242" y="484" width="114" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#92b5c4" stroke-opacity=".33"/>
+<text x="126" y="511" font-size="17" fill="#92b5c4" font-weight="700" text-anchor="middle">Model</text>
+<text x="299" y="511" font-size="17" fill="#92b5c4" font-weight="700" text-anchor="middle">Tools</text>
+<path d="M183 505H241" fill="none" stroke="#92b5c4" stroke-width="2" marker-end="url(#c)"/>
+<path d="M299 526V551H126V527" fill="none" stroke="#92b5c4" stroke-width="2.4" marker-end="url(#c)"/>
+<text x="213" y="575" font-size="15" fill="#c9cdd5" font-weight="600" text-anchor="middle">ReAct Loop · 도구 결과를 모델에 반환</text>
+<text x="213" y="593" font-size="13" fill="#a1a5af" font-weight="500" text-anchor="middle">도구 호출이 없으면 Agent 종료</text>
+<path d="M550 329V358" fill="none" stroke="#a0abd1" stroke-width="2" marker-end="url(#b)"/>
+<rect x="389" y="358" width="322" height="245" rx="16" fill="#171a20" fill-opacity=".95" stroke="#a0abd1" stroke-opacity=".33"/>
+<text x="407" y="385" font-size="15" fill="#a0abd1" font-weight="700" text-anchor="start">card</text>
+<text x="407" y="413" font-size="23" fill="#a0abd1" font-weight="730" text-anchor="start">Card Agent</text>
+<text x="407" y="439" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">결제 내역·카드 한도</text>
+<text x="407" y="460" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">카드 정지·해제 요청</text>
+<rect x="407" y="484" width="113" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#a0abd1" stroke-opacity=".33"/>
+<rect x="579" y="484" width="114" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#a0abd1" stroke-opacity=".33"/>
+<text x="463" y="511" font-size="17" fill="#a0abd1" font-weight="700" text-anchor="middle">Model</text>
+<text x="636" y="511" font-size="17" fill="#a0abd1" font-weight="700" text-anchor="middle">Tools</text>
+<path d="M520 505H578" fill="none" stroke="#a0abd1" stroke-width="2" marker-end="url(#b)"/>
+<path d="M636 526V551H463V527" fill="none" stroke="#a0abd1" stroke-width="2.4" marker-end="url(#b)"/>
+<text x="550" y="575" font-size="15" fill="#c9cdd5" font-weight="600" text-anchor="middle">ReAct Loop · 도구 결과를 모델에 반환</text>
+<text x="550" y="593" font-size="13" fill="#a1a5af" font-weight="500" text-anchor="middle">도구 호출이 없으면 Agent 종료</text>
+<path d="M887 329V358" fill="none" stroke="#9bbca9" stroke-width="2" marker-end="url(#g)"/>
+<rect x="726" y="358" width="322" height="245" rx="16" fill="#171a20" fill-opacity=".95" stroke="#9bbca9" stroke-opacity=".33"/>
+<text x="744" y="385" font-size="15" fill="#9bbca9" font-weight="700" text-anchor="start">budget</text>
+<text x="744" y="413" font-size="23" fill="#9bbca9" font-weight="730" text-anchor="start">Budget Agent</text>
+<text x="744" y="439" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">get_budget · check_budget</text>
+<text x="744" y="460" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">자유 사용 가능액·지출 영향</text>
+<rect x="744" y="484" width="113" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#9bbca9" stroke-opacity=".33"/>
+<rect x="916" y="484" width="114" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#9bbca9" stroke-opacity=".33"/>
+<text x="800" y="511" font-size="17" fill="#9bbca9" font-weight="700" text-anchor="middle">Model</text>
+<text x="973" y="511" font-size="17" fill="#9bbca9" font-weight="700" text-anchor="middle">Tools</text>
+<path d="M857 505H915" fill="none" stroke="#9bbca9" stroke-width="2" marker-end="url(#g)"/>
+<path d="M973 526V551H800V527" fill="none" stroke="#9bbca9" stroke-width="2.4" marker-end="url(#g)"/>
+<text x="887" y="575" font-size="15" fill="#c9cdd5" font-weight="600" text-anchor="middle">ReAct Loop · 도구 결과를 모델에 반환</text>
+<text x="887" y="593" font-size="13" fill="#a1a5af" font-weight="500" text-anchor="middle">도구 호출이 없으면 Agent 종료</text>
+<path d="M1224 329V358" fill="none" stroke="#bbabd0" stroke-width="2" marker-end="url(#p)"/>
+<rect x="1063" y="358" width="322" height="245" rx="16" fill="#171a20" fill-opacity=".95" stroke="#bbabd0" stroke-opacity=".33"/>
+<text x="1081" y="385" font-size="15" fill="#bbabd0" font-weight="700" text-anchor="start">product</text>
+<text x="1081" y="413" font-size="23" fill="#bbabd0" font-weight="730" text-anchor="start">Product &amp; Policy Agent</text>
+<text x="1081" y="439" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">상품·가입 조건·금리</text>
+<text x="1081" y="460" font-size="16" fill="#e4e6eb" font-weight="500" text-anchor="start">ask_bank_docs → 약관 RAG</text>
+<rect x="1081" y="484" width="113" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#bbabd0" stroke-opacity=".33"/>
+<rect x="1253" y="484" width="114" height="42" rx="16" fill="#171a20" fill-opacity=".95" stroke="#bbabd0" stroke-opacity=".33"/>
+<text x="1137" y="511" font-size="17" fill="#bbabd0" font-weight="700" text-anchor="middle">Model</text>
+<text x="1310" y="511" font-size="17" fill="#bbabd0" font-weight="700" text-anchor="middle">Tools</text>
+<path d="M1194 505H1252" fill="none" stroke="#bbabd0" stroke-width="2" marker-end="url(#p)"/>
+<path d="M1310 526V551H1137V527" fill="none" stroke="#bbabd0" stroke-width="2.4" marker-end="url(#p)"/>
+<text x="1224" y="575" font-size="15" fill="#c9cdd5" font-weight="600" text-anchor="middle">ReAct Loop · 도구 결과를 모델에 반환</text>
+<text x="1224" y="593" font-size="13" fill="#a1a5af" font-weight="500" text-anchor="middle">도구 호출이 없으면 Agent 종료</text>
+<path d="M550 603V633H885V603" fill="none" stroke="#bbabd0" stroke-width="2" stroke-dasharray="10 5" marker-end="url(#p)"/>
+<text x="717" y="655" font-size="17" fill="#bbabd0" font-weight="720" text-anchor="middle">복합 요청 예시 · card → budget 직접 인계</text>
+<text x="720" y="681" font-size="17" fill="#e2e4e9" font-weight="620" text-anchor="middle">각 Agent 종료 후  ·  plan이 남으면 Command(goto=following)  ·  없으면 Command(goto=END)</text>
+<rect x="52" y="707" width="653" height="35" rx="16" fill="#171a20" fill-opacity=".95" stroke="#92b5c4" stroke-opacity=".33"/>
+<text x="70" y="731" font-size="16" fill="#92b5c4" font-weight="660" text-anchor="start">도구 경계  ·  각 Agent의 MCP 도구 → 사용자 토큰으로 REST 호출</text>
+<rect x="722" y="707" width="664" height="35" rx="16" fill="#171a20" fill-opacity=".95" stroke="#bbabd0" stroke-opacity=".33"/>
+<text x="740" y="731" font-size="16" fill="#bbabd0" font-weight="650" text-anchor="start">턴 경계  ·  PostgreSQL 체크포인트에 대화 상태 저장</text>
+<rect x="32" y="779" width="1376" height="394" rx="18" fill="#171a20" fill-opacity=".92" stroke="#9bbca9" stroke-opacity=".29"/>
+<text x="52" y="809" font-size="15" fill="#9bbca9" font-weight="700" text-anchor="start">02  FINANCE · PAYMENTS · BUDGET GUARD</text>
+<rect x="52" y="826" width="386" height="96" rx="18" fill="#171a20" fill-opacity=".92" stroke="#a0abd1" stroke-opacity=".29"/><path d="M72 827h65" stroke="#a0abd1" stroke-width="2.3" filter="url(#glow)"/><text x="70" y="855" font-size="22" fill="#a0abd1" font-weight="720" text-anchor="start">금융 업무 / 계좌·이체</text><text x="70" y="879" font-size="16" fill="#b7bbc5" font-weight="500" text-anchor="start">이체 승인 대기 → 은행 앱 PIN</text><text x="70" y="899" font-size="16" fill="#b7bbc5" font-weight="500" text-anchor="start">서버에서 잔액·요청 번호·거래 조건 검사</text>
+<rect x="467" y="826" width="422" height="96" rx="18" fill="#171a20" fill-opacity=".92" stroke="#bbabd0" stroke-opacity=".29"/><path d="M487 827h65" stroke="#bbabd0" stroke-width="2.3" filter="url(#glow)"/><text x="485" y="855" font-size="22" fill="#bbabd0" font-weight="720" text-anchor="start">카드 결제 / 가맹점 시뮬레이터</text><text x="485" y="879" font-size="16" fill="#b7bbc5" font-weight="500" text-anchor="start">카드 상태·일일 한도·신용 한도·잔액 검사</text><text x="485" y="899" font-size="16" fill="#b7bbc5" font-weight="500" text-anchor="start">결제 보호 조건이면 승인 대기</text>
+<rect x="918" y="826" width="469" height="96" rx="18" fill="#171a20" fill-opacity=".92" stroke="#9bbca9" stroke-opacity=".29"/><path d="M938 827h65" stroke="#9bbca9" stroke-width="2.3" filter="url(#glow)"/><text x="936" y="855" font-size="22" fill="#9bbca9" font-weight="720" text-anchor="start">예산 계산 / 서버</text><text x="936" y="879" font-size="16" fill="#b7bbc5" font-weight="500" text-anchor="start">월급 주기 수입 − 지출 − 고정비 − 필수 생활비 − 목표 저축</text><text x="936" y="899" font-size="16" fill="#b7bbc5" font-weight="500" text-anchor="start">예상 지출 후 잔여액·부족액을 API 응답으로 반환</text>
+<path d="M245 922v16H720v18" fill="none" stroke="#a0abd1" stroke-width="2" marker-end="url(#b)"/>
+<path d="M678 922v33" fill="none" stroke="#bbabd0" stroke-width="2" marker-end="url(#p)"/>
+<path d="M1152 922v16H750v17" fill="none" stroke="#9bbca9" stroke-width="2" marker-end="url(#g)"/>
+<rect x="52" y="956" width="1335" height="110" rx="18" fill="#171a20" fill-opacity=".92" stroke="#c6b49a" stroke-opacity=".29"/>
+<text x="69" y="982" font-size="15" fill="#c6b49a" font-weight="700" text-anchor="start">BUDGET GUARD + APPROVAL</text>
+<text x="69" y="1009" font-size="18" fill="#e4e6eb" font-weight="670" text-anchor="start">타인 이체 · 체크/신용 결제의 예산 영향 확인</text>
+<text x="69" y="1035" font-size="17" fill="#b7bbc5" font-weight="500" text-anchor="start">초과·보호 조건 → 사유(필요 시) + PIN → 실행 시 예산 재검사</text>
+<text x="805" y="1009" font-size="18" fill="#9bbca9" font-weight="700" text-anchor="start">검사 통과 → 실행</text>
+<text x="805" y="1035" font-size="17" fill="#c6b49a" font-weight="500" text-anchor="start">조건 악화 → 중단하고 새 확인 요청</text>
+<path d="M720 1066v18" fill="none" stroke="#9bbca9" stroke-width="2" marker-end="url(#g)"/>
+<rect x="52" y="1086" width="1335" height="65" rx="18" fill="#171a20" fill-opacity=".92" stroke="#92b5c4" stroke-opacity=".29"/><path d="M72 1087h65" stroke="#92b5c4" stroke-width="2.3" filter="url(#glow)"/><text x="70" y="1115" font-size="22" fill="#92b5c4" font-weight="720" text-anchor="start">TRANSACTION EXECUTION  →  PostgreSQL</text><text x="70" y="1139" font-size="16" fill="#b7bbc5" font-weight="500" text-anchor="start">행 잠금 + 요청 번호로 중복 방지  ·  체크카드 즉시 출금  ·  신용카드 청구 기록  ·  계좌 잔액·장부·결제·예산 결정 이력</text>
+</g>
+</svg>
