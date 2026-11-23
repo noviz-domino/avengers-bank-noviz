@@ -2,14 +2,18 @@
 
 > 코드 패키지·레포 이름은 처음 이름(`avengers_bank`, `avengers-bank-noviz`)을 그대로 씁니다([ADR 0017](docs/decisions/0017-rename-bank.md)).
 
-은행 앱 클론입니다. 계좌·카드·이체 API에 **자연어 AI 상담(LangGraph Agent)**과 **상품·약관 RAG**를 연결했습니다. 서버는 거래 PIN으로 승인한 이체를 실행합니다. 모바일 화면은 별도로 데모 데이터로 체험할 수 있습니다.
+학습용 모바일 웹 뱅킹 프로젝트입니다. 계좌·카드·이체 기능에 **자연어 AI 상담(LangGraph)**, **상품·약관 RAG**, **월급 주기 기반 예산 관리**를 연결했습니다. 모바일 웹은 실제 백엔드 API에 연결되며, 데모 계정으로 주요 기능을 체험할 수 있습니다.
+
+**배포 데모** [capbanks.duckdns.org/app/](https://capbanks.duckdns.org/app/) · AWS EC2에서 Docker Compose와 Caddy로 배포했습니다. 2026-11-23 접속 확인에서는 도메인이 해석되지 않았습니다. 로컬에서 실행하려면 [실행 방법](#2-실행-방법)을 참고하세요.
 
 FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph · MCP · Gemini · Langfuse
 
 - **돈 처리**: 잔액·장부를 바꾸는 곳은 실행 함수 하나, 행 잠금, 요청 번호(같은 요청이 두 번 와도 한 번만), 승인 대기 + 거래 PIN
-- **AI 상담**: 라우터가 계좌·카드·상품·예산 담당을 고르고, 담당은 MCP 도구로 REST만 부름 → AI는 사용자보다 큰 권한이 없음
+- **AI 상담**은 라우터가 계좌·카드·상품·예산 담당을 선택합니다. MCP는 AI에 제공할 은행 기능과 입력값을 정의하고, 도구는 사용자 토큰으로 기존 REST API를 호출합니다. 이체 실행은 사용자의 거래 PIN 승인을 거칩니다.
 - **RAG**: 상품 DB + 앱 규칙을 쓴 데모 약관, 벡터 + 단어 하이브리드 검색, 근거 인용(정답 세트 Hit@5 1.000)
-- **문서**: [설계 결정](docs/decisions/README.md), [기능별 코드 가이드](docs/guides/README.md)
+- **문서**는 [기획 자료](docs/planning/README.md), [설계 결정](docs/decisions/README.md), [기능별 코드 가이드](docs/guides/README.md)에서 확인할 수 있습니다.
+
+![캡아메리카뱅크 멀티 에이전트 구조도](docs/capamerica-workflow.svg)
 
 ## 목차
 
@@ -32,10 +36,10 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 |---|---|
 | 은행 기본 기능 | 입출금·적금 개설(상품별 **가입 조건·적용 금리**), 정기예금(PIN 승인), 계좌 목록·총자산·거래내역 검색, 이체(승인 대기 → PIN), 계좌 해지, 카드 발급·정지·분실·결제·취소·한도·신용 대금 출금 |
 | 회원가입·인증 | 회원가입, 로그인(5회 실패 잠금), refresh token 교체·도난 감지, 로그아웃(기기별), 거래 PIN. 남의 데이터는 404 |
-| 자연어 입력 | `POST /chat`: 라우터 + 계좌·카드·상품 Agent, **대화 맥락 유지**(PostgreSQL), **정보가 부족하면 되묻기**, 이체·정지 해제는 승인 대기까지 |
+| 자연어 입력 | `POST /chat`, `POST /chat/stream`에서 계좌·카드·상품·예산 담당 연결, **대화 맥락 유지**(PostgreSQL), **정보가 부족하면 되묻기**, 이체·정지 해제는 승인 대기까지 |
 | RAG | `POST /rag/ask`, 상품 Agent의 `ask_bank_docs`: 상품 DB + 데모 약관, 조항 단위 청킹, 하이브리드 검색, 근거 인용, 근거 없으면 "자료 없음" |
 
-모바일 웹 앱(`/app`)은 위 기능을 **실제 API**로 씁니다: 로그인·회원가입, 총자산·계좌·거래내역·검색, 이체(PIN 승인 창), 카드 발급·정지·해제, 상품 가입, AI 상담(실시간 스트리밍), 거래 PIN 변경. 백엔드 API는 실행 후 `/docs`에서 확인할 수 있습니다.
+모바일 웹 앱(`/app`)은 **실제 API**로 로그인·회원가입, 총자산·계좌 상세와 거래 검색, 이체(PIN 승인), 카드 발급·정지·해제, 상품 가입, AI 상담(실시간 스트리밍), 거래 PIN 변경을 제공합니다. 이체 화면에서 받는 은행을 선택할 수 있으며, 타행 이체는 ClearingHub와 연동합니다. 백엔드 API는 실행 후 `/docs`에서 확인할 수 있습니다. [타행 이체 설계](docs/decisions/0022-clearinghub.md)
 
 ### 도메인별
 
@@ -51,7 +55,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 | mcp | ✅ AI 도구 18개(예산 조회·결제 영향 미리 보기 포함, 신청·변경은 사람이 화면에서). HTTP `/mcp`(Bearer), 로컬 stdio(Claude Desktop) |
 | rag | ✅ 검색·답변, 색인 갱신(바뀐 청크만 임베딩), 정답 세트 평가 |
 
-예산 관리는 월급 주기 계산, 신청·조회·변경·해지 화면, 체크·신용카드 및 타인 이체 가드, AI 조회·설명을 구현했습니다([ADR 0024](docs/decisions/0024-budget-guard.md)). 소비 패턴 분석·이월·목표 자동 이체와 대출은 후속 범위입니다.
+예산 관리는 월급 주기와 고정지출, 업종별 생활비 금액과 사용 주기를 반영합니다. 체크·신용카드 결제와 당행 타인 이체에 예산 검사를 적용하며, AI 상담에서 예산을 조회하고 거래가 예산에 미치는 영향을 확인할 수 있습니다. 소비 패턴 분석·이월·목표 자동 이체와 대출은 후속 범위입니다. [예산 관리 설계](docs/decisions/0024-budget-guard.md)
 
 ## 2. 실행 방법
 
@@ -231,7 +235,7 @@ docker compose exec app python -m avengers_bank.domains.agent.evaluate   # AI �
 uv run pytest
 ```
 
-테스트 147개는 SQLite로 돌고 **Gemini·Langfuse를 부르지 않습니다**(가짜 AI, `.env`에 키가 있어도). AI 테스트는 가짜 LLM이 "무엇을 고를지"만 정하고, 도구 호출은 진짜로 MCP → REST → DB를 지납니다.
+백엔드 테스트는 SQLite와 가짜 AI를 사용합니다. AI 테스트는 가짜 LLM이 도구를 선택하고, 도구 호출은 MCP → REST → DB를 지납니다.
 
 PR과 `main` push마다 GitHub Actions([ci.yml](.github/workflows/ci.yml))가 두 가지를 검사합니다.
 
@@ -293,6 +297,7 @@ docker compose exec app alembic upgrade head
 | [docs/ERD.md](docs/ERD.md) | ER 다이어그램, 코드에서 지킬 규칙 |
 | [docs/API_ENDPOINTS.md](docs/API_ENDPOINTS.md) | API 목록, 요청·응답 형식, 오류 코드 |
 | [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) | 폴더 구조, 계층 설명 |
-| [docs/decisions/](docs/decisions/README.md) | 설계 결정 기록(ADR) 18개: 무엇을 왜 바꿨는지, 팀 뼈대와의 차이 |
-| [docs/guides/](docs/guides/README.md) | 코드 가이드 12개: 기능별 흐름, 설계 이유, 면접 예상 질문 |
+| [docs/decisions/](docs/decisions/README.md) | 설계 결정 기록(ADR), 채택 이유와 팀 공통 기획에서 확장한 부분 |
+| [docs/guides/](docs/guides/README.md) | 기능별 코드 흐름과 설계 이유 |
+| [docs/deploy-checklist.md](docs/deploy-checklist.md) | 운영 서버 구성과 배포 절차 |
 | [docs/retrospective.md](docs/retrospective.md) | 회고 |
