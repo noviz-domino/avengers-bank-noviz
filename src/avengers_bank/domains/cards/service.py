@@ -66,19 +66,50 @@ def not_found() -> NotFoundException:
 REQUESTER_ACTOR = {"WEB": "USER", "AGENT": "AGENT", "MCP": "MCP"}
 
 
+LOST_PENDING_MESSAGE = "분실 신고 확정을 기다리는 카드입니다. 분실 신고를 취소한 뒤 풀어 주세요."
+
+
+async def lost_report_waiting(db: AsyncSession, user_id: int, card_id: int) -> bool:
+    """이 카드에 아직 확정 전인 분실 신청이 있나 (ADR 0033). 분실 신청은 카드를 정지만 해 두므로,
+    그사이 정지 해제가 승인되면 잃어버린 카드가 다시 결제될 수 있다"""
+    now = datetime.now(UTC)
+    waiting = await db.scalars(select(PendingAction).where(
+        PendingAction.user_id == user_id, PendingAction.action_type == "REPORT_LOST", PendingAction.status == "PENDING"))
+    # 만료 비교는 파이썬에서: SQLite는 시간대를 버리고 돌려준다 (approvals/service.py as_utc와 같은 이유)
+    return any(a.payload.get("card_id") == card_id and (a.expires_at if a.expires_at.tzinfo else a.expires_at.replace(tzinfo=UTC)) > now
+               for a in waiting)
+
+
 async def run_unsuspend_card(db: AsyncSession, action: PendingAction) -> None:
-    """승인된 정지 해제 (approvals EXECUTORS). 그사이 분실 신고됐으면 풀지 않는다"""
+    """승인된 정지 해제 (approvals EXECUTORS). 그사이 분실 신고됐거나 분실 신청이 대기 중이면 풀지 않는다"""
     found = await card_repository.find_by_id(db, action.payload["card_id"], lock=True)
     card = found[0] if found else None
     if card is None or card.user_id != action.user_id:
         raise TransferRejected("CARD_NOT_FOUND", "카드를 찾을 수 없습니다.")
     if card.status != "SUSPENDED":
         raise TransferRejected("CARD_NOT_SUSPENDED", "정지된 카드가 아닙니다.")
+    if await lost_report_waiting(db, card.user_id, card.card_id):
+        raise TransferRejected("CARD_LOST_PENDING", LOST_PENDING_MESSAGE)
     card.status = "ACTIVE"
     await audit_repository.record(  # 푼 사람은 PIN을 넣은 사용자. 요청을 누가 만들었는지는 detail에
         db, user_id=card.user_id, actor="USER", action="CARD_UNSUSPENDED", target=str(card.card_id),
         detail={"action_id": str(action.action_id), "requested_by": action.requested_by},
     )
+
+
+async def run_report_lost(db: AsyncSession, action: PendingAction) -> None:
+    """승인된 분실 신고 (approvals EXECUTORS, ADR 0033). 되돌릴 수 없어서 PIN을 넣은 사용자가 확정한다"""
+    found = await card_repository.find_by_id(db, action.payload["card_id"], lock=True)
+    card = found[0] if found else None
+    if card is None or card.user_id != action.user_id:
+        raise TransferRejected("CARD_NOT_FOUND", "카드를 찾을 수 없습니다.")
+    if card.status == "LOST":
+        raise TransferRejected("CARD_LOST", "이미 분실 신고된 카드입니다.")
+    await audit_repository.record(
+        db, user_id=card.user_id, actor="USER", action="CARD_LOST", target=str(card.card_id),
+        detail={"from": card.status, "action_id": str(action.action_id), "requested_by": action.requested_by},
+    )
+    card.status = "LOST"
 
 
 def budget_confirmation_required(action: PendingAction) -> ApiException:
@@ -206,6 +237,8 @@ class CardService:
                 raise ConflictException(message="분실 신고된 카드는 다시 쓸 수 없습니다. 재발급해 주세요.", code="CARD_LOST")
             if card.status != "SUSPENDED":
                 raise ConflictException(message="정지된 카드가 아닙니다.", code="CARD_NOT_SUSPENDED")
+            if await lost_report_waiting(db, user_id, card_id):
+                raise ConflictException(message=LOST_PENDING_MESSAGE, code="CARD_LOST_PENDING")
             action = PendingAction(
                 user_id=user_id, action_type="UNSUSPEND_CARD", requested_by=requested_by,
                 idempotency_key=idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
@@ -218,6 +251,47 @@ class CardService:
                 if "idempotency_key" not in str(e.orig):
                     raise
                 raise ConflictException(message="같은 요청을 처리하고 있습니다.", code="DUPLICATE_REQUEST") from None
+            return action, True
+
+    async def request_report_lost(
+        self, db: AsyncSession, user_id: int, card_id: int, idempotency_key: str, requested_by: str = "WEB"
+    ) -> tuple[PendingAction, bool]:
+        """분실 신고 신청 (ADR 0033): 카드는 지금 바로 일시정지하고(안전해지는 쪽, 되돌릴 수 있음),
+        되돌릴 수 없는 "분실" 확정은 승인 대기로 만든다 (PIN 승인 뒤 run_report_lost)"""
+        async with db.begin():
+            existing = await approval_repository.find_by_key(db, user_id, idempotency_key)
+            if existing is not None:
+                if existing.action_type != "REPORT_LOST" or existing.payload != {"card_id": card_id}:
+                    raise ConflictException(
+                        message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
+                    )
+                return existing, False
+            found = await card_repository.find_by_id(db, card_id, lock=True)
+            if found is None or found[0].user_id != user_id:
+                raise not_found()
+            card, product_name = found
+            if card.status == "LOST":
+                raise ConflictException(message="이미 분실 신고된 카드입니다.", code="CARD_LOST")
+            action = PendingAction(
+                user_id=user_id, action_type="REPORT_LOST", requested_by=requested_by,
+                idempotency_key=idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
+                payload={"card_id": card_id},
+                summary=(f"{card.nickname or product_name}({mask(card.card_num)}) 분실 신고\n"
+                         "신청할 때 카드를 일시정지했어요. 승인하면 분실이 확정되고 다시 쓸 수 없어요."),
+            )
+            try:
+                await approval_repository.save(db, action)
+            except IntegrityError as e:
+                if "idempotency_key" not in str(e.orig):
+                    raise
+                raise ConflictException(message="같은 요청을 처리하고 있습니다.", code="DUPLICATE_REQUEST") from None
+            if card.status == "ACTIVE":  # 대기 번호를 남겨 이 정지와 뒤의 분실 확정(CARD_LOST)을 잇는다
+                await audit_repository.record(
+                    db, user_id=user_id, actor=REQUESTER_ACTOR.get(requested_by, "USER"), action="CARD_SUSPENDED",
+                    target=str(card_id), detail={"from": card.status, "requested_by": requested_by, "why": "REPORT_LOST",
+                                                 "action_id": str(action.action_id)},
+                )
+                card.status = "SUSPENDED"
             return action, True
 
     async def _my_card(self, db: AsyncSession, user_id: int, card_id: int, lock: bool = False) -> Card:

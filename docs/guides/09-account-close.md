@@ -1,14 +1,17 @@
 # 9. 계좌 해지와 해지 뒤 환불
 
-> **잔액이 0이고, 쓸 수 있는 카드나 안 낸 카드 대금이 연결돼 있지 않은 입출금 계좌만 바로 해지한다. 해지 뒤 들어온 결제 취소는 "환불 대기"로 두고, 상담원이 고객을 확인한 뒤 다른 입출금 계좌로 보낸다.**
+> **잔액이 0이고, 쓸 수 있는 카드나 안 낸 카드 대금이 연결돼 있지 않은 입출금 계좌만 해지한다. 해지는 되돌릴 수 없어서 신청은 승인 대기만 만들고 PIN 승인 때 같은 검사를 한 번 더 한 뒤 해지한다([ADR 0033](../decisions/0033-irreversible-needs-pin.md)).**
+> **해지 뒤 들어온 결제 취소는 "환불 대기"로 두고, 상담원이 고객을 확인한 뒤 다른 입출금 계좌로 보낸다.**
 
-결정 이유: [ADR 0012](../decisions/0012-account-close.md)
+결정 이유: [ADR 0012](../decisions/0012-account-close.md), [ADR 0033](../decisions/0033-irreversible-needs-pin.md)
 
 ## 코드 위치
 
 | 하는 일 | API | 코드 |
 |---|---|---|
-| 해지 | `POST /accounts/{id}/close` | `accounts/service.py` `close` |
+| 해지 신청 (승인 대기) | `POST /accounts/{id}/close` | `accounts/service.py` `request_close` |
+| 해지 검사 (신청·실행 공통) | | `accounts/service.py` `lock_closable` |
+| PIN 승인 뒤 해지 | `POST /approvals/{action_id}/approve` | `accounts/service.py` `run_close_account` |
 | 해지 뒤 취소 → 환불 대기 | `POST /cards/{id}/transactions/{tx}/cancel` | `cards/service.py` `cancel`, `CardTransaction.refund_pending` |
 | 환불 대기 목록 (상담원) | `GET /system/card-refunds` | `cards/service.py` `list_pending_refunds` |
 | 다른 계좌로 환불 (상담원) | `POST /system/card-refunds/{card_tx_id}` | `cards/service.py` `refund_to` |
@@ -17,7 +20,7 @@
 
 ```mermaid
 flowchart TD
-    A([POST /close]) --> L["연결 카드 잠금 → 계좌 잠금<br/>(ERD 규칙 5 순서)"]
+    A(["POST /close (신청)<br/>또는 PIN 승인 뒤 실행"]) --> L["연결 카드 잠금 → 계좌 잠금<br/>(ERD 규칙 5 순서)"]
     L --> O{내 계좌?}
     O -- 아니오 --> OF[404]
     O -- 예 --> T{입출금 계좌?}
@@ -30,8 +33,10 @@ flowchart TD
     C -- 있음 --> CF[409 LINKED_CARD_EXISTS]
     C -- 없음 --> U{"안 낸 신용 사용분<br/>(UNBILLED·BILLED)?"}
     U -- 있음 --> UF[409 CARD_UNPAID]
-    U -- 없음 --> OK([CLOSED])
+    U -- 없음 --> OK(["신청: 202 승인 대기<br/>실행: CLOSED"])
 ```
+
+신청과 실행이 같은 검사(`lock_closable`)를 씁니다. 신청 뒤 10분 사이에 돈이 들어오거나 카드가 생기면 PIN을 넣어도 해지하지 않고, 승인 대기는 `FAILED`(예: `BALANCE_REMAINING`)로 남습니다.
 
 ## 환불 대기는 칸이 아니라 계산
 

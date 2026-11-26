@@ -23,6 +23,14 @@ class ActionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class KeyedRequest(BaseModel):
+    """승인 대기만 만드는 요청(정지 해제·계좌 해지·분실 신고)의 본문: 요청 번호만 받는다 (재전송해도 대기 하나)"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(min_length=8, max_length=100)
+
+
 class ApproveRequest(BaseModel):
     """승인은 PIN만 받는다. 실행할 내용(payload)은 받지 않는다 (바꿔치기 방지, ERD 승인·실행 규칙 1).
     예산을 넘는 건만 사람이 적은 사유와 "긴급" 여부를 함께 받는다 (budget_decisions에 기록)"""

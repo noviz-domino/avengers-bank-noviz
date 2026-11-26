@@ -30,7 +30,8 @@ class CardIssue(BaseModel):
 class CardSuspend(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    reason: Literal["SUSPENDED", "LOST"] = "SUSPENDED"  # LOST(분실)는 다시 풀 수 없다
+    # 분실(LOST)은 되돌릴 수 없어서 여기서 받지 않고 POST /cards/{id}/report-lost로 PIN 승인을 받는다 (ADR 0033)
+    reason: Literal["SUSPENDED"] = "SUSPENDED"
 
 
 class CardResponse(BaseModel):

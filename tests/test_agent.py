@@ -182,7 +182,7 @@ async def test_card_fraud_search_and_confirmed_suspension(bank):
         call("search_card_transactions", card_id=debit, payment_date=today),
         call("search_card_transactions", card_id=credit, payment_date=today),
         AIMessage("카페와 해외 상점 중 어느 결제인가요? 해당 카드를 일시 정지할까요?"),
-        call("suspend_card", card_id=credit, lost=False),
+        call("suspend_card", card_id=credit),
         call("get_my_cards"),
         AIMessage("해외 상점에서 사용한 카드를 일시 정지했어요."),
     ]

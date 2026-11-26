@@ -55,13 +55,13 @@ const result = action.status === "PENDING" ? await openApproval(action.action_id
 
 ## 카드·상품: 실제 API 연결
 
-> **카드와 상품 화면은 데모 데이터 없이 서버 API로 동작합니다. 정지·분실은 바로, 정지 해제와 예금 개설은 서버가 만든 승인 요청을 PIN으로 승인해야 반영됩니다.**
+> **카드와 상품 화면은 데모 데이터 없이 서버 API로 동작합니다. 일시정지는 바로, 정지 해제·분실 확정·예금 개설·계좌 해지는 서버가 만든 승인 요청을 PIN으로 승인해야 반영됩니다(분실 신청은 카드를 바로 멈춤).**
 
 | 하는 일 | 코드 |
 |---|---|
 | 카드 목록·상세·사용내역·한도 | `frontend/cards.mjs`의 `loadAll`, `loadCard` (`GET /cards`, `/cards/{id}`, `/transactions`, `/limits`) |
 | 카드 발급 | `cards.mjs`의 `submitIssue` (`GET /products/cards`, `GET /accounts`, `POST /cards`) |
-| 정지·분실·정지 해제 | `cards.mjs`의 `changeStatus` (`POST /cards/{id}/suspend`, `/unsuspend` → `openApproval`) |
+| 정지·분실·정지 해제 | `cards.mjs`의 `changeStatus` (`POST /cards/{id}/suspend`, `/report-lost`·`/unsuspend` → `openApproval`) |
 | 상품 목록·상세·금리 | `frontend/products.mjs`의 `listView`, `detailView`, `openingRate` |
 | 가입 | `products.mjs`의 `submit` (입출금·적금 `POST /accounts`, 예금 `POST /accounts/deposits` → `openApproval`) |
 
@@ -74,7 +74,7 @@ notice = result.status === "EXECUTED" ? "정지를 해제했어요." : ...;
 ```
 
 왜 이렇게 했나:
-- 정지는 안전한 쪽이라 바로 적용하고(확인 대화상자만), 푸는 것은 PIN으로 승인합니다. 분실은 되돌릴 수 없어 대화상자에 그대로 적습니다.
+- 정지는 안전한 쪽이라 바로 적용하고(확인 대화상자만), 푸는 것은 PIN으로 승인합니다. 분실은 신청 때 카드를 바로 멈추고 되돌릴 수 없는 확정만 PIN으로 받습니다([ADR 0033](../decisions/0033-irreversible-needs-pin.md)).
 - 금리는 서버가 문자열(`"3.50"`)로 줍니다. 화면은 0.01% 단위 정수로 바꿔 더하고(`hundredths`) 부동소수점 오차를 피합니다. 개설 시 적용 금리는 급여이체 우대를 빼고 우대 상한까지만 더합니다(서버 정책과 같음).
 - 입력 검사는 서버가 정본입니다. 화면은 `min`/`max` 힌트만 주고, 서버의 오류 문구(`AMOUNT_OUT_OF_RANGE` 등)를 그대로 보여 줍니다. 서버가 준 모든 문자열은 이스케이프합니다.
 - 월 이용금액은 한국 날짜 기준 이달의 `APPROVED` 건만 합산합니다. 할인 집계는 서버에 없어 만들지 않았습니다.

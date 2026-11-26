@@ -1,6 +1,6 @@
 # 11. MCP 서버: AI가 내 은행을 쓰는 입구
 
-> **MCP 서버는 은행 기능을 AI가 쓸 수 있는 도구 18개로 묶은 얇은 층이다. 도구는 DB를 보지 않고 사용자 토큰으로 REST API만 부른다. 그래서 AI는 사용자보다 큰 권한을 가질 수 없고, 돈은 여전히 PIN 없이 움직이지 않는다.**
+> **MCP 서버는 은행 기능을 AI가 쓸 수 있는 도구 19개로 묶은 얇은 층이다. 도구는 DB를 보지 않고 사용자 토큰으로 REST API만 부른다. 그래서 AI는 사용자보다 큰 권한을 가질 수 없고, 돈은 여전히 PIN 없이 움직이지 않는다.**
 
 결정 이유: [ADR 0014](../decisions/0014-mcp-server.md), [ADR 0004](../decisions/0004-agent-integration.md)
 
@@ -12,7 +12,7 @@ MCP(Model Context Protocol)는 AI 앱(Claude Desktop, 우리 Agent 등)이 외�
 
 | 하는 일 | 코드 |
 |---|---|
-| 도구 18개 정의 | `mcp_server/server.py` |
+| 도구 19개 정의 | `mcp_server/server.py` |
 | REST 호출, 토큰 고르기 | `mcp_server/api.py` (`call`, `token_for`, `TokenFile`) |
 | 로컬 실행·로그인 | `mcp_server/__main__.py` |
 | 앱에 붙이기 | `main.py` (`app.mount("/mcp", ...)`, lifespan) |

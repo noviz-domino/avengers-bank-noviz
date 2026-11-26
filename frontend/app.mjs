@@ -267,8 +267,8 @@ function accountPage(manage) {
       + (closing ? "" : escape(error)) + '</p></form>'
       + '<section class="card"><h2>계좌 해지</h2>'
       + (!checking ? '<p>예금·적금은 여기서 해지할 수 없어요.</p>'
-        : closing ? '<p>정말 해지할까요? 해지한 계좌는 되돌릴 수 없어요.</p>'
-          + button("close-confirm", "해지하기", "primary") + button("close-cancel", "취소", "outline")
+        : closing ? '<p>정말 해지할까요? 해지한 계좌는 되돌릴 수 없어서 PIN을 넣어야 해지돼요.</p>'
+          + button("close-confirm", "PIN으로 해지하기", "primary") + button("close-cancel", "취소", "outline")
         : '<p>잔액이 0원일 때만 해지할 수 있어요.</p>' + button("close-start", "계좌 해지", "outline"))
       + (closing ? '<p class="error" role="alert">' + escape(error) + "</p>" : "") + "</section></main>";
   }
@@ -599,13 +599,21 @@ app.addEventListener("click", async (event) => {
     case "close-start": manageState = { closing: true, error: "", busy: false }; return render();
     case "close-cancel": manageState = { closing: false, error: "", busy: false }; return render();
     case "close-confirm":
+      if (manageState.busy) return; // 두 번 누르면 해지 신청과 PIN 창이 두 개 생긴다
+      manageState.busy = true;
       try {
-        await api("/accounts/" + accountId + "/close", { method: "POST" });
+        // 해지는 되돌릴 수 없어서 서버가 승인 대기를 만들고 PIN으로 확정한다 (ADR 0033)
+        const { data } = await api("/accounts/" + accountId + "/close", { method: "POST", body: { idempotency_key: idempotencyKey() } });
+        const result = await openApproval(data.action_id);
+        if (result.status !== "EXECUTED") {
+          manageState = { ...manageState, busy: false, error: result.status === "FAILED" ? result.error.message : "해지를 취소했어요." };
+          return render();
+        }
         accountId = undefined;
         loadAccounts();
         return go("home");
       } catch (error) {
-        manageState.error = error.message;
+        manageState = { ...manageState, busy: false, error: error.message };
         return render();
       }
     case "submit-transfer": return submitTransfer();

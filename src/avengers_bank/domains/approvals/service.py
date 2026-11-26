@@ -7,8 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.exceptions import BadRequestException, ConflictException, NotFoundException
 from avengers_bank.domains.accounts.money import TransferRejected, execute_transfer
-from avengers_bank.domains.accounts.service import run_open_deposit
-from avengers_bank.domains.cards.service import run_budget_card_payment, run_card_payment, run_unsuspend_card
+from avengers_bank.domains.accounts.service import run_close_account, run_open_deposit
+from avengers_bank.domains.cards.service import (
+    run_budget_card_payment, run_card_payment, run_report_lost, run_unsuspend_card,
+)
 from avengers_bank.domains.approvals.models import PendingAction
 from avengers_bank.domains.approvals.repository import approval_repository
 from avengers_bank.domains.budget.models import BudgetDecision
@@ -31,6 +33,8 @@ async def run_transfer(db: AsyncSession, action: PendingAction, emergency: bool 
 EXECUTORS = {
     "TRANSFER": run_transfer, "OPEN_DEPOSIT": run_open_deposit, "UNSUSPEND_CARD": run_unsuspend_card,
     "CARD_PAYMENT": run_card_payment,
+    # 되돌릴 수 없는 것도 PIN 승인 뒤에 (ADR 0033)
+    "CLOSE_ACCOUNT": run_close_account, "REPORT_LOST": run_report_lost,
     clearing.ACTION_TYPE: clearing.stage_transfer,
     "BUDGET_CARD_PAYMENT": run_budget_card_payment, "BUDGET_DISABLE": run_budget_disable, "BUDGET_UPDATE": run_budget_update,
 }

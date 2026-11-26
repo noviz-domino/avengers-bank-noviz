@@ -2,7 +2,6 @@ from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from avengers_bank.core.database import get_db
@@ -11,7 +10,7 @@ from avengers_bank.core.clock import today_kst
 from avengers_bank.core.dependencies import RequestedBy, get_current_user, require_system_key
 from avengers_bank.core.responses import SuccessResponse, error_responses
 from avengers_bank.domains.approvals.models import PendingAction
-from avengers_bank.domains.approvals.schemas import ActionResponse
+from avengers_bank.domains.approvals.schemas import ActionResponse, KeyedRequest
 from avengers_bank.domains.cards import protection
 from avengers_bank.domains.cards.schemas import (
     CardBillRunResponse,
@@ -43,12 +42,6 @@ system_router = APIRouter(prefix="/system", tags=["system"], dependencies=[Depen
 
 DB = Annotated[AsyncSession, Depends(get_db)]
 Me = Annotated[UserResponse, Depends(get_current_user)]
-
-
-class UnsuspendRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    idempotency_key: str = Field(min_length=8, max_length=100)
 
 
 @products_router.get("/cards", response_model=SuccessResponse[list[CardProductResponse]])
@@ -108,13 +101,27 @@ async def get_my_card(card_id: int, db: DB, me: Me):
 
 @router.post("/{card_id}/suspend", response_model=SuccessResponse[CardResponse], responses=error_responses(404, 409))
 async def suspend_card(card_id: int, data: CardSuspend, db: DB, me: Me, requested_by: RequestedBy):
-    """정지·분실 신고: 바로 적용 (안전해지는 쪽은 승인 없이, ADR 0004). 감사 기록(audit_logs)에 남는다"""
+    """일시정지: 바로 적용 (안전해지고 되돌릴 수 있어서 승인 없이, ADR 0004). 감사 기록(audit_logs)에 남는다.
+    분실 신고는 되돌릴 수 없어서 `POST /cards/{card_id}/report-lost`로 PIN 승인을 받는다 (ADR 0033)"""
     return SuccessResponse[CardResponse](data=await card_service.suspend(db, me.user_id, card_id, data.reason, requested_by))
+
+
+@router.post("/{card_id}/report-lost", response_model=SuccessResponse[ActionResponse],
+             status_code=status.HTTP_202_ACCEPTED, responses=error_responses(404, 409))
+async def request_report_lost(card_id: int, data: KeyedRequest, response: Response, db: DB, me: Me,
+                              requested_by: RequestedBy):
+    """분실 신고 신청 (ADR 0033): 카드는 바로 일시정지하고 승인 대기를 만든다.
+    `POST /approvals/{action_id}/approve`(PIN)로 분실이 확정된다(다시 쓸 수 없음)"""
+    action, created = await card_service.request_report_lost(db, me.user_id, card_id, data.idempotency_key, requested_by)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return SuccessResponse[ActionResponse](
+        data=action, message="카드를 일시정지했어요. 승인 화면에서 PIN을 입력하면 분실 신고가 확정됩니다.")
 
 
 @router.post("/{card_id}/unsuspend", response_model=SuccessResponse[ActionResponse],
              status_code=status.HTTP_202_ACCEPTED, responses=error_responses(404, 409))
-async def request_unsuspend(card_id: int, data: UnsuspendRequest, response: Response, db: DB, me: Me,
+async def request_unsuspend(card_id: int, data: KeyedRequest, response: Response, db: DB, me: Me,
                             requested_by: RequestedBy):
     """정지 해제: 승인 대기만 만든다. `POST /approvals/{action_id}/approve`(PIN)로 풀린다"""
     action, created = await card_service.request_unsuspend(db, me.user_id, card_id, data.idempotency_key, requested_by)
