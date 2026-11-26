@@ -71,6 +71,7 @@ class Plan(BaseModel):
 - 약관 질문은 RAG가 근거와 함께 쓴 답을 그대로 내고 끝에 근거 문서 제목을 붙인다.
 - 기간 지출·수입 질문("이번 달 식비 얼마 썼어?")은 라우터가 기간·업종·낱말·방향을 채우고 코드가 업종마다 검색해 서버 합계를 더한다. 기간이 없거나 날짜가 이상하면 담당 Agent가 처리한다([ADR 0035](../decisions/0035-agent-search-quick-lane.md)).
 - 빠른 길은 담당 노드 안에서 돌아서 `routed`와 진행 표시(담당 → 도구)가 그대로다.
+- 라우터만 가벼운 모델(`gemini-3.5-flash-lite`, 생각 `minimal`)을 쓴다. 담당 Agent와 RAG는 `gemini-3.8-flash`. 라우터 한 번이 약 2.5초에서 1.0초가 되어 빠른 길 질문은 1초 안팎이다([ADR 0036](../decisions/0036-router-light-model.md)).
 - 개선 전후 측정 원본과 질문별 비교는 [평가 기록](../evaluations/agent-latency/README.md)에 남긴다. 고칠 때마다 같은 질문 세트로 다시 잰다(`evaluate.py --out`).
 
 ## 왜 이렇게 했나

@@ -13,6 +13,7 @@ from mcp.shared.memory import create_connected_server_and_client_session
 from avengers_bank.core.exceptions import ApiException, ConflictException
 from avengers_bank.domains.agent import checkpoint, tracing
 from avengers_bank.domains.agent.graph import MAX_HOPS, build
+from avengers_bank.domains.agent.llm import router_for
 from avengers_bank.domains.agent.schemas import ChatResponse, ChatTurn
 from avengers_bank.domains.agent.stream import EventTranslator, sse
 from avengers_bank.domains.agent.transfer_check import build_transfer_check
@@ -105,7 +106,7 @@ class AgentService:
                     state = await graph.ainvoke({"messages": [HumanMessage(message)]}, config)
                 else:
                     async with create_connected_server_and_client_session(mcp) as session:
-                        graph = build(llm, await load_mcp_tools(session), checkpoint.saver)
+                        graph = build(llm, await load_mcp_tools(session), checkpoint.saver, router_for(llm))
                         state = await graph.ainvoke(first_turn(message), config)
         except ApiException:
             raise
@@ -138,7 +139,7 @@ class AgentService:
             translate = EventTranslator()
             async with asyncio.timeout(TURN_TIMEOUT):
                 async with create_connected_server_and_client_session(mcp) as session:
-                    graph = build(llm, await load_mcp_tools(session), checkpoint.saver)
+                    graph = build(llm, await load_mcp_tools(session), checkpoint.saver, router_for(llm))
                     async for ev in graph.astream_events(first_turn(message), config, version="v2"):
                         for out in translate(ev):
                             put(out)

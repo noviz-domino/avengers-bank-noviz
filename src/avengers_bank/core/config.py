@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = "gemini-embedding-2"
     # Gemini 3의 생각 수준. 낮을수록 빠르다. low가 p50 15→8초 (ADR 0016 측정). minimal은 3.8 Flash가 지원하지 않음
     gemini_thinking: Literal["low", "medium", "high"] = "low"
+    # 라우터만 따로 쓰는 가벼운 모델 (ADR 0036). 라우터는 모든 턴에 한 번씩 돌아서 여기서 줄인 시간이 모든 질문에 붙는다.
+    # 측정: 담당 맞힘 21/21 그대로, p50 8.0→4.2초, 라우터 한 번 약 2.5→1.0초. 담당과 같은 모델을 쓰려면 GEMINI_ROUTER_MODEL=gemini-3.8-flash
+    gemini_router_model: str = "gemini-3.5-flash-lite"
+    gemini_router_thinking: Literal["minimal", "low", "medium", "high"] = "minimal"
     # 서버 전체 AI 호출 하루 한도(한국 날짜 기준, 채팅 1번 = 3). 공개 서버에서 계정을 여러 개 만들어도 비용이 묶이게 (ADR 0026)
     ai_daily_limit: int = Field(default=100, gt=0)
     kakao_local_api_key: SecretStr | None = None
