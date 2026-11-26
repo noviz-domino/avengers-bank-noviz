@@ -1,8 +1,9 @@
 :root {
   color-scheme: light;
-  font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif;
-  color: #10233b;
-  background: #eaeef1;
+  font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--ui-navy, #172033);
+  background: var(--ui-bg, #eef3fa);
   --navy: var(--ui-navy);
   --blue: var(--ui-blue);
   --muted: var(--ui-muted);
@@ -38,6 +39,44 @@ svg { display: block; width: 100%; height: auto; }
   background: #fff;
   box-shadow: 0 0 50px #10233b14;
 }
+/* 넓은 화면: 왼쪽 은행 화면(480px) + 오른쪽 AI 상담 (app.mjs의 desktop, ADR 0031) */
+.app.desk {
+  display: grid;
+  grid-template-columns: 480px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+  width: min(100%, 1240px);
+  padding: 20px;
+  background: transparent;
+  box-shadow: none;
+}
+.desk-main { display: flex; flex-direction: column; min-height: calc(100dvh - 40px); border-radius: var(--ui-radius); background: #fff; overflow: clip; }
+.app.desk[data-page="home"] .desk-main, .app.desk[data-page="accounts"] .desk-main { background: transparent; }
+.desk-main .ui-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: var(--ui-radius) var(--ui-radius) 0 0; }
+.desk-main .ui-tab[data-action="chat"] { display: none; } /* 상담은 오른쪽에 늘 열려 있다 */
+.desk-chat { position: sticky; top: 20px; display: flex; flex-direction: column; height: calc(100dvh - 40px); border-radius: var(--ui-radius); background: #fff; overflow: hidden; }
+.desk-chat .chat-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.desk-chat .ui-header { border-bottom: 1px solid var(--ui-line); }
+.desk-chat .ui-header [data-action="menu"] { display: none; }
+.desk-chat main.chat { flex: 1; min-height: 0; }
+.desk-chat .chat-feed { overflow-y: auto; scrollbar-width: thin; }
+.desk-chat .composer { bottom: 0; }
+.desk-chat .chat-feed:has(> .chat-examples) { justify-content: center; } /* 대화 전 빈 상담 칸은 안내를 가운데에 (ADR 0032) */
+/* "새 기능" 말풍선 (ADR 0032): 휴대폰은 하단 탭의 AI 상담을, 넓은 화면은 오른쪽 상담 칸 제목을 가리킨다.
+   화살표 위치 = 탭 바 안쪽 여백 16px + 탭 한 칸의 절반 - 말풍선 오른쪽 여백 8px - 화살표 반 폭 7px */
+.ai-tip { position: fixed; z-index: 3; right: calc((100% - min(100%, 480px)) / 2 + 8px); bottom: calc(var(--ui-tabs-height) + 12px); display: flex; align-items: flex-start; gap: 10px; width: min(300px, calc(100% - 16px)); padding: 14px 8px 14px 14px; border-radius: var(--ui-radius-sm); background: var(--ui-navy); color: #fff; box-shadow: 0 8px 24px #17203333; animation: ai-tip-in .3s ease-out; }
+.ai-tip::after { content: ""; position: absolute; right: calc((min(100vw, 480px) - 32px) / 10 + 1px); bottom: -6px; width: 14px; height: 14px; border-radius: 2px; background: inherit; transform: rotate(45deg); }
+.ai-tip-badge { flex: none; margin-top: 2px; padding: 2px 7px; border-radius: 999px; background: var(--ui-blue); font-size: 11px; font-weight: 800; }
+.ai-tip p { flex: 1; color: #d5deee; font-size: 13px; line-height: 1.5; word-break: keep-all; }
+.ai-tip strong { display: block; margin-bottom: 2px; color: #fff; font-size: 15px; }
+.ai-tip .ai-tip-close { flex: none; width: 32px; min-height: 32px; height: 32px; margin-top: -6px; padding: 6px; color: #fff; }
+.desk-chat .ai-tip { position: absolute; top: 72px; right: auto; bottom: auto; left: var(--ui-page-gutter); }
+.desk-chat .ai-tip::after { top: -6px; right: auto; bottom: auto; left: 28px; }
+.app.ai-tip-on .ui-tab[data-action="chat"] { position: relative; color: var(--ui-blue); }
+.app.ai-tip-on .ui-tab[data-action="chat"]::after { content: ""; position: absolute; top: 6px; left: calc(50% + 10px); width: 8px; height: 8px; border-radius: 50%; background: var(--ui-error); }
+@keyframes ai-tip-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .ai-tip { animation: none; } }
+.desk-chat .bubble { max-width: 76%; }
 .topbar {
   display: flex;
   align-items: center;
@@ -138,38 +177,49 @@ dt { color: var(--muted); }
 dd { margin: 0; text-align: right; font-weight: 750; }
 .success-mark { border-radius: 100%; display: grid; place-items: center; width: 58px; height: 58px; background: #eaf3e9; color: #24633a; font-size: 1.65rem; }
 
-/* AI 상담: 대화 영역은 옅은 회색, 입력줄은 흰색 + 윗선으로 구분한다 */
+/* AI 상담: 노비즈 뱅크 채팅 모양 (ADR 0031). 흰 바탕, AI 말풍선은 옅은 회청색, 내 말은 파랑, 예시는 칩 */
 .chat-screen { display: contents; }
-main.chat { display: flex; flex-direction: column; padding: 0; background: var(--ui-surface); }
+main.chat { display: flex; flex-direction: column; padding: 0; background: var(--ui-white); }
 main.chat > * + * { margin-top: 0; }
-.chat-feed { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: var(--ui-space-md) var(--ui-page-gutter) var(--ui-space-lg); }
+.chat-progress { position: sticky; top: 0; z-index: 1; padding: 10px var(--ui-page-gutter) 8px; border-bottom: 1px solid var(--ui-line); background: var(--ui-white); }
+.chat-steps { display: flex; gap: 6px; }
+.chat-step { flex: 1; padding: 6px 2px; border-radius: 10px; background: var(--ui-surface); color: var(--ui-muted); font-size: 12px; font-weight: 600; text-align: center; white-space: nowrap; transition: background .3s, color .3s; }
+.chat-step.past { background: var(--ui-blue-soft); color: var(--ui-blue-text); }
+.chat-step.on { background: var(--ui-blue); color: var(--ui-white); }
+.chat-step.wait { background: var(--ui-amber); color: var(--ui-white); }
+.chat-flow { margin-top: 6px; color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
+.chat-feed { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: var(--ui-space-md) var(--ui-page-gutter) var(--ui-space-lg); }
 .chat-feed > * { scroll-margin-bottom: 90px; }
 .chat-row { display: flex; align-items: flex-start; gap: var(--ui-space-sm); }
-.chat-avatar { flex: 0 0 28px; display: grid; place-items: center; height: 28px; margin-top: 2px; }
-.chat-avatar svg { width: 22px; }
-.bubble { max-width: 84%; margin: 0; padding: 10px 14px; border-radius: 18px; overflow-wrap: anywhere; line-height: 1.6; }
+.chat-avatar { flex: 0 0 32px; display: grid; place-items: center; height: 32px; border-radius: 11px; background: var(--ui-blue-soft); }
+.chat-avatar svg { width: 20px; }
+.bubble { max-width: 84%; margin: 0; padding: 12px 15px; border-radius: 18px; overflow-wrap: anywhere; line-height: 1.55; font-size: 15px; }
 .bubble p { white-space: pre-wrap; }
-.bubble.assistant { border-top-left-radius: 6px; background: var(--ui-white); box-shadow: 0 1px 2px #10233b14; }
+.bubble.assistant { border-top-left-radius: 6px; background: var(--ui-surface); }
 .bubble.user { align-self: flex-end; border-bottom-right-radius: 6px; background: var(--ui-blue); color: var(--ui-white); }
-.chat-hint { margin-top: var(--ui-space-sm); text-align: right; color: var(--ui-muted); font-size: var(--ui-small-size); }
-/* 예시는 "아직 보내지 않은 내 말풍선"처럼 점선으로 그린다 */
-.bubble.user.chat-example { min-height: var(--ui-touch); border: 1.5px dashed #8fb1d6; background: var(--ui-white); color: var(--ui-blue); font-weight: 600; text-align: left; }
+.chat-hint { margin-top: var(--ui-space-xs); color: var(--ui-muted); font-size: var(--ui-small-size); }
+.chat-examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.chat-example { min-height: 32px; padding: 5px 12px; border: 1px solid var(--ui-line); line-height: 1.35; border-radius: 999px; background: var(--ui-white); color: var(--ui-navy); font-size: 14px; font-weight: 500; text-align: left; }
+.chat-example:hover { border-color: var(--ui-blue); background: var(--ui-blue-soft); color: var(--ui-blue-text); }
 .bubble.status { color: var(--ui-muted); font-size: var(--ui-small-size); }
 .chat-dots { display: inline-flex; gap: 3px; margin-left: 6px; }
 .chat-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: chat-dot 1.2s infinite ease-in-out; }
 .chat-dots i:nth-child(2) { animation-delay: .15s; }
 .chat-dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes chat-dot { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .chat-dots i { animation: none; } }
-.chat-action { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ui-line); }
-.chat-action .ui-button { margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .chat-dots i, .chat-step { animation: none; transition: none; } }
+/* 승인 카드: AI 말풍선 아래 테두리 상자. 버튼은 공통 PIN 창(approval.mjs)을 연다 */
+.chat-action { display: grid; gap: 10px; width: min(370px, calc(100% - 40px)); margin-left: 40px; padding: 16px; border: 1.5px solid var(--ui-blue); border-radius: 20px; background: var(--ui-white); }
+.chat-action-kind { display: inline-flex; align-items: center; gap: 5px; justify-self: start; padding: 4px 10px; border-radius: 999px; background: var(--ui-blue-soft); color: var(--ui-blue-text); font-size: 12px; font-weight: 700; }
+.chat-action-kind .ui-icon { width: 14px; height: 14px; flex-basis: 14px; }
+.chat-action p { color: var(--ui-navy); font-size: 15px; font-weight: 600; line-height: 1.5; white-space: pre-line; }
+.chat-action .ui-button { width: 100%; border-radius: 14px; }
 .status { color: var(--muted); font-size: .88rem; }
-.composer { position: sticky; bottom: var(--ui-tabs-height); z-index: 1; padding: 10px var(--ui-page-gutter); border-top: 1px solid #d5dce4; background: var(--ui-white); box-shadow: 0 -4px 12px #10233b0a; }
-.composer > div { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 6px; border: 1px solid #cbd5df; border-radius: 999px; background: var(--ui-surface); }
-.composer > div:focus-within { border-color: var(--ui-blue); background: var(--ui-white); }
-.composer input { min-height: 40px; border: 0; border-radius: 999px; background: transparent; font-weight: 400; }
-.composer input:focus-visible { outline: none; }
-.composer .primary { flex: 0 0 40px; width: 40px; min-width: 40px; min-height: 40px; padding: 0; border-radius: 50%; }
+.composer { position: sticky; bottom: var(--ui-tabs-height); z-index: 1; padding: 12px var(--ui-page-gutter); border-top: 1px solid var(--ui-line); background: var(--ui-white); }
+.composer > div { display: flex; align-items: center; gap: 8px; }
+.composer input { flex: 1; min-width: 0; min-height: 48px; padding: 12px 16px; border: 1.5px solid var(--ui-line); border-radius: 14px; background: var(--ui-surface); color: var(--ui-navy); font-size: 15px; font-weight: 400; }
+.composer input:focus { border-color: var(--ui-blue); background: var(--ui-white); outline: none; }
+.composer .primary { flex: 0 0 48px; width: 48px; min-width: 48px; min-height: 48px; padding: 0; border-radius: 14px; }
 .composer .primary .ui-icon { width: 20px; height: 20px; }
 
 .app[data-page="account"] h1, .app[data-page="manage"] h1, .transfer h1 { font-size: var(--ui-title-size); line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }

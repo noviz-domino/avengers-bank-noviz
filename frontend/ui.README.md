@@ -6,20 +6,21 @@
 
 | 용도 | CSS 변수 | 값 |
 |---|---|---|
-| 크림 / 흰색 / 네이비 | `--ui-cream`, `--ui-white`, `--ui-navy` | `#fbf5e9` / `#fff` / `#10233b` |
-| 입출금 / 옅은 배경 | `--ui-blue`, `--ui-blue-soft` | `#1d5fa8` / `#edf4fd` |
-| 조용한 회색 면 (총자산·대화 영역·타일) | `--ui-surface` | `#f4f6f8` |
-| 예금·적금 / 옅은 배경 | `--ui-sage`, `--ui-sage-soft` | `#487657` / `#eef6f0` |
-| 최근 거래 / 옅은 배경 | `--ui-amber`, `--ui-amber-soft` | `#96611c` / `#fcf3e3` |
-| 오류 / 보조 글자 / 구분선 | `--ui-error`, `--ui-muted`, `--ui-line` | `#a22938` / `#647083` / `#e6eaef` |
+| 바탕 (홈·계좌 탭) | `--ui-bg` | `#eef3fa` |
+| 옅은 면(이름만 크림) / 흰색 / 본문 글자 | `--ui-cream`, `--ui-white`, `--ui-navy` | `#f5f8fc` / `#fff` / `#172033` |
+| 강조 파랑 / 옅은 배경 / 옅은 배경 위 글자 | `--ui-blue`, `--ui-blue-soft`, `--ui-blue-text` | `#2f6bff` / `#e7eeff` / `#2352cc` |
+| 조용한 면 (AI 말풍선·입력칸·타일) | `--ui-surface` | `#f5f8fc` |
+| 예금·적금 / 옅은 배경 | `--ui-sage`, `--ui-sage-soft` | `#0f8a59` / `#e3f6ee` |
+| 최근 거래·승인 대기 / 옅은 배경 | `--ui-amber`, `--ui-amber-soft` | `#a86500` / `#fff3db` |
+| 오류 / 보조 글자 / 구분선 | `--ui-error`, `--ui-muted`, `--ui-line` | `#d63a40` / `#5d6b82` / `#e3e9f2` |
 | 페이지 / 섹션 / 본문 / 보조 | `--ui-title-size`, `--ui-section-size`, `--ui-body-size`, `--ui-small-size` | 26 / 18 / 15 / 13px |
-| 좌우 여백 | `--ui-page-gutter` | 36px, 340px 이하 24px ([ADR 0029](../docs/decisions/0029-layout-gutter-tabs-menu.md)). 공통 `main`·홈·카드·상품·상담이 모두 이 값을 써요 |
+| 좌우 여백 | `--ui-page-gutter` | 20px, 340px 이하 16px ([ADR 0031](../docs/decisions/0031-noviz-layout-agent-steps.md), 처음 값은 [ADR 0029](../docs/decisions/0029-layout-gutter-tabs-menu.md)의 36px). 공통 `main`·홈·카드·상품·상담이 모두 이 값을 써요 |
 | 여백 단위 | `--ui-space-xs`, `--ui-space-sm`, `--ui-space-md`, `--ui-space-lg` | 4 / 8 / 16 / 24px |
-| 작은 / 큰 모서리 | `--ui-radius-sm`, `--ui-radius` | 10 / 16px |
-| 그림자 | `--ui-shadow` | `0 4px 18px #10233b0a` |
+| 작은 / 큰 모서리 | `--ui-radius-sm`, `--ui-radius` | 12 / 18px |
+| 그림자 | `--ui-shadow` | `0 1px 2px #17203308` (거의 없음) |
 | 최소 터치 | `--ui-touch` | 44px |
 
-홈 총자산만 36px(340px 이하 32px)로 강조해요. 페이지 제목은 `pageTitle`을 써요. 시안의 작은 배너 컨트롤도 터치 영역은 44px이에요. 폰트는 기존 Pretendard → 맑은 고딕 → 시스템 글꼴 순서를 유지해요.
+색 체계는 노비즈 뱅크에서 가져왔어요([ADR 0031](../docs/decisions/0031-noviz-layout-agent-steps.md)). 홈·계좌 탭은 회청색 바탕 위에 흰 상자를 쌓고 섹션 머리에는 색 띠를 두지 않아요. 색은 계좌 아이콘 타일에만 써요. 총자산은 파란 카드에 흰 글자 32px(340px 이하도 32px)로 강조해요. 페이지 제목은 `pageTitle`을 써요. 시안의 작은 배너 컨트롤도 터치 영역은 44px이에요. 폰트는 Pretendard 웹폰트(jsDelivr)를 불러오고 못 받으면 맑은 고딕 → 시스템 글꼴 순서예요. 넓은 화면(1024px 이상)에서는 왼쪽 화면 + 오른쪽 AI 상담 두 칸이에요(`app.mjs`의 `desktop`).
 
 ## 사용 규칙
 
