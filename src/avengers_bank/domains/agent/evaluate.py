@@ -3,7 +3,8 @@
 질문은 읽기만 하는 것만(routing.jsonl): 이체·분실 신고처럼 데이터를 바꾸는 질문은 반복 측정하지 않는다.
 서버(docker compose)가 떠 있어야 하고, 데모 계정으로 로그인해 도구를 부른다. Gemini 호출: 질문마다 2~6번.
 
-    docker compose exec app python -m avengers_bank.domains.agent.evaluate [--label before] [--pause 6]
+    docker compose exec app python -m avengers_bank.domains.agent.evaluate [--label before] [--pause 6] [--out /tmp/run.json]
+    docker compose cp app:/tmp/run.json docs/evaluations/agent-latency/날짜_번호-이름.json   # 결과를 레포에 남겨 비교
 """
 
 import argparse
@@ -16,6 +17,8 @@ from pathlib import Path
 
 import httpx
 
+from avengers_bank.core.clock import today_kst
+from avengers_bank.core.config import get_settings
 from avengers_bank.domains.agent.llm import gemini_chat
 from avengers_bank.domains.agent.service import agent_service
 from avengers_bank.domains.agent.tracing import CallCounter
@@ -69,6 +72,7 @@ def main() -> None:
     parser.add_argument("--label", default="run")
     parser.add_argument("--pause", type=float, default=6.0)
     parser.add_argument("--api", default="http://localhost:8000")
+    parser.add_argument("--out", help="결과(설정·요약·질문별 기록)를 JSON 파일로 남긴다. 개선 전후 비교용 (docs/evaluations/agent-latency)")
     args = parser.parse_args()
     login = httpx.post(f"{args.api}/users/login", json={"login_id": DEMO_LOGIN_ID, "password": DEMO_PASSWORD})
     if login.is_error:
@@ -76,7 +80,13 @@ def main() -> None:
     token = login.json()["data"]["access_token"]
     me = httpx.get(f"{args.api}/users/me", headers={"Authorization": f"Bearer {token}"}).json()["data"]
     rows = asyncio.run(run(token, me["user_id"], args.pause))
-    print(json.dumps({"label": args.label, **summarize(rows)}, ensure_ascii=False))
+    summary = {"label": args.label, **summarize(rows)}
+    print(json.dumps(summary, ensure_ascii=False))
+    if args.out:
+        s = get_settings()
+        result = {"date": today_kst().isoformat(), "model": s.gemini_model, "thinking": s.gemini_thinking,
+                  "summary": summary, "rows": rows}
+        Path(args.out).write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

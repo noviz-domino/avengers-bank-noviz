@@ -1,0 +1,22 @@
+   3.1s  calls=1  ['account']  OK  내 계좌 잔액 알려줘
+   9.5s  calls=3  ['account']  OK  이번 달에 편의점에서 얼마 썼어?
+  10.5s  calls=3  ['account']  OK  이번 달 들어온 돈이 얼마야?
+  12.7s  calls=4  ['account']  OK  생활비 통장 상세 보여줘
+   3.8s  calls=1  ['card']  OK  내 카드 목록 보여줘
+  11.2s  calls=4  ['card']  OK  체크카드 한도 얼마 남았어?
+  15.9s  calls=5  ['card']  OK  카드 사용내역 보여줘
+   9.9s  calls=3  ['product']  OK  적금 상품 뭐 있어?
+   8.9s  calls=1  ['product']  OK  카드 대금 못 내면 어떻게 돼?
+  11.0s  calls=4  ['account']  OK  이체 한도가 얼마야?
+   7.1s  calls=1  ['product']  OK  스타크 신용카드 혜택이 뭐야?
+  15.6s  calls=4  ['card', 'account']  OK  카드 한도랑 내 잔액 알려줘
+   2.9s  calls=1  []  OK  안녕
+   6.4s  calls=1  []  OK  고마워!
+   2.8s  calls=1  ['budget']  OK  이번 달 얼마 더 쓸 수 있어?
+   8.6s  calls=3  ['budget']  OK  30만 원짜리 사도 돼?
+   3.3s  calls=1  ['budget']  OK  오늘 하루에 얼마까지 써도 돼?
+   8.7s  calls=3  ['budget']  OK  목표 저축 잘 지키고 있어?
+   8.2s  calls=1  ['account', 'budget']  OK  잔액이랑 이번 달 예산 알려줘
+  16.8s  calls=5  ['account']  OK  이번 달 식비 얼마 썼어?
+   8.0s  calls=1  ['product']  OK  예산 관리는 어떻게 신청해?
+{"label": "after", "questions": 21, "errors": 0, "routing_accuracy": 1.0, "llm_calls_avg": 2.4285714285714284, "p50": 8.7, "p95": 15.9}

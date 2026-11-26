@@ -17,6 +17,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from avengers_bank.core.clock import today_kst
+from avengers_bank.domains.agent.quick import LANES, QuickKind, run_lane
 
 MAX_HOPS = 3  # 한 턴에 도메인 Agent를 부르는 최대 횟수 (복합 요청 "정지하고 잔액 알려줘"는 2번)
 LABELS = {"account": "계좌", "card": "카드", "product": "상품·약관", "budget": "예산"}
@@ -75,7 +76,12 @@ ROUTER = """너는 캡아메리카뱅크 AI 상담의 라우터다. 사용자의
 - "카드 대금 못 내면 어떻게 돼?"처럼 연체 규칙·불이익을 묻는 질문은 product다. "내 카드 대금이 밀렸어?"처럼 내 카드의 현재 상태를 묻는 질문은 card다.
 - budget: 내 예산. "이번 달 얼마 더 쓸 수 있어", "하루에 얼마 써도 돼", "이거 사도 돼?", "30만 원 써도 돼?", 자유 사용 가능액·목표 저축·고정 지출. 이미 쓴 돈의 내역·합계("어디서 얼마 썼어")는 budget이 아니라 account
 여러 업무가 섞이면 사용자가 말한 순서대로 담는다. 앞 대화에 이어지는 말(되물음에 대한 답, "응", "그걸로")은 그 업무의 담당을 고른다.
-은행 업무가 아닌 말(인사, 감사 등)이면 agents를 비우고 reply에 짧게 답한다."""
+은행 업무가 아닌 말(인사, 감사 등)이면 agents를 비우고 reply에 짧게 답한다.
+quick: 담당의 일이 아래처럼 단순하면 표시한다. 조건·기간·특정 계좌나 카드만·금액이 붙거나 확실하지 않으면 표시하지 않는다.
+- balance(account): 내 계좌 잔액·총자산·계좌 목록 전체를 묻는 것만. 거래내역·지출·이체·특정 계좌 상세는 아님
+- cards(card): 내 카드 목록·상태를 묻는 것만. 한도·사용내역·정지는 아님
+- budget(budget): 이번 주기에 얼마 더 쓸 수 있는지, 하루에 얼마 써도 되는지만. "X원 써도 돼?"처럼 금액이 있으면 아님
+- docs(product): 약관·규칙·상품 조건을 묻는 질문. question에 앞 대화 없이도 알 수 있는 질문 한 문장을 쓴다. 상품 목록을 보여 달라는 것은 아님"""
 
 class Plan(BaseModel):
     """라우터의 출력: 이번 턴에 일할 담당과 순서. 정해진 이름만 고를 수 있다 (ADR 0006: 엉뚱한 Agent로 보내지 않게).
@@ -83,11 +89,15 @@ class Plan(BaseModel):
 
     agents: list[AgentName] = Field(default_factory=list, description="처리할 담당, 처리 순서대로. 은행 업무가 아니면 빈 목록")
     reply: str | None = Field(default=None, description="agents가 비었을 때 사용자에게 할 짧은 답")
+    quick: list[QuickKind] = Field(default_factory=list, description="코드가 바로 답할 단순 조회 (ADR 0034). 확실할 때만")
+    question: str | None = Field(default=None, description="quick에 docs가 있을 때 RAG에 물을 질문 한 문장")
 
 
 class ChatState(MessagesState):
     plan: list[str]  # 이번 턴에 아직 일하지 않은 담당
     routed: list[str]  # 이번 턴에 일한 담당 (응답·평가용)
+    quick: list[str]  # 이번 턴에 빠른 길로 처리할 조회 (ADR 0034)
+    question: str | None  # docs 빠른 길의 질문
 
 
 def common_prompt() -> str:
@@ -119,16 +129,24 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
         agents_in_order = list(dict.fromkeys(plan.agents))[:MAX_HOPS]  # 같은 담당 두 번, 핑퐁 없이
         if not agents_in_order:
             return Command(goto=END, update={"messages": [AIMessage(plan.reply or "무엇을 도와드릴까요?")]})
-        return Command(goto=agents_in_order[0], update={"plan": agents_in_order[1:], "routed": agents_in_order[:1]})
+        return Command(goto=agents_in_order[0], update={"plan": agents_in_order[1:], "routed": agents_in_order[:1],
+                                                         "quick": plan.quick, "question": plan.question})
 
     def domain(name: str):
         async def run(state: ChatState) -> Command:
             # 복합 요청에서 두 번째 담당은 대화가 앞 담당의 답(AI)으로 끝난 채 불린다. Gemini는 AI 메시지로 끝나는
             # 요청을 거절해서, 이번에 할 일을 사람 말로 붙인다. 이 안내는 저장하지 않는다
-            ask = HumanMessage(f"(상담 안내) 위 대화에서 아직 처리하지 않은 {LABELS[name]} 업무를 처리하세요.")
-            sent = [*recent(state["messages"]), ask]
-            out = await agents[name].ainvoke({"messages": sent})
-            new = out["messages"][len(sent):]  # 이 Agent가 더한 도구 호출·결과·답
+            kind, tool = LANES[name]
+            answer = None
+            if kind in (state.get("quick") or []):  # 라우터가 단순 조회라고 표시: 도구만 부르고 코드가 답한다 (ADR 0034)
+                answer = await run_lane(kind, by_name[tool], state.get("question"))
+            if answer is not None:
+                new = [AIMessage(answer)]
+            else:
+                ask = HumanMessage(f"(상담 안내) 위 대화에서 아직 처리하지 않은 {LABELS[name]} 업무를 처리하세요.")
+                sent = [*recent(state["messages"]), ask]
+                out = await agents[name].ainvoke({"messages": sent})
+                new = out["messages"][len(sent):]  # 이 Agent가 더한 도구 호출·결과·답
             if not state["plan"]:
                 return Command(goto=END, update={"messages": new})
             following, *rest = state["plan"]
