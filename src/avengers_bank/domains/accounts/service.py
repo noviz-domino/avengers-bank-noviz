@@ -110,6 +110,46 @@ async def create_account(
     return account, terms
 
 
+async def lock_closable(db: AsyncSession, user_id: int, account_id: int) -> Account:
+    """해지할 수 있는 입출금 계좌인지 잠그고 검사한다 (ADR 0012). 신청 때와 PIN 승인 뒤 실행 때 같은 검사를 한다
+    (ADR 0033). 잠금 순서(ERD 규칙 5)대로 연결 카드 → 계좌를 잠그고, 카드 검사는 계좌를 잠근 뒤에 한다
+    (그사이 이 계좌로 발급된 카드까지 보려고)"""
+    await db.execute(select(Card.card_id).where(Card.linked_account_id == account_id)
+                     .order_by(Card.card_id).with_for_update())
+    account = await db.scalar(select(Account).where(Account.account_id == account_id)
+                              .with_for_update().execution_options(populate_existing=True))
+    if account is None or account.user_id != user_id:
+        raise TransferRejected("ACCOUNT_NOT_FOUND", "계좌를 찾을 수 없습니다.")
+    if account.account_type != "CHECKING":
+        raise TransferRejected("ACCOUNT_CANNOT_CLOSE", "예·적금 해지(만기·중도)는 아직 지원하지 않습니다.")
+    if account.status != "ACTIVE":
+        raise TransferRejected("ACCOUNT_NOT_ACTIVE", "이미 해지했거나 쓸 수 없는 계좌입니다.")
+    if account.balance != 0:
+        raise TransferRejected("BALANCE_REMAINING", f"남은 돈 {account.balance:,}원을 먼저 옮겨 주세요.")
+    if await db.scalar(select(exists().where(
+        AccountTransaction.account_id == account_id,
+        AccountTransaction.action_id == PendingAction.action_id,
+        PendingAction.action_type == ACTION_TYPE, PendingAction.status == "APPROVED",
+    ))):
+        raise TransferRejected("CLEARING_PENDING", "처리 중인 타행 송금이 있습니다.")
+    if await db.scalar(select(func.count()).where(
+            Card.linked_account_id == account_id, Card.status.in_(("ACTIVE", "SUSPENDED")))):
+        raise TransferRejected("LINKED_CARD_EXISTS", "이 계좌를 결제 계좌로 쓰는 카드가 있습니다. 카드를 먼저 정리해 주세요.")
+    linked = select(Card.card_id).where(Card.linked_account_id == account_id)
+    if await db.scalar(select(func.count()).where(  # 분실 카드라도 안 갚은 신용 사용분(연체 포함)이 있으면
+            CardTransaction.card_id.in_(linked), CardTransaction.status == "APPROVED",
+            CardTransaction.billing_status.in_(("UNBILLED", "BILLED")))):
+        raise TransferRejected("CARD_UNPAID", "연결된 카드에 아직 안 낸 대금이 있습니다.")
+    return account
+
+
+async def run_close_account(db: AsyncSession, action: PendingAction) -> None:
+    """승인된 계좌 해지 (approvals EXECUTORS). 신청 뒤 10분 사이에 돈이 들어왔거나 카드가 생겼으면 해지하지 않는다"""
+    account = await lock_closable(db, action.user_id, action.payload["account_id"])
+    account.status, account.closed_at = "CLOSED", datetime.now(UTC)
+    action.result = {"account_id": account.account_id}
+
+
 async def run_open_deposit(db: AsyncSession, action: PendingAction) -> None:
     """승인된 예금 개설 실행기 (approvals/service.py EXECUTORS). 승인과 같은 트랜잭션 안에서:
     상품·가입 조건을 다시 확인 → 예금 계좌 생성 → 맡길 돈을 입출금 계좌에서 옮김."""
@@ -260,41 +300,39 @@ class AccountService:
             terms=AccountTermsResponse.model_validate(terms) if terms else None,
         )
 
-    async def close(self, db: AsyncSession, user_id: int, account_id: int) -> AccountDetailResponse:
-        """잔액 0인 입출금 계좌를 바로 해지 (ADR 0012). 잠금 순서(ERD 규칙 5)대로 연결 카드 → 계좌를 잠그고,
-        카드 검사는 계좌를 잠근 뒤에 한다 (그사이 이 계좌로 발급된 카드까지 보려고)"""
+    async def request_close(
+        self, db: AsyncSession, user_id: int, account_id: int, idempotency_key: str, requested_by: str = "WEB"
+    ) -> tuple[PendingAction, bool]:
+        """계좌 해지 신청: 해지할 수 있는지 미리 검사하고 승인 대기만 만든다. 되돌릴 수 없어서 어느 입구든
+        PIN 승인 뒤에 해지한다 (ADR 0033, 해지 조건은 ADR 0012)"""
         async with db.begin():
-            await db.execute(select(Card.card_id).where(Card.linked_account_id == account_id)
-                             .order_by(Card.card_id).with_for_update())
-            account = await db.scalar(select(Account).where(Account.account_id == account_id)
-                                      .with_for_update().execution_options(populate_existing=True))
-            if account is None or account.user_id != user_id:
-                raise not_found()
-            if account.account_type != "CHECKING":
-                raise BadRequestException(message="예·적금 해지(만기·중도)는 아직 지원하지 않습니다.", code="ACCOUNT_CANNOT_CLOSE")
-            if account.status != "ACTIVE":
-                raise ConflictException(message="이미 해지했거나 쓸 수 없는 계좌입니다.", code="ACCOUNT_NOT_ACTIVE")
-            if account.balance != 0:
-                raise ConflictException(message=f"남은 돈 {account.balance:,}원을 먼저 옮겨 주세요.", code="BALANCE_REMAINING")
-            if await db.scalar(select(exists().where(
-                AccountTransaction.account_id == account_id,
-                AccountTransaction.action_id == PendingAction.action_id,
-                PendingAction.action_type == ACTION_TYPE, PendingAction.status == "APPROVED",
-            ))):
-                raise ConflictException(message="처리 중인 타행 송금이 있습니다.", code="CLEARING_PENDING")
-            if await db.scalar(select(func.count()).where(
-                    Card.linked_account_id == account_id, Card.status.in_(("ACTIVE", "SUSPENDED")))):
-                raise ConflictException(
-                    message="이 계좌를 결제 계좌로 쓰는 카드가 있습니다. 카드를 먼저 정리해 주세요.", code="LINKED_CARD_EXISTS"
-                )
-            linked = select(Card.card_id).where(Card.linked_account_id == account_id)
-            if await db.scalar(select(func.count()).where(  # 분실 카드라도 안 갚은 신용 사용분(연체 포함)이 있으면
-                    CardTransaction.card_id.in_(linked), CardTransaction.status == "APPROVED",
-                    CardTransaction.billing_status.in_(("UNBILLED", "BILLED")))):
-                raise ConflictException(message="연결된 카드에 아직 안 낸 대금이 있습니다.", code="CARD_UNPAID")
-            account.status, account.closed_at = "CLOSED", datetime.now(UTC)
-            await db.flush()
-            return self._detail(*await account_repository.find_by_id(db, account_id))
+            existing = await approval_repository.find_by_key(db, user_id, idempotency_key)
+            if existing is not None:
+                if existing.action_type != "CLOSE_ACCOUNT" or existing.payload != {"account_id": account_id}:
+                    raise ConflictException(
+                        message="같은 요청 번호로 다른 내용을 보낼 수 없습니다.", code="IDEMPOTENCY_KEY_REUSED"
+                    )
+                return existing, False
+            try:
+                account = await lock_closable(db, user_id, account_id)
+            except TransferRejected as e:  # 요청 단계에서는 원래 해지 API와 같은 상태 코드로 알린다
+                if e.code == "ACCOUNT_NOT_FOUND":
+                    raise not_found() from None
+                error = BadRequestException if e.code == "ACCOUNT_CANNOT_CLOSE" else ConflictException
+                raise error(message=e.message, code=e.code) from None
+            action = PendingAction(
+                user_id=user_id, action_type="CLOSE_ACCOUNT", requested_by=requested_by,
+                idempotency_key=idempotency_key, expires_at=datetime.now(UTC) + APPROVAL_TTL,
+                payload={"account_id": account_id},
+                summary=f"{account.nickname or '입출금 계좌'}({account.account_num}) 해지\n해지한 계좌는 되살릴 수 없어요.",
+            )
+            try:
+                await approval_repository.save(db, action)
+            except IntegrityError as e:
+                if "idempotency_key" not in str(e.orig):
+                    raise
+                raise ConflictException(message="같은 요청을 처리하고 있습니다.", code="DUPLICATE_REQUEST") from None
+            return action, True
 
     # TODO: 이체 한도 변경(올리는 것은 승인 필요)
 

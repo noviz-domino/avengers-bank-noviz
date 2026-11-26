@@ -126,7 +126,7 @@
 | ✅ | GET | `/accounts/{account_id}/transactions?limit=&before=` | 🔒 | 거래내역, 최근부터. 다음 쪽은 받은 마지막 `tx_id`를 `before`로 |
 | ✅ | PATCH | `/accounts/{account_id}` | 🔒 | 별칭 변경 (`null`이면 지움) |
 | ✅ | POST | `/accounts/deposits` | 🔒 | **예금 개설 신청** → `202` 승인 대기. PIN 승인 때 계좌 생성 + 맡길 돈 이동이 한 트랜잭션 |
-| ✅ | POST | `/accounts/{account_id}/close` | 🔒 | **입출금 계좌 해지**, 잔액 0일 때만 바로. 쓸 수 있는 연결 카드·안 낸 카드 대금이 있으면 막음 ([ADR 0012](decisions/0012-account-close.md)). 실패: `400 ACCOUNT_CANNOT_CLOSE`(예·적금), `409 ACCOUNT_NOT_ACTIVE`, `409 BALANCE_REMAINING`, `409 LINKED_CARD_EXISTS`, `409 CARD_UNPAID` |
+| ✅ | POST | `/accounts/{account_id}/close` | 🔒 | **입출금 계좌 해지 신청** → `202` 승인 대기(`CLOSE_ACCOUNT`, 본문 `idempotency_key`). 되돌릴 수 없어서 PIN 승인 때 조건을 다시 보고 해지 ([ADR 0033](decisions/0033-irreversible-needs-pin.md)). 잔액 0일 때만. 쓸 수 있는 연결 카드·안 낸 카드 대금이 있으면 막음 ([ADR 0012](decisions/0012-account-close.md)). 실패: `400 ACCOUNT_CANNOT_CLOSE`(예·적금), `409 ACCOUNT_NOT_ACTIVE`, `409 BALANCE_REMAINING`, `409 LINKED_CARD_EXISTS`, `409 CARD_UNPAID` |
 | 📝 | | 이체 한도 변경 | 🔒 | 한도를 올리는 것은 보안을 약하게 해서 승인 PR에서 |
 
 <details>
@@ -269,7 +269,8 @@
 | ✅ | POST | `/cards` | 🔒 | 발급 (`product_id`, `linked_account_id`=내 입출금 계좌, 신용은 `payment_day` 1~28, 기본 14) |
 | ✅ | GET | `/cards`, `/cards/{card_id}` | 🔒 | 내 카드 목록·상세 |
 | ✅ | GET | `/cards/transactions` | 🔒 | 카드 검색: 내 모든 카드(또는 `card_id`)의 사용내역을 `keyword`(가맹점)·`category`·`from_date`·`to_date`(한국 날짜)로. 최근 100건 + 조건 전체의 승인 합계(`total_amount`, 취소 제외)·건수(`count`). 모르는 조건은 422 (ADR 0029) |
-| ✅ | POST | `/cards/{card_id}/suspend` | 🔒 | 정지(`reason: SUSPENDED`) 또는 분실 신고(`LOST`). **바로** 적용. 분실은 되돌릴 수 없음. `X-Requested-By`와 함께 감사 기록(`CARD_SUSPENDED`·`CARD_LOST`)에 남음 (ADR 0030) |
+| ✅ | POST | `/cards/{card_id}/suspend` | 🔒 | 일시정지(`reason: SUSPENDED`만). **바로** 적용. `X-Requested-By`와 함께 감사 기록(`CARD_SUSPENDED`)에 남음 (ADR 0030) |
+| ✅ | POST | `/cards/{card_id}/report-lost` | 🔒 | 분실 신고 신청: 카드를 **바로 일시정지**하고 `202` 승인 대기(`REPORT_LOST`). PIN 승인 뒤 분실 확정(되돌릴 수 없음, 감사 기록 `CARD_LOST`) ([ADR 0033](decisions/0033-irreversible-needs-pin.md)) |
 | ✅ | POST | `/cards/{card_id}/unsuspend` | 🔒 | 정지 해제 요청 → `202` 승인 대기(`UNSUSPEND_CARD`). PIN 승인 때 상태를 다시 보고 풂 |
 | ✅ | POST | `/cards/{card_id}/payments` | 🔒 | **가맹점 결제 흉내**(`merchant_name`, `amount`, `idempotency_key`). PIN 없이 바로 `201`. 체크는 결제 계좌에서 출금, 신용은 사용 기록(`UNBILLED`). 같은 요청 번호면 처음 결과 `200`. Agent 도구에 없음 ([ADR 0010](decisions/0010-card-payments.md)). 결제 보호를 켠 사용자는 `409 MERCHANT_CHANNEL_REQUIRED` (가맹점 경로 `POST /system/card-payments/{card_id}`만) |
 | ✅ | GET | `/cards/{card_id}/transactions?payment_date=` | 🔒 | 사용내역 (최근 순). `payment_date`(한국 날짜)를 주면 그날 승인된 거래만 |
@@ -338,20 +339,20 @@ data: {"session_id": "…", "reply": "일일 한도는 1,000,000원입니다.\n\
 
 ## mcp: AI 도구 (`domains/mcp_server`)
 
-MCP(Model Context Protocol) 서버. 도구 18개가 아래 REST API를 사용자 토큰으로 부릅니다. 결정 이유: [ADR 0014](decisions/0014-mcp-server.md), 코드 설명: [가이드 11](guides/11-mcp.md)
+MCP(Model Context Protocol) 서버. 도구 19개가 아래 REST API를 사용자 토큰으로 부릅니다. 결정 이유: [ADR 0014](decisions/0014-mcp-server.md), 코드 설명: [가이드 11](guides/11-mcp.md)
 
 | 상태 | 입구 | 인증 | 설명 |
 |---|---|---|---|
 | ✅ | `POST /mcp` (streamable HTTP, JSON 응답) | `Authorization: Bearer <access token>` | 우리 Agent용. 헤더의 토큰을 그대로 REST에 넘김 |
 | ✅ | `python -m avengers_bank.domains.mcp_server` (stdio) | refresh token 파일 (`login` 명령) | Claude Desktop·Claude Code용 |
 
-- 도구: 계좌 `get_my_accounts` `get_account` `search_transactions` `request_transfer` `open_account` `request_deposit` `close_account` / 카드 `get_my_cards` `issue_card` `search_card_transactions` `get_card_limit` `suspend_card` `request_unsuspend_card` / 상품 `search_products` `get_product_detail` `ask_bank_docs` / 예산(읽기만) `get_budget`(`GET /budget`) `check_budget`(`GET /budget/check`, `amount`>0·`category` 선택)
+- 도구: 계좌 `get_my_accounts` `get_account` `search_transactions` `request_transfer` `open_account` `request_deposit` `request_close_account` / 카드 `get_my_cards` `issue_card` `search_card_transactions` `get_card_limit` `suspend_card` `request_report_lost_card` `request_unsuspend_card` / 상품 `search_products` `get_product_detail` `ask_bank_docs` / 예산(읽기만) `get_budget`(`GET /budget`) `check_budget`(`GET /budget/check`, `amount`>0·`category` 선택)
 - 없는 것: 승인·PIN, 카드 결제, `/system/*`, 대출, 예산 신청·변경·해제(`POST`·`PATCH`·`DELETE /budget`: 신청은 사용자가 표를 보고 확정, 약하게 바꾸기·해제는 PIN이라 예산 화면에서 사람이)
 - 실패하면 REST의 오류를 `코드: 메시지`로 돌려줍니다(예: `CARD_NOT_FOUND: 카드를 찾을 수 없습니다.`).
 
 ### 요청한 곳 (`X-Requested-By`)
 
-승인 대기를 만드는 API(`POST /transfers`, `POST /accounts/deposits`, `POST /cards/{id}/unsuspend`)와 카드 정지·분실(`POST /cards/{id}/suspend`, 감사 기록용)은 `X-Requested-By: WEB | AGENT | MCP` 헤더를 받아 `requested_by`에 남깁니다(없으면 `WEB`). `SYSTEM`은 헤더로 보낼 수 없고, 가맹점 결제가 보호 규칙에 걸렸을 때 서버가 직접 씁니다. 승인 화면이 "AI가 만든 요청"이라고 보여 주는 **정보용**이고, 보안은 PIN 승인이 맡습니다.
+승인 대기를 만드는 API(`POST /transfers`, `POST /accounts/deposits`, `POST /accounts/{id}/close`, `POST /cards/{id}/unsuspend`, `POST /cards/{id}/report-lost`)와 카드 일시정지(`POST /cards/{id}/suspend`, 감사 기록용)는 `X-Requested-By: WEB | AGENT | MCP` 헤더를 받아 `requested_by`에 남깁니다(없으면 `WEB`). `SYSTEM`은 헤더로 보낼 수 없고, 가맹점 결제가 보호 규칙에 걸렸을 때 서버가 직접 씁니다. 승인 화면이 "AI가 만든 요청"이라고 보여 주는 **정보용**이고, 보안은 PIN 승인이 맡습니다.
 
 ## rag: 상품·약관 질문 (`domains/rag`)
 
