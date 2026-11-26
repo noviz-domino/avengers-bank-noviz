@@ -41,7 +41,25 @@ let messages = [];
 let sessionId;
 let responding = false;
 let progress = "";
+// 에이전트 진행 표시 (ADR 0031): 서버의 status 이벤트(routed → agent → tool)와 끝 상태를 단계로 보여 준다
+let stage = "idle"; // idle | routed | agent | tool | approval | done
+let flow = "";
+let draft = ""; // 입력칸에 쓰던 글
 let draw = () => {};
+
+export const STEPS = [["routed", "담당 고르기"], ["agent", "담당 확인"], ["tool", "도구 실행"], ["done", "답변"]];
+const IDLE_FLOW = "말을 걸면 라우터가 담당을 고르고 담당이 도구를 써요.";
+
+/** 단계 표시 HTML. 지난 단계는 켜고 지금 단계는 강조한다. 승인 대기면 마지막 칸을 "승인 대기"로 바꾼다 */
+export function stepsHtml(current, text) {
+  const order = ["routed", "agent", "tool", "done"];
+  const at = current === "approval" ? 3 : order.indexOf(current);
+  return '<div class="chat-steps" aria-label="에이전트 진행 단계">' + STEPS.map(([key, label], i) => {
+    const wait = current === "approval" && key === "done";
+    const state = wait ? " wait" : i < at ? " past" : i === at ? " on" : "";
+    return '<span class="chat-step' + state + '"' + (i === at ? ' aria-current="step"' : "") + ">" + (wait ? "승인 대기" : label) + "</span>";
+  }).join("") + '</div><p class="chat-flow">' + escape(text || IDLE_FLOW) + "</p>";
+}
 let controller; // 진행 중인 답변 요청. 새 대화·로그아웃 때 끊어 옛 답이 새 대화에 섞이지 않게 한다
 
 export function resetChat() {
@@ -51,6 +69,9 @@ export function resetChat() {
   sessionId = undefined;
   responding = false;
   progress = "";
+  stage = "idle";
+  flow = "";
+  draft = "";
 }
 
 async function post(message, signal) {
@@ -92,6 +113,8 @@ async function ask(question) {
   const reply = { role: "assistant", text: "", actions: [] };
   responding = true;
   progress = "담당을 고르고 있어요…";
+  stage = "routed";
+  flow = progress;
   draw();
   const mine = (controller = new AbortController());
   try {
@@ -110,6 +133,8 @@ async function ask(question) {
       for (const { event, data } of parsed.events) {
         if (event === "status") {
           progress = data.label;
+          if (["routed", "agent", "tool"].includes(data.stage)) stage = data.stage;
+          flow = data.label;
           requested ||= /^request_/.test(data.tool ?? "");
         }
         else if (event === "token") {
@@ -131,10 +156,15 @@ async function ask(question) {
         if (action.requested_by === "AGENT" && !shown.has(action.action_id)) reply.actions.push({ id: action.action_id, summary: action.summary });
       }
     }
+    const waiting = reply.actions.length > 0;
+    stage = waiting ? "approval" : "done";
+    flow = waiting ? "승인 대기를 만들었어요. 돈은 PIN으로 승인해야 움직여요." : "요청 하나를 끝까지 처리했어요.";
   } catch (error) {
     if (mine.signal.aborted) return; // 새 대화로 넘어간 뒤의 응답은 버린다
     if (!messages.includes(reply)) messages.push(reply);
     reply.text = (reply.text ? reply.text + "\n\n" : "") + (error.message || NETWORK_MESSAGE);
+    stage = "idle";
+    flow = "처리하지 못했어요.";
   }
   if (mine.signal.aborted) return;
   responding = false;
@@ -172,26 +202,32 @@ const GREETING = "안녕하세요, 캡아메리카뱅크 AI 상담이에요.\n�
 /** 상담 화면을 root에 그린다. 하단 메뉴는 app.mjs가 붙인다. 정리 함수를 돌려준다 */
 export function mountChat(root, { shield = "" } = {}) {
   root.innerHTML = header({ title: "AI 상담", heading: true, menu: true, rightHtml: '<button type="button" class="ui-button ui-button--quiet" data-chat-new>' + icon("plus") + "새 대화</button>" })
-    + '<main class="chat"><div class="chat-feed" aria-live="polite"></div>'
+    + '<main class="chat"><section class="chat-progress" aria-label="지금 에이전트는"></section><div class="chat-feed" aria-live="polite"></div>'
     + '<form class="composer" data-form="chat"><div><input name="question" aria-label="질문" placeholder="예: 이번 달 카페에서 얼마 썼어?" maxlength="1000" autocomplete="off" required>'
     + '<button class="ui-button ui-button--primary primary" aria-label="보내기">' + icon("send") + "</button></div></form></main>";
   const feed = root.querySelector(".chat-feed");
+  const steps = root.querySelector(".chat-progress");
   const send = root.querySelector(".composer .primary");
   const input = root.querySelector("input");
   const newChat = root.querySelector("[data-chat-new]");
   let alive = true;
+  // 넓은 화면에서는 왼쪽 화면이 바뀔 때마다 상담 칸도 다시 그린다. 쓰던 글이 지워지지 않게 이어 붙인다
+  input.value = draft;
+  const onInput = () => { draft = input.value; };
+  input.addEventListener("input", onInput);
   // AI 말풍선은 방패 아바타와 한 줄, 내 말풍선은 오른쪽
   const avatar = '<span class="chat-avatar">' + shield + "</span>";
   const fromAi = (inner) => '<div class="chat-row">' + avatar + '<article class="bubble assistant"><span class="ui-sr-only">AI 상담</span>' + inner + "</article></div>";
   const bubble = (item, i) => item.role === "user"
     ? '<article class="bubble user"><span class="ui-sr-only">나</span><p>' + escape(item.text) + "</p></article>"
-    : fromAi("<p>" + escape(plain(item.text)) + "</p>" + (item.actions ?? []).map((a) => '<div class="chat-action"><small>' + escape(a.summary)
-      + '</small><button type="button" class="ui-button ui-button--outline" data-chat-approve="' + i + '" data-action-id="' + escape(a.id) + '"' + (a.busy ? " disabled" : "") + ">이체 확인하기</button></div>").join(""));
+    : fromAi("<p>" + escape(plain(item.text)) + "</p>") + (item.actions ?? []).map((a) => '<div class="chat-action"><span class="chat-action-kind">' + icon("shield")
+      + '승인이 필요해요</span><p>' + escape(a.summary) + '</p><button type="button" class="ui-button ui-button--primary" data-chat-approve="' + i + '" data-action-id="' + escape(a.id) + '"' + (a.busy ? " disabled" : "") + ">내용 확인하고 PIN으로 승인</button></div>").join("");
   const intro = () => fromAi("<p>" + escape(GREETING) + "</p>")
-    + '<p class="chat-hint">이렇게 입력해 보세요. 누르면 입력칸에 들어가요.</p>'
-    + examples.map((q) => '<button type="button" class="bubble user chat-example" data-chat-question="' + escape(q) + '">' + escape(q) + "</button>").join("");
+    + '<p class="chat-hint">이렇게 입력해 보세요. 누르면 입력칸에 들어가요.</p><div class="chat-examples">'
+    + examples.map((q) => '<button type="button" class="chat-example" data-chat-question="' + escape(q) + '">' + escape(q) + "</button>").join("") + "</div>";
   draw = () => {
     if (!alive) return;
+    steps.innerHTML = stepsHtml(stage, flow);
     feed.innerHTML = (messages.length ? messages.map(bubble).join("") : intro())
       + (responding ? '<div class="chat-row">' + avatar + '<p class="bubble assistant status" role="status">' + escape(progress) + '<span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span></p></div>' : "");
     send.disabled = responding;
@@ -201,18 +237,18 @@ export function mountChat(root, { shield = "" } = {}) {
   const onClick = (event) => {
     const el = event.target.closest("button");
     if (!el) return;
-    if (el.dataset.chatQuestion) { input.value = el.dataset.chatQuestion; input.focus(); }
+    if (el.dataset.chatQuestion) { input.value = draft = el.dataset.chatQuestion; input.focus(); }
     else if (el.dataset.chatApprove) approve(Number(el.dataset.chatApprove), el.dataset.actionId);
     else if ("chatNew" in el.dataset) { resetChat(); draw(); input.focus(); }
   };
   const onSubmit = (event) => {
     event.preventDefault();
     const question = input.value.trim();
-    input.value = "";
+    input.value = draft = "";
     ask(question);
   };
   root.addEventListener("click", onClick);
   root.addEventListener("submit", onSubmit);
   draw();
-  return () => { alive = false; root.removeEventListener("click", onClick); root.removeEventListener("submit", onSubmit); };
+  return () => { alive = false; root.removeEventListener("click", onClick); root.removeEventListener("submit", onSubmit); input.removeEventListener("input", onInput); };
 }

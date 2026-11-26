@@ -1,29 +1,33 @@
+/* 색 체계는 langgraph-financial-agent(노비즈 뱅크) 화면에서 가져왔다: 회청색 바탕 + 흰 카드 + 파랑 하나 (ADR 0031)
+   --ui-cream은 이름만 남기고 옅은 회청색 면으로 바꿨다 (카드 상자·바로가기가 이 값을 쓴다) */
 :root {
-  --ui-cream: #fbf5e9;
+  --ui-bg: #eef3fa;
+  --ui-cream: #f5f8fc;
   --ui-white: #fff;
-  --ui-navy: #10233b;
-  --ui-blue: #1d5fa8;
-  --ui-blue-soft: #edf4fd;
-  --ui-surface: #f4f6f8;
-  --ui-sage: #487657;
-  --ui-sage-soft: #eef6f0;
-  --ui-amber: #96611c;
-  --ui-amber-soft: #fcf3e3;
-  --ui-error: #a22938;
-  --ui-muted: #647083;
-  --ui-line: #e6eaef;
+  --ui-navy: #172033;
+  --ui-blue: #2f6bff;
+  --ui-blue-text: #2352cc;
+  --ui-blue-soft: #e7eeff;
+  --ui-surface: #f5f8fc;
+  --ui-sage: #0f8a59;
+  --ui-sage-soft: #e3f6ee;
+  --ui-amber: #a86500;
+  --ui-amber-soft: #fff3db;
+  --ui-error: #d63a40;
+  --ui-muted: #5d6b82;
+  --ui-line: #e3e9f2;
   --ui-title-size: 26px;
   --ui-section-size: 18px;
   --ui-body-size: 15px;
   --ui-small-size: 13px;
-  --ui-page-gutter: 36px; /* 24px의 1.5배 (2026-11-11) */
+  --ui-page-gutter: 20px; /* 노비즈 뱅크와 같은 값. 화면마다 폭이 같도록 이 값 하나만 쓴다 (ADR 0031) */
   --ui-space-xs: 4px;
   --ui-space-sm: 8px;
   --ui-space-md: 16px;
   --ui-space-lg: 24px;
-  --ui-radius-sm: 10px;
-  --ui-radius: 16px;
-  --ui-shadow: 0 4px 18px #10233b0a;
+  --ui-radius-sm: 12px;
+  --ui-radius: 18px;
+  --ui-shadow: 0 1px 2px #17203308;
   --ui-touch: 44px;
   --ui-tabs-height: calc(61px + max(8px, env(safe-area-inset-bottom)));
 }
@@ -77,10 +81,12 @@ h2.ui-section-head > button { display: flex; justify-content: space-between; ali
 .ui-tone-blue { background: var(--ui-blue-soft); color: var(--ui-blue); }
 .ui-tone-sage { background: var(--ui-sage-soft); color: var(--ui-sage); }
 .ui-tone-amber { background: var(--ui-amber-soft); color: var(--ui-amber); }
+/* 섹션 머리는 색 띠 없이 글자와 아이콘만: 색은 아이콘 타일 한 곳에만 쓴다 (ADR 0031) */
+.ui-section-head.ui-tone-blue, .ui-section-head.ui-tone-sage, .ui-section-head.ui-tone-amber { background: transparent; color: inherit; }
 .ui-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--ui-space-sm); padding: 16px 0; border-bottom: 1px solid var(--ui-line); list-style: none; }
-.ui-row:has(> .ui-row-icon) { grid-template-columns: 28px minmax(0, 1fr) auto; }
-.ui-row-icon { display: grid; place-items: center; margin-top: 3px; background: transparent; }
-.ui-row-icon .ui-icon { width: 28px; height: 28px; }
+.ui-row:has(> .ui-row-icon) { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; }
+.ui-row-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; }
+.ui-row-icon .ui-icon { width: 22px; height: 22px; flex-basis: 22px; }
 .ui-row-title { min-width: 0; text-align: left; }
 button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; background: transparent; }
 .ui-row-copy strong { display: block; font-size: 16px; line-height: 1.5; word-break: keep-all; overflow-wrap: anywhere; }
@@ -118,11 +124,13 @@ button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; backgr
 /* 홈만 새 값으로 맞춰, 2단계 이전의 화면별 CSS에는 영향을 주지 않는다. */
 .ui-home { padding: 0 var(--ui-page-gutter) 24px; color: var(--ui-navy); font-size: var(--ui-body-size); }
 .ui-home > * + * { margin-top: var(--ui-space-md); }
-.ui-home .ui-balance { margin-inline: calc(-1 * var(--ui-page-gutter)); padding: 8px var(--ui-page-gutter) 13px; background: var(--ui-surface); }
+/* 총자산은 파란 카드에 흰 글자 (노비즈 뱅크의 총 잔액 카드) */
+.ui-home .ui-balance { position: relative; overflow: hidden; isolation: isolate; padding: 20px 22px; border-radius: var(--ui-radius); background: var(--ui-blue); color: var(--ui-white); }
+.ui-home .ui-balance::after { content: ""; position: absolute; z-index: -1; right: -40px; top: -40px; width: 150px; height: 150px; border-radius: 50%; background: #ffffff1f; }
 .ui-balance > div { display: flex; justify-content: space-between; align-items: center; }
-.ui-balance p { color: var(--ui-navy); font-size: var(--ui-section-size); font-weight: 800; }
-.ui-balance .ui-button { padding: 0; color: var(--ui-muted); }
-.ui-balance h1, .ui-balance-total { display: block; font-size: 36px; line-height: 1.3; letter-spacing: -.035em; font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
+.ui-balance p { color: inherit; font-size: var(--ui-body-size); font-weight: 600; opacity: .9; }
+.ui-balance .ui-button { padding: 0; color: inherit; }
+.ui-balance h1, .ui-balance-total { display: block; margin-top: 4px; font-size: 32px; font-weight: 800; line-height: 1.3; letter-spacing: -.03em; font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
 .ui-campaign { position: relative; isolation: isolate; overflow: hidden; border-radius: var(--ui-radius); background: var(--ui-cream); }
 .ui-campaign-playback { right: calc(4px + 2 * var(--ui-touch)); }
 .ui-campaign-playback::before { inset: 10px; }
@@ -141,6 +149,21 @@ button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; backgr
 .ui-home .ui-section-head h2 { white-space: nowrap; }
 .ui-home .ui-section-head h2 .ui-icon { color: var(--ui-amber); }
 .ui-home .ui-recent .ui-row { align-items: center; padding-block: 4px; }
+/* 홈·계좌 탭은 회청색 바탕 위에 흰 상자를 쌓는다 (노비즈 뱅크 배치, ADR 0031) */
+.app[data-page="home"], .app[data-page="accounts"] { background: var(--ui-bg); }
+.app[data-page="home"] .ui-header, .app[data-page="accounts"] .ui-header { background: transparent; }
+.ui-home > .account-group, .ui-home > .ui-recent { padding: 8px 16px 6px; border-radius: var(--ui-radius); background: var(--ui-white); }
+.ui-home .ui-row:has(> .ui-row-icon) { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; }
+.ui-home .ui-row-icon { width: 36px; height: 36px; }
+@media (max-width: 420px) { /* 흰 상자 안이라 폭이 좁다: 이체 버튼을 금액 아래로 내려 계좌 이름·번호 자리를 확보한다 */
+  .ui-home .account-group .ui-row-end { flex-direction: column; align-items: flex-end; gap: 4px; }
+  .ui-home .account-group .ui-row-end .ui-button { min-height: 36px; padding: 4px 14px; }
+}
+.ui-home > .account-group .ui-row:last-child, .ui-home > .ui-recent .ui-row:last-child { border-bottom: 0; }
+.ui-home .ui-section-head { padding-inline: 0; }
+.ui-home h2.ui-section-head > button { width: 100%; margin-inline: 0; padding-inline: 0; }
+.ui-home .ui-link-card, .ui-home .ui-ai { background: var(--ui-white); }
+.ui-home .ui-quick-links a { background: var(--ui-white); border-color: transparent; }
 /* 한 줄 바로가기 카드: 아이콘 + 설명(왼쪽) + 값(오른쪽) */
 .ui-link-card { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 12px 10px 16px; border: 0; border-radius: var(--ui-radius); background: var(--ui-cream); color: var(--ui-navy); text-align: left; }
 .ui-link-card > .ui-icon:first-child { color: var(--ui-amber); }
@@ -199,7 +222,7 @@ button.ui-row-title { min-height: var(--ui-touch); padding: 0; border: 0; backgr
 .ui-ai h2 .ui-icon { width: 28px; height: 28px; }
 .ui-ai-prompt { display: flex; justify-content: space-between; align-items: center; gap: var(--ui-space-sm); width: 100%; margin-top: 12px; padding: 8px 12px; border: 0; border-radius: var(--ui-radius-sm); background: var(--ui-white); color: var(--ui-muted); font-size: var(--ui-body-size); font-weight: 500; text-align: left; white-space: normal; word-break: keep-all; }
 @media (max-width: 340px) {
-  :root { --ui-page-gutter: 24px; }
+  :root { --ui-page-gutter: 16px; }
   .ui-section-head { padding-inline: 8px; }
   h2.ui-section-head > button { width: calc(100% + 16px); margin-inline: -8px; padding-inline: 8px; }
   .ui-section-label strong { font-size: 16px; }

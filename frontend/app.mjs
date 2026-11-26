@@ -36,6 +36,19 @@ let filter = "all";
 let txQuery = {}; // 계좌 상세 거래 검색: 키워드(바로 입력) + 필터 창(기간·카테고리·금액)
 let campaign = 0;
 let campaignPaused = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// 처음 홈에 오면 AI 상담 자리를 가리키는 "새 기능" 말풍선 (ADR 0032). 닫기나 상담 열기 한 번이면 이 브라우저에서는 다시 안 띄운다
+const AI_TIP_KEY = "cab.aiTipSeen";
+let aiTipSeen = (() => { try { return localStorage.getItem(AI_TIP_KEY) === "1"; } catch { return false; } })();
+function closeAiTip() {
+  aiTipSeen = true;
+  try { localStorage.setItem(AI_TIP_KEY, "1"); } catch { /* 저장 불가: 이번 방문 동안만 기억 */ }
+  app.querySelector(".ai-tip")?.remove();
+  app.classList.remove("ai-tip-on");
+}
+const aiTip = () => '<aside class="ai-tip" aria-label="새 기능 안내"><span class="ai-tip-badge">NEW</span>'
+  + '<p><strong>AI 에이전트가 생겼어요</strong>잔액 확인, 이체, 상품 상담을 말로 해 보세요.</p>'
+  + uiButton("", { action: "ai-tip-close", icon: "close", ariaLabel: "안내 닫기", className: "ai-tip-close" }) + "</aside>";
+const desktop = window.matchMedia("(min-width: 1024px)");
 let campaignTimer;
 let unmountChat;
 let transfer;
@@ -221,6 +234,8 @@ function home() {
     + '<section class="balance ui-balance" aria-label="내 총자산"><div><p>내 총자산</p>'
     + uiButton("", { action: "privacy", icon: privateBalance ? "eyeOff" : "eye", ariaLabel: privateBalance ? "잔액 보기" : "잔액 숨기기", pressed: privateBalance })
     + '</div><h1>' + (privateBalance ? hidden : money(total)) + '</h1></section>'
+    // 포트폴리오의 중심인 AI 상담 입구를 총자산 바로 아래에 둔다 (ADR 0032)
+    + cardBox('<h2>' + icon("chat") + '금융 업무를 물어보세요</h2><button type="button" class="ui-button ui-ai-prompt" data-action="chat"><span>이번 달 카페에서 얼마 썼어?</span>' + icon("arrow") + '</button>', "ui-ai")
     + '<button type="button" class="ui-link-card" data-action="budget">' + icon("target") + '<span><strong>예산 가드</strong><small>'
     + (budget?.enrolled ? '지금 더 쓸 수 있는 돈</small></span><b>' + (privateBalance ? hidden : money(budget.free_to_spend)) + '</b>' : '생활비와 저축 목표를 지키게 도와줘요</small></span><b class="ui-link-card-cta">설정하기</b>')
     + icon("chevron") + '</button>'
@@ -232,7 +247,6 @@ function home() {
       const account = accountById(tx.account_id);
       return listRow({ title: txLabel(tx), subtitle: shortDate(tx.created_at) + " · " + (account ? accountName(account) : tx.category ?? "미분류"), amount: (tx.amount > 0 ? "+" : "−") + money(Math.abs(tx.amount)), credit: tx.amount > 0 });
     }).join("") + '</ul>' : stateBlock("empty", { message: "아직 거래내역이 없어요." })) + '</section>'
-    + cardBox('<h2>' + icon("chat") + '금융 업무를 물어보세요</h2><button type="button" class="ui-button ui-ai-prompt" data-action="chat"><span>이번 달 카페에서 얼마 썼어?</span>' + icon("arrow") + '</button>', "ui-ai")
     + (location.pathname.startsWith("/app/") ? '<nav class="ui-quick-links" aria-label="바로가기"><a href="./benefits.html">' + icon("gift") + '내 혜택 찾기</a>'
       + '<a href="./protection.html">' + icon("shield") + '카드 보호 시연</a></nav>' : "")
     + '</main>' + nav("home");
@@ -468,7 +482,13 @@ function render() {
   unmountEvent = undefined;
   unmountNotifications?.();
   unmountNotifications = undefined;
-  const page = currentPage();
+  const route = currentPage();
+  // 넓은 화면(1024px 이상)에서는 왼쪽에 은행 화면, 오른쪽에 AI 상담을 늘 띄운다 (노비즈 뱅크 배치, ADR 0031).
+  // 상담 탭으로 오면 왼쪽은 홈을 보여 준다
+  const wide = desktop.matches && route !== "login" && route !== "signup";
+  const page = wide && route === "chat" ? "home" : route;
+  if (route === "chat" && !aiTipSeen) closeAiTip();
+  const tip = page === "home" && accounts && !aiTipSeen ? aiTip() : "";
   const ext = () => '<div id="ext-screen"></div>';
   const body = {
     login, home, accounts: accountsPage, account: () => accountPage(false), manage: () => accountPage(true),
@@ -477,8 +497,13 @@ function render() {
     budget: ext, signup: ext, menu: ext, search: ext, "card-search": ext, notifications: ext, event: ext,
     products: () => '<div class="products-app" id="products-screen"></div>' + nav("products"),
   }[page]();
-  app.innerHTML = body;
+  // 말풍선은 휴대폰에서는 하단 탭의 AI 상담 위, 넓은 화면에서는 오른쪽 상담 칸 제목 아래에 둔다
+  app.innerHTML = wide
+    ? '<div class="desk-main">' + body + '</div><aside class="desk-chat" aria-label="AI 상담"><div class="chat-screen" id="desk-chat"></div>' + tip + '</aside>'
+    : body + tip;
   app.dataset.page = page;
+  app.classList.toggle("desk", wide);
+  app.classList.toggle("ai-tip-on", !!tip);
   if (page === "budget") unmountBudget = mountBudget(app.querySelector("#ext-screen"), { go, onChanged: loadAccounts });
   if (page === "signup") mountSignup(app.querySelector("#ext-screen"), extCtx);
   if (page === "menu") mountMenu(app.querySelector("#ext-screen"), extCtx);
@@ -488,8 +513,10 @@ function render() {
   if (page === "event") unmountEvent = mountEvent(app.querySelector("#ext-screen"), location.hash.slice(7));
   if (page === "cards") unmountCards = mountCards(app.querySelector("#cards-screen"), { embedded: true });
   if (page === "products") unmountProducts = mountProducts(app.querySelector("#products-screen"), location.hash.slice(1));
-  if (page === "chat") unmountChat = mountChat(app.querySelector("#chat-screen"), { shield });
+  if (wide) unmountChat = mountChat(app.querySelector("#desk-chat"), { shield });
+  else if (page === "chat") unmountChat = mountChat(app.querySelector("#chat-screen"), { shield });
   if (previousPage === page) focus();
+  if (wide && route === "chat") app.querySelector('#desk-chat input[name="question"]')?.focus();
   syncCampaignTimer();
 }
 
@@ -618,6 +645,7 @@ app.addEventListener("click", async (event) => {
       }
     case "submit-transfer": return submitTransfer();
     case "privacy": privateBalance = !privateBalance; return render();
+    case "ai-tip-close": return closeAiTip();
     case "campaign-prev":
     case "campaign": campaign = 1 - campaign; updateCampaign(); return syncCampaignTimer();
     case "campaign-pause": campaignPaused = !campaignPaused; updateCampaign(); return syncCampaignTimer();
@@ -652,5 +680,6 @@ window.addEventListener("hashchange", () => {
   heading?.focus({ preventScroll: true });
   window.scrollTo(0, 0);
 });
+desktop.addEventListener("change", () => render());
 render();
 if (isSignedIn()) loadAccounts();

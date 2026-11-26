@@ -14,6 +14,7 @@ const paths = {
   chat: '<path d="M21 11c0 5-4 8-9 8l-8 3 2-6a7 7 0 0 1-3-5c0-5 4-8 9-8s9 3 9 8Z"/><path d="M8 11h.01M12 11h.01M16 11h.01"/>',
   cards: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
   transfer: '<path d="M4 8h15m-4-4 4 4-4 4M20 16H5m4-4-4 4 4 4"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
   lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',

@@ -17,6 +17,7 @@
 | [v2](v2-2026-11-11-compact/) | 2026-11-11 | 여백 줄이기, AI 상담 채팅형 개편, 로그인 화면 다시 디자인 | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
 | [v3](v3-2026-11-11-login-review/) | 2026-11-11 | 로그인 화면 리뷰 반영. 02~08은 v4 직전 상태(main `0bd196a`)를 375×812로 찍음 | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
 | [v4](v4-2026-11-11-layout-tabs/) | 2026-11-11 | 좌우 여백 1.5배·위 여백, 하단 탭 시트(홈·계좌·카드·상품·AI 상담), 전체 메뉴는 머리글 오른쪽 위, 계좌 탭 새 화면(09). 384×760(갤럭시 S23+ 기준)으로 찍음 | [ADR 0029](../../decisions/0029-layout-gutter-tabs-menu.md) |
+| [v5](v5-2026-11-26-noviz-layout/) | 2026-11-26 | 노비즈 뱅크 색 체계(회청색 바탕·흰 상자·파랑 하나)와 Pretendard 웹폰트, 파란 총자산 카드, 상담 칩·승인 카드·에이전트 진행 표시. 01(처음 홈의 "새 기능" 코치마크, ADR 0032)·02·03·05·09만 384×760으로 찍고 넓은 화면 두 칸 배치는 `d1`(진행 중)·`d2`(답변 끝) 1440×900 | [ADR 0031](../../decisions/0031-noviz-layout-agent-steps.md), [0032](../../decisions/0032-ai-chat-discovery.md) |
 
 ## v1 → v2 화면별 비교
 
