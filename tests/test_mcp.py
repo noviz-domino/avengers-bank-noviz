@@ -55,11 +55,15 @@ def as_user(monkeypatch, headers):
 
 async def test_tool_list_has_no_approval_payment_or_system():
     tools = {t.name: t for t in await mcp.list_tools()}
-    assert len(tools) == 18
+    assert len(tools) == 19
     assert not [n for n in tools if any(w in n for w in ("approve", "pin", "pay", "bill", "reindex", "refund"))]
     assert tools["get_my_accounts"].annotations.readOnlyHint is True
     assert tools["request_transfer"].annotations.destructiveHint is False  # 승인 대기만 만듦
-    assert tools["close_account"].annotations.destructiveHint is True
+    assert tools["suspend_card"].annotations.destructiveHint is True
+    # 되돌릴 수 없는 해지·분실 확정은 승인 대기로 (ADR 0033). 분실 신청은 카드를 바로 멈춰서 CHANGE
+    assert tools["request_close_account"].annotations.destructiveHint is False
+    assert tools["request_report_lost_card"].annotations.destructiveHint is True
+    assert "close_account" not in tools
     assert tools["get_budget"].annotations.readOnlyHint is tools["check_budget"].annotations.readOnlyHint is True
     assert not [n for n in tools if "budget" in n and n not in ("get_budget", "check_budget")]  # 신청·변경·해제는 사람이
 
@@ -82,9 +86,11 @@ async def test_errors_and_ownership_come_from_rest(bank, monkeypatch):
     card = (await issue(client, tony, src)).json()["data"]
     as_user(monkeypatch, peter)  # 남의 카드
     with pytest.raises(ToolError, match="CARD_NOT_FOUND"):
-        await tool("suspend_card", card_id=card["card_id"], lost=True)
+        await tool("suspend_card", card_id=card["card_id"])
     as_user(monkeypatch, tony)
-    assert (await tool("suspend_card", card_id=card["card_id"], lost=True))["data"]["status"] == "LOST"
+    lost = await tool("request_report_lost_card", card_id=card["card_id"])  # 분실은 승인 대기만 (ADR 0033)
+    assert lost["data"]["action_type"] == "REPORT_LOST" and lost["data"]["status"] == "PENDING"
+    assert (await tool("get_my_cards"))["data"][0]["status"] == "SUSPENDED"  # 카드는 바로 일시정지
     products = await tool("search_products")
     assert products["data"]["cards"] and all(p["type"] != "LOAN" for p in products["data"]["accounts"])
 

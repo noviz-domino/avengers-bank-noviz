@@ -1,6 +1,6 @@
 # 6. 카드 (발급·정지·해제)
 
-> **신용·체크카드는 한 테이블이고, 번호는 Luhn 검증 숫자가 붙은 16자리, 응답에는 가린 번호만 나간다. 정지·분실 신고는 바로, 정지 해제는 PIN 승인이다. 결제는 다음 PR에서 실행 함수를 거친다.**
+> **신용·체크카드는 한 테이블이고, 번호는 Luhn 검증 숫자가 붙은 16자리, 응답에는 가린 번호만 나간다. 일시정지는 바로, 정지 해제와 분실 확정은 PIN 승인이다(분실 신청은 카드를 바로 멈춤, [ADR 0033](../decisions/0033-irreversible-needs-pin.md)). 결제는 다음 PR에서 실행 함수를 거친다.**
 
 결정 원문: [ADR 0009](../decisions/0009-card-policy.md), [ADR 0003](../decisions/0003-db-redesign.md)
 
@@ -12,7 +12,9 @@
 | 발급 | `POST /cards` | `cards/service.py` `issue` |
 | 내 카드·상세 | `GET /cards`, `/cards/{id}` | `cards/service.py` `list_mine`, `get_mine` |
 | 카드 검색 (카드 탭 돋보기) | `GET /cards/transactions` | `cards/service.py` `search_txs`, `repository.py` `search_txs`, 화면 `frontend/card-search.mjs` |
-| 정지·분실 신고 (바로) | `POST /cards/{id}/suspend` | `cards/service.py` `suspend` |
+| 일시정지 (바로) | `POST /cards/{id}/suspend` | `cards/service.py` `suspend` |
+| 분실 신청 (바로 정지 + 승인 대기) | `POST /cards/{id}/report-lost` | `cards/service.py` `request_report_lost` |
+| PIN 승인 뒤 분실 확정 | `POST /approvals/{action_id}/approve` | `cards/service.py` `run_report_lost` |
 | 정지 해제 (승인) | `POST /cards/{id}/unsuspend` → `/approvals/{id}/approve` | `cards/service.py` `request_unsuspend`, 실행기 `run_unsuspend_card` |
 | 카드번호 | — | `cards/card_number.py` |
 
@@ -37,13 +39,13 @@ stateDiagram-v2
     [*] --> ACTIVE: 발급
     ACTIVE --> SUSPENDED: 정지 (바로)
     SUSPENDED --> ACTIVE: 해제 (PIN 승인)
-    ACTIVE --> LOST: 분실 신고 (바로)
-    SUSPENDED --> LOST: 분실 신고 (바로)
+    ACTIVE --> SUSPENDED: 분실 신청 (바로 정지)
+    SUSPENDED --> LOST: 분실 확정 (PIN 승인)
     LOST --> [*]: 재발급만 가능
 ```
 
-- **안전해지는 쪽(정지·분실)은 바로, 위험해지는 쪽(해제)은 승인**: 이체·예산 설정과 같은 원칙입니다(ADR 0004, 0007).
-- 해제 승인을 기다리는 동안 분실 신고가 되면, 승인해도 풀리지 않습니다(실행기가 상태를 다시 봄 → `FAILED`).
+- **안전해지는 쪽(일시정지)은 바로, 위험해지는 쪽(해제)과 되돌릴 수 없는 쪽(분실 확정)은 승인**: 이체·예산 설정과 같은 원칙입니다(ADR 0004, 0007, [ADR 0033](../decisions/0033-irreversible-needs-pin.md)).
+- 해제 승인을 기다리는 동안 분실 신청이 들어오면 승인해도 풀리지 않습니다. 분실이 확정됐으면 `CARD_NOT_SUSPENDED`, 확정 전이면 `CARD_LOST_PENDING`으로 `FAILED`가 됩니다(실행기가 상태와 대기 중인 분실 신청을 다시 봄).
 - **상태가 바뀔 때마다 감사 기록**(ADR 0030): `CARD_SUSPENDED`·`CARD_LOST`(입구 `requested_by`와 이전 상태), 해제 실행 때 `CARD_UNSUSPENDED`. 분실은 되돌릴 수 없어서 "누가 어디서"를 남깁니다.
 - **공개 데모 카드**: 데모 비밀번호가 공개라 누구나 분실 신고할 수 있습니다. 서버 시작 seed(`seed_demo_card`)가 분실 아닌 카드가 없으면 새로 발급하고, 카드 화면은 쓸 수 있는 카드부터 보여 줍니다.
 
@@ -65,8 +67,8 @@ A. 카드번호는 결제에 쓰이는 정보라 응답·로그·Agent 대화에
 **Q. Luhn은 왜 넣었나요? 보안 기능인가요?**
 A. 보안이 아니라 **입력 오류 검출**입니다. 한 자리를 잘못 쓰거나 이웃한 두 자리를 바꿔 쓰면 대부분 검증에 실패합니다. 카드번호를 손으로 입력하는 화면에서 서버까지 가기 전에 오타를 잡을 수 있습니다.
 
-**Q. 분실 신고를 왜 승인 없이 바로 하나요? 다른 사람이 내 카드를 정지할 수 있지 않나요?**
-A. 로그인한 본인(또는 본인 토큰을 가진 Agent)만 할 수 있고, 최악의 경우 카드가 정지되는 것이라 돈이 나가지 않습니다. 반대로 승인을 요구하면 PIN을 입력하는 동안 잃어버린 카드가 결제될 수 있습니다. 그래서 "안전해지는 쪽은 바로"입니다. 대신 해제는 PIN이 필요해서, 토큰만 가진 사람이 정지를 풀고 결제할 수는 없습니다.
+**Q. 분실 신고는 왜 바로 정지하고 확정만 PIN으로 하나요?**
+A. 카드를 잃어버린 사람에게 가장 급한 것은 결제를 멈추는 일입니다. 정지는 되돌릴 수 있어서 바로 합니다. 반대로 분실 확정은 되돌릴 수 없어서 AI가 잘못 부르거나 토큰만 가진 사람이 확정하지 못하게 PIN을 받습니다([ADR 0033](../decisions/0033-irreversible-needs-pin.md)). 확정 전에 정지 해제가 승인되면 잃어버린 카드가 다시 결제될 수 있어서, 분실 신청이 대기 중인 카드는 해제를 막습니다.
 
 **Q. 계좌 검색이 있는데 카드 검색을 왜 따로 만들었나요?**
 A. 신용카드 결제는 결제할 때 계좌에서 돈이 나가지 않아 계좌 장부에 건마다 남지 않습니다(결제일에 "카드 대금" 한 줄). 그래서 계좌 검색으로는 "스타벅스에서 신용카드로 쓴 것"을 찾을 수 없습니다. 카드 검색은 카드 사용내역(`card_transactions`)을 내 카드 조건(`Card.user_id`)으로 조인해서 찾고, 합계는 취소를 뺀 승인 건만 셉니다. `/{card_id}`보다 먼저 등록해야 `transactions`를 카드 번호로 읽으려다 422가 나지 않습니다.

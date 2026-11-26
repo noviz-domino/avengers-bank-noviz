@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from sqlalchemy import select
 
@@ -8,17 +10,30 @@ from avengers_bank.domains.audit.models import AuditLog
 from tests.test_card_bills import KEY, run, set_balance, today_is_2030  # noqa: F401  today_is_2030은 fixture
 from tests.test_card_payments import bank, cancel, ledger, pay  # noqa: F401  bank는 fixture
 from tests.test_cards import issue
-from tests.test_transfers import balance, open_account, user
+from tests.test_transfers import PIN, balance, open_account, user
 
 pytestmark = pytest.mark.anyio
 
 
-def close(client, me, account):
-    return client.post(f"/accounts/{account['account_id']}/close", headers=me)
+async def approved(client, me, requested):
+    """승인 대기를 만든 요청이면 PIN으로 승인한 응답을, 신청에서 막혔으면 그 응답을 돌려준다 (ADR 0033)"""
+    if requested.status_code not in (200, 202):
+        return requested
+    return await client.post(f"/approvals/{requested.json()['data']['action_id']}/approve", json={"pin": PIN}, headers=me)
 
 
-def lost(client, me, card):
-    return client.post(f"/cards/{card['card_id']}/suspend", json={"reason": "LOST"}, headers=me)
+def request_close(client, me, account, **headers):
+    key = {"idempotency_key": f"close-{uuid.uuid4().hex[:12]}"}
+    return client.post(f"/accounts/{account['account_id']}/close", json=key, headers={**me, **headers})
+
+
+async def close(client, me, account):
+    return await approved(client, me, await request_close(client, me, account))
+
+
+async def lost(client, me, card):
+    key = {"idempotency_key": f"lost-{uuid.uuid4().hex[:12]}"}
+    return await approved(client, me, await client.post(f"/cards/{card['card_id']}/report-lost", json=key, headers=me))
 
 
 def code(res) -> str:
@@ -29,7 +44,7 @@ async def test_close_empty_checking(bank):
     client, me, *_ = bank
     empty = await open_account(client, me)
     res = await close(client, me, empty)
-    assert res.status_code == 200 and res.json()["data"]["status"] == "CLOSED"
+    assert res.status_code == 200 and res.json()["data"]["status"] == "EXECUTED"
     listed = (await client.get("/accounts", headers=me)).json()["data"]["accounts"]
     assert empty["account_id"] not in [a["account_id"] for a in listed]
     assert code(await close(client, me, empty)) == "ACCOUNT_NOT_ACTIVE"
@@ -119,3 +134,95 @@ async def test_pending_list_matches_property(bank):
     async with SessionLocal() as db:
         log = await db.scalar(select(AuditLog).where(AuditLog.action == "CARD_REFUND_TO"))
     assert (log.actor, log.target, log.detail["amount"]) == ("SYSTEM", str(paid_credit["card_tx_id"]), 3_000)
+
+
+async def test_close_needs_pin_and_rechecks(bank):
+    # 해지는 되돌릴 수 없어서 어느 입구든 PIN 승인 뒤에 (ADR 0033). 승인 사이에 돈이 들어오면 해지하지 않는다
+    client, me, *_ = bank
+    empty = await open_account(client, me)
+    requested = await request_close(client, me, empty, **{"X-Requested-By": "MCP"})
+    action = requested.json()["data"]
+    assert requested.status_code == 202 and action["action_type"] == "CLOSE_ACCOUNT" and action["requested_by"] == "MCP"
+    assert "되살릴 수 없어요" in action["summary"]
+    listed = (await client.get("/accounts", headers=me)).json()["data"]["accounts"]
+    assert empty["account_id"] in [a["account_id"] for a in listed]  # PIN 전에는 그대로
+
+    await set_balance(empty["account_id"], 5_000)  # 승인 전에 돈이 들어옴
+    res = await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
+    assert code(res) == "BALANCE_REMAINING"
+    assert (await client.get(f"/approvals/{action['action_id']}", headers=me)).json()["data"]["status"] == "FAILED"
+    assert (await client.get(f"/accounts/{empty['account_id']}", headers=me)).json()["data"]["status"] == "ACTIVE"
+
+
+async def test_report_lost_suspends_now_and_locks_after_pin(bank):
+    # 분실 신고: 카드는 바로 일시정지(안전), 되돌릴 수 없는 분실 확정은 PIN 승인 뒤 (ADR 0033)
+    client, me, checking, debit, _ = bank
+    url = f"/cards/{debit['card_id']}"
+    res = await client.post(f"{url}/report-lost", json={"idempotency_key": "lost-now-1"}, headers=me)
+    action = res.json()["data"]
+    assert res.status_code == 202 and action["action_type"] == "REPORT_LOST"
+    assert (await client.get(url, headers=me)).json()["data"]["status"] == "SUSPENDED"
+    again = await client.post(f"{url}/report-lost", json={"idempotency_key": "lost-now-1"}, headers=me)
+    assert again.status_code == 200 and again.json()["data"]["action_id"] == action["action_id"]  # 재전송은 대기 하나
+    assert (await client.post(f"{url}/suspend", json={"reason": "LOST"}, headers=me)).status_code == 422  # 바로 분실은 없음
+
+    await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
+    assert (await client.get(url, headers=me)).json()["data"]["status"] == "LOST"
+    assert code(await client.post(f"{url}/report-lost", json={"idempotency_key": "lost-now-2"}, headers=me)) == "CARD_LOST"
+
+
+async def test_close_request_is_idempotent(bank):
+    client, me, *_ = bank
+    empty, other = await open_account(client, me), await open_account(client, me)
+    body = {"idempotency_key": "close-same-key"}
+    first = await client.post(f"/accounts/{empty['account_id']}/close", json=body, headers=me)
+    again = await client.post(f"/accounts/{empty['account_id']}/close", json=body, headers=me)
+    assert first.status_code == 202 and again.status_code == 200
+    assert again.json()["data"]["action_id"] == first.json()["data"]["action_id"]  # 재전송은 대기 하나
+    assert code(await client.post(f"/accounts/{other['account_id']}/close", json=body, headers=me)) == "IDEMPOTENCY_KEY_REUSED"
+
+
+async def test_card_issued_after_close_request_blocks_close(bank):
+    # 신청 뒤 승인 전에 그 계좌로 카드가 생기면 PIN을 넣어도 해지하지 않는다 (ADR 0033)
+    client, me, *_ = bank
+    empty = await open_account(client, me)
+    action = (await request_close(client, me, empty)).json()["data"]
+    assert (await issue(client, me, empty)).status_code == 201
+    res = await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
+    assert code(res) == "LINKED_CARD_EXISTS"
+    assert (await client.get(f"/accounts/{empty['account_id']}", headers=me)).json()["data"]["status"] == "ACTIVE"
+
+
+async def test_rejected_lost_report_leaves_card_suspended(bank):
+    # 분실 신청을 거절하면 카드는 일시정지로 남고 정지 해제(PIN)로 되살릴 수 있다
+    client, me, checking, debit, _ = bank
+    url = f"/cards/{debit['card_id']}"
+    action = (await client.post(f"{url}/report-lost", json={"idempotency_key": "lost-reject-1"}, headers=me)).json()["data"]
+    await client.post(f"/approvals/{action['action_id']}/reject", headers=me)
+    assert (await client.get(url, headers=me)).json()["data"]["status"] == "SUSPENDED"
+    assert (await approved(client, me, await client.post(f"{url}/unsuspend", json={"idempotency_key": "unsuspend-after-reject"}, headers=me))).status_code == 200
+    assert (await client.get(url, headers=me)).json()["data"]["status"] == "ACTIVE"
+
+
+async def test_unsuspend_blocked_while_lost_report_waits(bank):
+    # 분실 신청은 카드를 정지만 해 둔다. 확정 전에 정지 해제가 승인되면 잃어버린 카드가 다시 결제된다 (리뷰 지적)
+    client, me, checking, debit, _ = bank
+    url = f"/cards/{debit['card_id']}"
+    await client.post(f"{url}/suspend", json={}, headers=me)
+    unsuspend = (await client.post(f"{url}/unsuspend", json={"idempotency_key": "unsuspend-before-lost"}, headers=me)).json()["data"]
+    await client.post(f"{url}/report-lost", json={"idempotency_key": "lost-after-unsuspend"}, headers=me)
+    res = await client.post(f"/approvals/{unsuspend['action_id']}/approve", json={"pin": PIN}, headers=me)
+    assert code(res) == "CARD_LOST_PENDING"
+    assert (await client.get(url, headers=me)).json()["data"]["status"] == "SUSPENDED"
+    blocked = await client.post(f"{url}/unsuspend", json={"idempotency_key": "unsuspend-while-lost"}, headers=me)
+    assert blocked.status_code == 409 and code(blocked) == "CARD_LOST_PENDING"
+
+
+async def test_others_card_report_lost_is_404_and_changes_nothing(bank):
+    client, me, checking, debit, _ = bank
+    peter = await user(client, "spidey", "피터")
+    res = await client.post(f"/cards/{debit['card_id']}/report-lost", json={"idempotency_key": "lost-not-mine"}, headers=peter)
+    assert res.status_code == 404 and code(res) == "CARD_NOT_FOUND"
+    assert (await client.get(f"/cards/{debit['card_id']}", headers=me)).json()["data"]["status"] == "ACTIVE"
+    async with SessionLocal() as db:
+        assert (await db.scalars(select(AuditLog).where(AuditLog.target == str(debit["card_id"])))).all() == []

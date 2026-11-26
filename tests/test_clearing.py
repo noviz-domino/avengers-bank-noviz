@@ -137,7 +137,7 @@ async def test_outbound_pin_timeout_and_finalization(bank, keys, monkeypatch, ou
     approved = await client.post(url, json={"pin": PIN}, headers=tony)
     assert approved.json()["data"]["status"] == "APPROVED"
     assert await balance(src["account_id"]) == 0
-    closed = await client.post(f"/accounts/{src['account_id']}/close", headers=tony)
+    closed = await client.post(f"/accounts/{src['account_id']}/close", json={"idempotency_key": "close-clearing"}, headers=tony)
     assert closed.status_code == 409 and closed.json()["error"]["code"] == "CLEARING_PENDING"
     async with SessionLocal() as db:
         payload = (await db.get(PendingAction, action_id)).payload

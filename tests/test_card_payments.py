@@ -259,7 +259,7 @@ async def test_credit_records_use_within_unpaid_limit(bank):
 async def test_stopped_card_cannot_pay_but_can_cancel(bank):
     client, me, checking, debit, _ = bank
     tx = (await pay(client, me, debit)).json()["data"]
-    await client.post(f"/cards/{debit['card_id']}/suspend", json={"reason": "LOST"}, headers=me)
+    await client.post(f"/cards/{debit['card_id']}/suspend", json={}, headers=me)
     res = await pay(client, me, debit, key="pay-00000002")
     assert res.status_code == 409 and res.json()["error"]["code"] == "CARD_NOT_ACTIVE"
     assert (await pay(client, me, debit)).status_code == 200  # 분실 전 결제의 재전송은 처음 결과

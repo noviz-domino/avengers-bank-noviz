@@ -96,7 +96,8 @@ async def test_lost_cannot_come_back(bank):
     url = f"/cards/{card['card_id']}"
     await client.post(f"{url}/suspend", json={}, headers=me)
     action = (await client.post(f"{url}/unsuspend", json={"idempotency_key": "unsuspend-2"}, headers=me)).json()["data"]
-    await client.post(f"{url}/suspend", json={"reason": "LOST"}, headers=me)  # 승인 전에 분실 신고
+    lost = (await client.post(f"{url}/report-lost", json={"idempotency_key": "lost-before-unsuspend"}, headers=me)).json()["data"]
+    await client.post(f"/approvals/{lost['action_id']}/approve", json={"pin": PIN}, headers=me)  # 정지 해제 승인 전에 분실 확정
 
     response = await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
     assert response.json()["error"]["code"] == "CARD_NOT_SUSPENDED"  # 분실 카드는 승인해도 안 풀림
@@ -131,14 +132,20 @@ async def test_card_status_changes_are_audited(bank):
     await client.post(f"{url}/suspend", json={}, headers=me)
     action = (await client.post(f"{url}/unsuspend", json={"idempotency_key": "audit-unsuspend"}, headers=me)).json()["data"]
     await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
-    await client.post(f"{url}/suspend", json={"reason": "LOST"}, headers={**me, "X-Requested-By": "MCP"})
+    lost_action = (await client.post(f"{url}/report-lost", json={"idempotency_key": "audit-lost"},
+                                     headers={**me, "X-Requested-By": "MCP"})).json()["data"]
+    await client.post(f"/approvals/{lost_action['action_id']}/approve", json={"pin": PIN}, headers=me)
 
     async with SessionLocal() as db:
         logs = (await db.scalars(select(AuditLog).where(AuditLog.target == str(card["card_id"])).order_by(AuditLog.log_id))).all()
     assert [(log.action, log.actor) for log in logs] == [
-        ("CARD_SUSPENDED", "USER"), ("CARD_UNSUSPENDED", "USER"), ("CARD_LOST", "MCP")]
+        ("CARD_SUSPENDED", "USER"), ("CARD_UNSUSPENDED", "USER"), ("CARD_SUSPENDED", "MCP"), ("CARD_LOST", "USER")]
+    # 분실을 확정한 사람은 PIN을 넣은 사용자, 요청을 만든 입구는 detail에
+    assert logs[-1].detail["requested_by"] == "MCP" and logs[-1].detail["from"] == "SUSPENDED"
     assert logs[0].detail == {"from": "ACTIVE", "requested_by": "WEB"}
-    assert logs[2].detail == {"from": "ACTIVE", "requested_by": "MCP"}
+    # 분실 신청 때 바로 일시정지. 대기 번호로 뒤의 분실 확정 기록과 이어진다
+    assert logs[2].detail == {"from": "ACTIVE", "requested_by": "MCP", "why": "REPORT_LOST", "action_id": lost_action["action_id"]}
+    assert logs[3].detail["action_id"] == lost_action["action_id"]
 
 
 async def test_seed_gives_demo_user_a_usable_card_again(client):

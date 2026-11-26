@@ -47,7 +47,7 @@ FastAPI · SQLAlchemy(async) · PostgreSQL + pgvector · Alembic · LangGraph ·
 | accounts | ✅ 입출금·적금 개설(가입 조건·적용 금리), 예금 개설(PIN 승인), 목록·총자산·상세·거래내역·별칭, 입출금 계좌 해지 |
 | transactions | ✅ 내 모든 계좌 거래 검색(기간·금액·키워드·카테고리)과 합계, 카테고리 자동 분류·수정 |
 | transfers, approvals | ✅ 이체 요청 → 승인 대기 → PIN 승인 → 실행(잔액·한도 재검사), 거절, 요청 번호, 감사 기록 |
-| cards | ✅ 발급(Luhn 번호·가린 번호), 정지·분실(즉시), 정지 해제(PIN), 결제·취소·사용내역·한도, 신용 대금 출금·연체, 위치·시간 기반 결제 보호 |
+| cards | ✅ 발급(Luhn 번호·가린 번호), 일시정지(즉시), 분실 확정·정지 해제(PIN, 분실 신청은 바로 정지), 결제·취소·사용내역·한도, 신용 대금 출금·연체, 위치·시간 기반 결제 보호 |
 | budget | ✅ 월급 주기·고정지출·업종별 생활비 반영, 체크·신용카드 결제와 당행 타인 이체에 예산 검사 |
 | chat | ✅ AI 상담: 라우터(턴마다 한 번 계획) + 담당 4개(예산 담당은 서버가 계산한 숫자를 설명만 함), 대화 기억, Langfuse 추적 |
 | mcp | ✅ AI 도구 18개(예산 조회·결제 영향 미리 보기 포함, 신청·변경은 사람이 화면에서). HTTP `/mcp`(Bearer), 로컬 stdio(Claude Desktop) |
@@ -163,7 +163,7 @@ python -m http.server 8765 --bind 127.0.0.1 --directory frontend   # http://127.
 3. `GET /transactions?category=카페·간식` → 거래 검색과 합계
 4. `POST /transfers` → **`202` 승인 대기**만 생김(돈은 안 움직임)
 5. `PUT /users/me/pin`으로 PIN 설정(토큰만으로 PIN을 바꾸지 못하게 비밀번호도 함께 보냄) → `POST /approvals/{action_id}/approve`에 PIN → 그때 이체 실행
-6. `POST /cards` → `POST /cards/{id}/suspend`(`LOST`) → `POST /cards/{id}/payments`가 막히는지 확인
+6. `POST /cards` → `POST /cards/{id}/report-lost`(바로 일시정지 + 승인 대기) → `POST /cards/{id}/payments`가 막히는지 확인
 
 ### 자연어 요청 예시 (실제 Gemini 응답, 2026-11-06)
 

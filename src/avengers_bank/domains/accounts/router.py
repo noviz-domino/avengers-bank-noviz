@@ -18,7 +18,7 @@ from avengers_bank.domains.accounts.schemas import (
     TransactionUpdate,
 )
 from avengers_bank.domains.accounts.service import account_service
-from avengers_bank.domains.approvals.schemas import ActionResponse
+from avengers_bank.domains.approvals.schemas import ActionResponse, KeyedRequest
 from avengers_bank.domains.users.schemas import UserResponse
 
 # 계좌가 한 테이블이라 종류별 경로를 두지 않는다 (ADR 0003)
@@ -79,12 +79,16 @@ async def rename_account(account_id: int, data: AccountUpdate, db: DB, me: Me):
 
 
 
-@router.post("/{account_id}/close", response_model=SuccessResponse[AccountDetailResponse],
-             responses=error_responses(400, 404, 409))
-async def close_account(account_id: int, db: DB, me: Me):
-    """잔액 0인 입출금 계좌를 바로 해지 (ADR 0012). 남은 돈은 먼저 이체(PIN 승인)로 옮긴다"""
-    account = await account_service.close(db, me.user_id, account_id)
-    return SuccessResponse[AccountDetailResponse](data=account, message="계좌를 해지했습니다.")
+@router.post("/{account_id}/close", response_model=SuccessResponse[ActionResponse],
+             status_code=status.HTTP_202_ACCEPTED, responses=error_responses(400, 404, 409))
+async def close_account(account_id: int, data: KeyedRequest, response: Response, db: DB, me: Me,
+                        requested_by: RequestedBy):
+    """잔액 0인 입출금 계좌 해지 신청 → 승인 대기 (ADR 0012·0033). 되돌릴 수 없어서
+    `POST /approvals/{action_id}/approve`(PIN)로 해지된다. 남은 돈은 먼저 이체(PIN 승인)로 옮긴다"""
+    action, created = await account_service.request_close(db, me.user_id, account_id, data.idempotency_key, requested_by)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return SuccessResponse[ActionResponse](data=action, message="승인 화면에서 PIN을 입력하면 계좌가 해지됩니다.")
 
 # 계좌를 가로지르는 거래 검색 (Agent의 search_transactions 도구도 이걸 쓴다: ADR 0006)
 tx_router = APIRouter(prefix="/transactions", tags=["transactions"], responses=error_responses(401, 422))

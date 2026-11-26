@@ -150,7 +150,7 @@ export function mountCards(root, { embedded = false } = {}) {
       ${button("limit", '한도 확인 <span aria-hidden="true">›</span>', "cards-manage-row")}
       ${card.status === "SUSPENDED" ? button("unsuspend", "정지 해제 (PIN 승인)", "cards-manage-row", busy ? "disabled" : "") : button("suspend", "일시정지", "cards-manage-row", card.status !== "ACTIVE" || busy ? "disabled" : "")}
       ${button("lost", "분실 신고", "cards-manage-row cards-danger", card.status === "LOST" || busy ? "disabled" : "")}
-      <p class="note">정지는 바로 적용돼요. 정지 해제에는 PIN 승인이 필요해요. 분실 신고는 되돌릴 수 없고 새 카드를 발급받아야 해요.</p>`;
+      <p class="note">정지는 바로 적용돼요. 정지 해제와 분실 신고에는 PIN 승인이 필요해요. 분실 신고는 되돌릴 수 없고 새 카드를 발급받아야 해요.</p>`;
   }
 
   function issueForm() {
@@ -188,7 +188,7 @@ export function mountCards(root, { embedded = false } = {}) {
       ? header({ title: "카드", heading: true, rightHtml: tools + uiButton("", { action: "card-search", icon: "search", ariaLabel: "카드 검색" }), menu: true })
       : header({ title: titles[page], heading: true, back }).replace('data-action=', 'data-card-action=')}
       ${body()}
-      <dialog class="cards-dialog" aria-labelledby="cards-confirm-title">${confirmStatus && card ? `<h2 id="cards-confirm-title">${confirmStatus === "LOST" ? "분실 신고할까요?" : "일시정지할까요?"}</h2><p>${escape(cardName(card))} · •••• ${escape(last4(card))}</p><p class="note">${confirmStatus === "LOST" ? "분실 신고 후에는 다시 사용할 수 없어요. 되돌릴 수 없고 새 카드를 발급받아야 해요." : "카드 사용을 잠시 멈춰요. 정지 해제는 PIN 승인이 필요해요."}</p><div class="cards-dialog-actions">${button("cancel", "취소", "outline")}${button("confirm", confirmStatus === "LOST" ? "분실 신고" : "일시정지", "primary")}</div>` : ""}</dialog>`;
+      <dialog class="cards-dialog" aria-labelledby="cards-confirm-title">${confirmStatus && card ? `<h2 id="cards-confirm-title">${confirmStatus === "LOST" ? "분실 신고할까요?" : "일시정지할까요?"}</h2><p>${escape(cardName(card))} · •••• ${escape(last4(card))}</p><p class="note">${confirmStatus === "LOST" ? "카드는 바로 멈추고 PIN을 넣으면 분실이 확정돼요. 분실 신고한 카드는 되돌릴 수 없고 새 카드를 발급받아야 해요." : "카드 사용을 잠시 멈춰요. 정지 해제는 PIN 승인이 필요해요."}</p><div class="cards-dialog-actions">${button("cancel", "취소", "outline")}${button("confirm", confirmStatus === "LOST" ? "분실 신고" : "일시정지", "primary")}</div>` : ""}</dialog>`;
     focus();
     if (activeAction) root.querySelector(`[data-card-action="${activeAction}"]`)?.focus({ preventScroll: true });
     if (confirmStatus && card) {
@@ -199,7 +199,7 @@ export function mountCards(root, { embedded = false } = {}) {
     }
   }
 
-  // 정지·분실은 바로, 해제는 PIN 승인 뒤에 반영된다
+  // 일시정지는 바로, 해제와 분실 확정은 PIN 승인 뒤에 반영된다. 분실 신청은 카드를 먼저 멈춘다 (ADR 0033)
   async function changeStatus(action) {
     const card = selected();
     busy = true; notice = ""; render();
@@ -208,9 +208,14 @@ export function mountCards(root, { embedded = false } = {}) {
         const { data } = await api(`/cards/${card.card_id}/unsuspend`, { method: "POST", body: { idempotency_key: idempotencyKey() } });
         const result = await openApproval(data.action_id);
         notice = result.status === "EXECUTED" ? "정지를 해제했어요." : result.status === "REJECTED" ? "정지 해제 요청을 취소했어요." : message(result.error);
+      } else if (action === "LOST") {
+        const { data } = await api(`/cards/${card.card_id}/report-lost`, { method: "POST", body: { idempotency_key: idempotencyKey() } });
+        const result = await openApproval(data.action_id);
+        notice = result.status === "EXECUTED" ? "분실 신고를 마쳤어요. 새 카드를 발급받아 주세요."
+          : result.status === "REJECTED" ? "분실 신고를 취소했어요. 카드는 일시정지 상태예요." : message(result.error);
       } else {
         await api(`/cards/${card.card_id}/suspend`, { method: "POST", body: { reason: action } });
-        notice = action === "LOST" ? "분실 신고를 접수했어요. 새 카드를 발급받아 주세요." : "카드를 일시정지했어요.";
+        notice = "카드를 일시정지했어요.";
       }
     } catch (e) { notice = message(e); }
     busy = false;
