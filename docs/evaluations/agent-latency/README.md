@@ -13,7 +13,9 @@ AI 상담을 고칠 때마다 같은 질문 세트를 실제 Gemini로 다시 �
 | 2026-11-06 | 개선 전 (담당이 끝날 때마다 라우터 다시 호출, 질문 14개) | 14/14 | 4.1 | 15.0초 | 28.5초 | 결정 기록 안 표 | [ADR 0016](../../decisions/0016-agent-latency-tracing.md) |
 | 2026-11-06 | 라우터가 턴 처음에 한 번만 계획 + 생각 수준 low (질문 14개) | 13/14 | 3.1 | 8.2초 | 16.8초 | 결정 기록 안 표 | [ADR 0016](../../decisions/0016-agent-latency-tracing.md) |
 | 2026-11-27 | 빠른 길 넣기 전 기준선 (질문 21개) | 21/21 | 3.4 | 11.3초 | 17.1초 | [01-before](2026-11-27_01-before.txt) | [ADR 0034](../../decisions/0034-agent-quick-lanes.md) |
-| 2026-11-27 | **빠른 길** (잔액·카드 목록·남은 예산·약관 질문은 LLM 한 번) | **21/21** | **2.4** | **8.7초** | **15.9초** | [02-quick-lanes](2026-11-27_02-quick-lanes.txt) | [ADR 0034](../../decisions/0034-agent-quick-lanes.md) |
+| 2026-11-27 | 빠른 길 (잔액·카드 목록·남은 예산·약관 질문은 LLM 한 번) | 21/21 | 2.4 | 8.7초 | 15.9초 | [02-quick-lanes](2026-11-27_02-quick-lanes.txt) | [ADR 0034](../../decisions/0034-agent-quick-lanes.md) |
+| 2026-11-27 | 검색형 빠른 길 넣기 전 기준선 (빠른 길 머지 뒤 다시 잼) | 21/21 | 2.3 | 8.3초 | 16.7초 | [03-before-search](2026-11-27_03-before-search.txt) | [ADR 0035](../../decisions/0035-agent-search-quick-lane.md) |
+| 2026-11-27 | **검색형 빠른 길** (기간·업종 지출·수입 질문도 LLM 한 번) | **21/21** | **2.0** | **7.3초** | **13.4초** | [04-search-lane](2026-11-27_04-search-lane.json) | [ADR 0035](../../decisions/0035-agent-search-quick-lane.md) |
 
 - 11월 6일 행과 11월 27일 행은 질문 수(14개와 21개)와 Gemini 응답 속도가 달라서 숫자를 바로 비교하지 않는다. 같은 날 같은 세트로 잰 전후만 비교한다.
 - 질문마다 한 번씩 재서 p95는 사실상 가장 느린 질문 1~2개의 값이다. 경향으로 본다.
@@ -49,9 +51,21 @@ AI 상담을 고칠 때마다 같은 질문 세트를 실제 Gemini로 다시 �
 - 약관 질문의 "1번 + RAG"는 Agent 쪽 호출 1번에 RAG 답변 호출(서버 안의 Gemini 한 번)이 더해진 것이다. RAG 호출은 전후 모두 세지 않았다.
 - 남은 느린 질문은 기간·업종을 고르는 검색형("이번 달 식비", "카드 사용내역")이다. 다음 개선 대상이다([조사 보고서](../../research/agent-latency-and-rag.md)).
 
+## 2026-11-27 검색형 빠른 길: 바뀐 질문
+
+| 질문 | 전 (03) | 후 (04) |
+|---|---|---|
+| 이번 달에 편의점에서 얼마 썼어? | 10.3초 (3번) | 2.6초 (1번) |
+| 이번 달 들어온 돈이 얼마야? | 7.7초 (3번) | 2.6초 (1번) |
+| 이번 달 식비 얼마 썼어? | 11.3초 (3번) | 3.4초 (1번) |
+
+- 다른 질문은 호출 수가 같고 시간 차이는 Gemini 응답 속도의 흔들림이다.
+- 답 숫자는 서버 검색 합계와 대조했다(식비 12,000원, 들어온 돈 8,769,000원).
+
 ## 새로 잴 때
 
 1. 바꾼 것을 Docker에 반영한다: `docker compose up -d --build app`
 2. 잰다: `docker compose exec app python -m avengers_bank.domains.agent.evaluate --label 이름 --out /tmp/run.json`
+   - Windows Git Bash에서는 앞에 `MSYS_NO_PATHCONV=1`을 붙인다. 안 붙이면 Git Bash가 `/tmp/run.json`을 Windows 경로로 바꿔 넘겨서 컨테이너 안에 파일이 생기지 않는다(2026-11-27에 실제로 겪음)
 3. 결과를 레포로 가져온다: `docker compose cp app:/tmp/run.json docs/evaluations/agent-latency/날짜_번호-이름.json`
 4. 위 "결과 한눈에" 표에 한 줄 더하고, 바꾸기 직전 기준선도 같은 날 다시 재서 함께 남긴다.

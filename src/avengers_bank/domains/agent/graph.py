@@ -17,6 +17,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from avengers_bank.core.clock import today_kst
+from avengers_bank.domains.accounts.schemas import Category
 from avengers_bank.domains.agent.quick import LANES, QuickKind, run_lane
 
 MAX_HOPS = 3  # 한 턴에 도메인 Agent를 부르는 최대 횟수 (복합 요청 "정지하고 잔액 알려줘"는 2번)
@@ -79,6 +80,7 @@ ROUTER = """너는 캡아메리카뱅크 AI 상담의 라우터다. 사용자의
 은행 업무가 아닌 말(인사, 감사 등)이면 agents를 비우고 reply에 짧게 답한다.
 quick: 담당의 일이 아래처럼 단순하면 표시한다. 조건·기간·특정 계좌나 카드만·금액이 붙거나 확실하지 않으면 표시하지 않는다.
 - balance(account): 내 계좌 잔액·총자산·계좌 목록 전체를 묻는 것만. 거래내역·지출·이체·특정 계좌 상세는 아님
+- search(account): 기간 안에 쓴 돈·들어온 돈의 합계나 내역("이번 달 편의점에서 얼마 썼어", "지난주 들어온 돈"). from_date·to_date(YYYY-MM-DD, 오늘 날짜로 계산, 오늘을 넘지 않게)를 반드시 채운다. 업종이 목록에 있으면 categories("식비"는 식사와 외식·술자리), 목록에 없는 가게·낱말이면 keyword("편의점"), 쓴 돈이면 direction=OUT·들어온 돈이면 IN. 기간을 알 수 없거나 특정 계좌만·금액 조건이 붙으면 표시하지 않는다
 - cards(card): 내 카드 목록·상태를 묻는 것만. 한도·사용내역·정지는 아님
 - budget(budget): 이번 주기에 얼마 더 쓸 수 있는지, 하루에 얼마 써도 되는지만. "X원 써도 돼?"처럼 금액이 있으면 아님
 - docs(product): 약관·규칙·상품 조건을 묻는 질문. question에 앞 대화 없이도 알 수 있는 질문 한 문장을 쓴다. 상품 목록을 보여 달라는 것은 아님"""
@@ -91,6 +93,12 @@ class Plan(BaseModel):
     reply: str | None = Field(default=None, description="agents가 비었을 때 사용자에게 할 짧은 답")
     quick: list[QuickKind] = Field(default_factory=list, description="코드가 바로 답할 단순 조회 (ADR 0034). 확실할 때만")
     question: str | None = Field(default=None, description="quick에 docs가 있을 때 RAG에 물을 질문 한 문장")
+    # search 빠른 길의 조건 (ADR 0035). 코드가 다시 검사하고 이상하면 담당 Agent가 처리한다
+    from_date: str | None = Field(default=None, description="search의 시작 날짜 YYYY-MM-DD (한국 날짜)")
+    to_date: str | None = Field(default=None, description="search의 끝 날짜 YYYY-MM-DD (한국 날짜, 오늘 이하)")
+    categories: list[Category] = Field(default_factory=list, description="search의 업종. 최대 3개")
+    keyword: str | None = Field(default=None, description="search에서 업종 목록에 없는 가게·낱말")
+    direction: Literal["IN", "OUT"] | None = Field(default=None, description="search: 쓴 돈 OUT, 들어온 돈 IN")
 
 
 class ChatState(MessagesState):
@@ -98,6 +106,7 @@ class ChatState(MessagesState):
     routed: list[str]  # 이번 턴에 일한 담당 (응답·평가용)
     quick: list[str]  # 이번 턴에 빠른 길로 처리할 조회 (ADR 0034)
     question: str | None  # docs 빠른 길의 질문
+    search: dict | None  # search 빠른 길의 조건 (ADR 0035)
 
 
 def common_prompt() -> str:
@@ -125,21 +134,25 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
 
     async def router(state: ChatState) -> Command:
         # 턴 처음에 한 번만: 대화는 사람 말로 끝난다 (Gemini는 AI 메시지로 끝나는 요청을 거절한다)
-        plan = await llm.with_structured_output(Plan).ainvoke([SystemMessage(ROUTER), *recent(state["messages"])])
+        # 오늘 날짜는 끝에 붙인다: 날마다 바뀌는 부분을 뒤에 두어 앞부분은 늘 같게 (검색 기간 계산용, ADR 0035)
+        system = SystemMessage(f"{ROUTER}\n오늘은 {today_kst().isoformat()}(한국)이다.")
+        plan = await llm.with_structured_output(Plan).ainvoke([system, *recent(state["messages"])])
         agents_in_order = list(dict.fromkeys(plan.agents))[:MAX_HOPS]  # 같은 담당 두 번, 핑퐁 없이
         if not agents_in_order:
             return Command(goto=END, update={"messages": [AIMessage(plan.reply or "무엇을 도와드릴까요?")]})
         return Command(goto=agents_in_order[0], update={"plan": agents_in_order[1:], "routed": agents_in_order[:1],
-                                                         "quick": plan.quick, "question": plan.question})
+                                                         "quick": plan.quick, "question": plan.question,
+                                                         "search": plan.model_dump(include={"from_date", "to_date", "categories", "keyword", "direction"})})
 
     def domain(name: str):
         async def run(state: ChatState) -> Command:
             # 복합 요청에서 두 번째 담당은 대화가 앞 담당의 답(AI)으로 끝난 채 불린다. Gemini는 AI 메시지로 끝나는
             # 요청을 거절해서, 이번에 할 일을 사람 말로 붙인다. 이 안내는 저장하지 않는다
-            kind, tool = LANES[name]
             answer = None
-            if kind in (state.get("quick") or []):  # 라우터가 단순 조회라고 표시: 도구만 부르고 코드가 답한다 (ADR 0034)
-                answer = await run_lane(kind, by_name[tool], state.get("question"))
+            # 라우터가 단순 조회라고 표시: 도구만 부르고 코드가 답한다 (ADR 0034·0035). 한 담당에 표시된 길이 여럿이면 처음 것
+            kind = next((k for k in LANES[name] if k in (state.get("quick") or [])), None)
+            if kind is not None:
+                answer = await run_lane(kind, by_name[LANES[name][kind]], state.get("question"), state.get("search"))
             if answer is not None:
                 new = [AIMessage(answer)]
             else:

@@ -7,15 +7,18 @@
 """
 
 import json
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from langchain_core.tools import BaseTool
 
-QuickKind = Literal["balance", "cards", "budget", "docs"]
-# 담당별로 쓸 수 있는 빠른 길과 도구
-LANES: dict[str, tuple[QuickKind, str]] = {
-    "account": ("balance", "get_my_accounts"), "card": ("cards", "get_my_cards"),
-    "budget": ("budget", "get_budget"), "product": ("docs", "ask_bank_docs"),
+from avengers_bank.core.clock import KST, today_kst
+
+QuickKind = Literal["balance", "search", "cards", "budget", "docs"]
+# 담당별로 쓸 수 있는 빠른 길과 도구 (한 담당에 여러 길)
+LANES: dict[str, dict[QuickKind, str]] = {
+    "account": {"balance": "get_my_accounts", "search": "search_transactions"},
+    "card": {"cards": "get_my_cards"}, "budget": {"budget": "get_budget"}, "product": {"docs": "ask_bank_docs"},
 }
 CARD_STATUS = {"ACTIVE": "사용 중", "SUSPENDED": "일시정지", "LOST": "분실 신고"}
 
@@ -65,9 +68,65 @@ def docs_text(r: dict) -> str:
     return r["answer"] + (f"\n\n근거: {', '.join(titles)}" if titles else "")
 
 
-async def run_lane(kind: QuickKind, tool: BaseTool, question: str | None) -> str | None:
-    """빠른 길 하나를 실행해 답 글을 돌려준다. 도구가 실패하면 None (담당 Agent가 대신 처리)"""
+SHOWN = 5  # 검색 답에 보여 줄 최근 거래 수
+
+
+def day_label(d: date) -> str:
+    return f"{d.month}월 {d.day}일"
+
+
+def kst_day(iso: str) -> date:
+    """거래 시각(UTC 저장)을 한국 날짜로. 밤 늦은 거래가 전날로 보이지 않게"""
+    at = datetime.fromisoformat(iso)
+    return (at if at.tzinfo else at.replace(tzinfo=UTC)).astimezone(KST).date()
+
+
+def search_args(search: dict, today: date) -> dict | None:
+    """라우터가 채운 검색 조건을 검사한다. 기간이 없거나 날짜가 이상하면 None (담당 Agent가 처리, ADR 0035)"""
     try:
+        start, end = date.fromisoformat(search["from_date"]), date.fromisoformat(search["to_date"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if start > end or end > today:
+        return None
+    return {"from_date": start, "to_date": end, "categories": list(dict.fromkeys(search.get("categories") or []))[:3],
+            "keyword": search.get("keyword") or None, "direction": search.get("direction")}
+
+
+async def spending(tool: BaseTool, search: dict, today: date) -> str | None:
+    """지출·수입 검색: 업종마다 한 번씩 부르고 서버가 계산한 합계(total_in·total_out)만 더한다. 모델은 계산하지 않는다"""
+    args = search_args(search, today)
+    if args is None:
+        return None
+    base = {"from_date": args["from_date"].isoformat(), "to_date": args["to_date"].isoformat(),
+            "keyword": args["keyword"], "direction": args["direction"], "limit": SHOWN}
+    results = [data_of(await tool.ainvoke({k: v for k, v in {**base, "category": c}.items() if v is not None}))
+               for c in args["categories"] or [None]]
+    total_in, total_out = sum(r["total_in"] for r in results), sum(r["total_out"] for r in results)
+    what = "·".join(args["categories"]) or (f"'{args['keyword']}'" if args["keyword"] else "")
+    head = f"{day_label(args['from_date'])}~{day_label(args['to_date'])}" + (f" {what}" if what else "")
+    lines = []
+    if args["direction"] != "IN":
+        lines.append(f"{head} 쓴 돈은 {won(total_out)}이에요.")
+    if args["direction"] != "OUT":
+        lines.append(f"{head} 들어온 돈은 {won(total_in)}이에요." if args["direction"] == "IN" else f"들어온 돈은 {won(total_in)}이에요.")
+    txs = sorted((t for r in results for t in r["transactions"]), key=lambda t: t["created_at"], reverse=True)
+    for t in txs[:SHOWN]:
+        name = t["counterparty_name"] or t["memo"] or t["category"] or "거래"
+        sign = "+" if t["amount"] > 0 else "−"
+        lines.append(f"- {day_label(kst_day(t['created_at']))} {name} {sign}{won(abs(t['amount']))}")
+    if len(txs) > SHOWN or any(r["next_before"] for r in results):
+        lines.append(f"(최근 {SHOWN}건만 보여요. 합계는 기간 전체예요.)")
+    elif not txs:
+        lines.append("이 기간에 해당하는 거래가 없어요.")
+    return "\n".join(lines)
+
+
+async def run_lane(kind: QuickKind, tool: BaseTool, question: str | None, search: dict | None = None) -> str | None:
+    """빠른 길 하나를 실행해 답 글을 돌려준다. 도구가 실패하거나 조건이 이상하면 None (담당 Agent가 대신 처리)"""
+    try:
+        if kind == "search":
+            return await spending(tool, search or {}, today_kst())
         raw = await tool.ainvoke({"question": question} if kind == "docs" else {})
         data = data_of(raw)
     except Exception:  # ToolError(서버 오류 코드), 형식 문제: 원래 길로
