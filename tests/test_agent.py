@@ -533,3 +533,40 @@ async def test_quick_lane_falls_back_to_agent_when_tool_fails(bank):
     fake.replies = [AIMessage("약관 문서를 지금 찾을 수 없어요.")]
     data = (await chat(client, tony, "카드 대금 못 내면 어떻게 돼?")).json()["data"]
     assert len(fake.agent_inputs) == 1 and data["reply"] == "약관 문서를 지금 찾을 수 없어요."
+
+
+async def paid(client, me, src, dst, amount, memo, key):
+    """승인까지 마친 실제 이체 (거래내역에 TRANSFER_OUT으로 남는다)"""
+    action = (await client.post("/transfers", json=transfer(src, dst, amount=amount, key=key, memo=memo), headers=me)).json()["data"]
+    await client.post(f"/approvals/{action['action_id']}/approve", json={"pin": PIN}, headers=me)
+
+
+async def test_quick_search_uses_server_totals(bank):
+    """검색형 빠른 길 (ADR 0035): 라우터가 채운 기간·업종·낱말로 검색하고 서버 합계만 옮긴다. 업종이 여럿이면 합계를 더한다"""
+    client, tony, peter, src, dst, fake = bank
+    await paid(client, tony, src, dst, 4_500, "편의점 도시락", "pay-search-01")
+    await paid(client, tony, src, dst, 12_000, "점심 식사", "pay-search-02")
+    today = today_kst().isoformat()
+    fake.routes = [
+        Plan(agents=["account"], quick=["search"], from_date=today, to_date=today, keyword="편의점", direction="OUT"),
+        Plan(agents=["account"], quick=["search"], from_date=today, to_date=today, categories=["식사", "카페·간식"], direction="OUT"),
+    ]
+    first = (await chat(client, tony, "오늘 편의점에서 얼마 썼어?")).json()["data"]["reply"]
+    assert "'편의점' 쓴 돈은 4,500원이에요." in first and "−4,500원" in first
+    second = (await chat(client, tony, "오늘 식비랑 간식 얼마 썼어?")).json()["data"]["reply"]
+    assert "식사·카페·간식 쓴 돈은 16,500원이에요." in second  # 업종별 서버 합계 4,500 + 12,000
+    assert fake.agent_inputs == []  # 담당 LLM 없이
+
+
+async def test_quick_search_without_valid_period_goes_to_agent(bank):
+    """기간이 없거나 미래 날짜면 코드가 답하지 않고 담당 Agent가 처리한다 (라우터의 날짜 실수 대비)"""
+    from datetime import timedelta
+
+    client, tony, peter, src, dst, fake = bank
+    tomorrow = (today_kst() + timedelta(days=1)).isoformat()
+    fake.routes = [Plan(agents=["account"], quick=["search"], direction="OUT"),
+                   Plan(agents=["account"], quick=["search"], from_date=tomorrow, to_date=tomorrow)]
+    fake.replies = [AIMessage("언제 쓴 돈을 볼까요?"), AIMessage("내일 거래는 아직 없어요.")]
+    assert (await chat(client, tony, "편의점에서 얼마 썼어?")).json()["data"]["reply"] == "언제 쓴 돈을 볼까요?"
+    assert (await chat(client, tony, "내일 쓴 돈")).json()["data"]["reply"] == "내일 거래는 아직 없어요."
+    assert len(fake.agent_inputs) == 2
