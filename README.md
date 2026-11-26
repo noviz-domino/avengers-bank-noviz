@@ -144,6 +144,7 @@ python -m http.server 8765 --bind 127.0.0.1 --directory frontend   # http://127.
 | `SYSTEM_API_KEY` | 선택 | 시스템 작업(가맹점 결제 시뮬레이터, 카드 대금 출금, RAG 색인) 키, 32자 이상. 비우면 그 API만 꺼짐 |
 | `GEMINI_API_KEY` | AI·RAG에 필요 | [Google AI Studio](https://aistudio.google.com/apikey) 무료 키. 비우면 AI·RAG API만 `503`이고 은행 기능은 그대로 |
 | `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL`, `GEMINI_THINKING` | 선택 | 사용할 Gemini 모델과 생각 수준 |
+| `GEMINI_ROUTER_MODEL`, `GEMINI_ROUTER_THINKING` | 선택 | AI 상담 라우터만 쓰는 모델과 생각 수준. 비우면 `gemini-3.5-flash-lite`, `minimal` (ADR 0036) |
 | `AI_DAILY_LIMIT` | 선택 | 서버 전체 AI 호출 하루 한도 |
 | `KAKAO_LOCAL_API_KEY` | 선택 | 주변 식당·카페 실제 장소 검색. 비우면 예시 매장 사용 |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` | 선택 | [Langfuse](https://cloud.langfuse.com) 키. 넣으면 AI 상담 실행이 단계별로 기록됨 |

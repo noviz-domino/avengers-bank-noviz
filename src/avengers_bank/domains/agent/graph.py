@@ -123,7 +123,7 @@ def recent(messages: list) -> list:
     return tail[start:]
 
 
-def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpointSaver):
+def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpointSaver, router_llm: BaseChatModel | None = None):
     by_name = {t.name: t for t in tools}
     agents = {
         # checkpointer=False: 담당 Agent의 중간 상태는 따로 저장하지 않는다 (바깥 그래프가 결과만 저장, 중복 저장 방지)
@@ -136,7 +136,7 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
         # 턴 처음에 한 번만: 대화는 사람 말로 끝난다 (Gemini는 AI 메시지로 끝나는 요청을 거절한다)
         # 오늘 날짜는 끝에 붙인다: 날마다 바뀌는 부분을 뒤에 두어 앞부분은 늘 같게 (검색 기간 계산용, ADR 0035)
         system = SystemMessage(f"{ROUTER}\n오늘은 {today_kst().isoformat()}(한국)이다.")
-        plan = await llm.with_structured_output(Plan).ainvoke([system, *recent(state["messages"])])
+        plan = await (router_llm or llm).with_structured_output(Plan).ainvoke([system, *recent(state["messages"])])
         agents_in_order = list(dict.fromkeys(plan.agents))[:MAX_HOPS]  # 같은 담당 두 번, 핑퐁 없이
         if not agents_in_order:
             return Command(goto=END, update={"messages": [AIMessage(plan.reply or "무엇을 도와드릴까요?")]})

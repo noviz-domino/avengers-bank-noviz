@@ -1,0 +1,30 @@
+== gemini-3.8-flash low
+ 2.4s 이번 달 식비 얼마 썼어? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-27", "categories": ["식사", "외식·술자리"], "direction": "OUT"}
+ 2.3s 지난달 편의점에서 얼마 썼어? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-10-01", "to_date": "2026-10-31", "keyword": "편의점", "direction": "OUT"}
+ 2.7s 어제 카페에서 쓴 돈 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-26", "to_date": "2026-11-26", "categories": ["카페·간식"], "direction": "OUT"}
+ 2.2s 이번 달 교통비 합계 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-27", "categories": ["교통"], "direction": "OUT"}
+ 3.3s 생활비 통장 잔액만 알려줘 -> {"agents": ["account"]}
+ 2.5s 30만 원 써도 돼? -> {"agents": ["budget"]}
+ 2.2s 카드 대금 못 내면 어떻게 돼? -> {"agents": ["product"], "quick": ["docs"], "question": "카드 대금 연체 시 어떻게 되나요?"}
+ 2.8s 11월 1일부터 10일까지 들어온 돈 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-10", "direction": "IN"}
+ 3.6s 이번 주 술값 얼마야? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-23", "to_date": "2026-11-27", "categories": ["외식·술자리"], "direction": "OUT"}
+== gemini-3.5-flash-lite minimal
+ 1.1s 이번 달 식비 얼마 썼어? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-27", "categories": ["식사", "외식·술자리"], "direction": "OUT"}
+ 0.8s 지난달 편의점에서 얼마 썼어? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-10-01", "to_date": "2026-10-31", "keyword": "편의점", "direction": "OUT"}
+ 1.0s 어제 카페에서 쓴 돈 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-26", "to_date": "2026-11-26", "categories": ["카페·간식"], "direction": "OUT"}
+ 1.0s 이번 달 교통비 합계 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-27", "categories": ["교통"], "direction": "OUT"}
+ 1.0s 생활비 통장 잔액만 알려줘 -> {"agents": ["account"]}
+ 1.0s 30만 원 써도 돼? -> {"agents": ["budget"]}
+ 1.0s 카드 대금 못 내면 어떻게 돼? -> {"agents": ["product"], "quick": ["docs"], "question": "카드 대금을 연체하면 어떤 불이익이 생기나요?"}
+ 1.0s 11월 1일부터 10일까지 들어온 돈 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-10", "direction": "IN"}
+ 1.1s 이번 주 술값 얼마야? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-23", "to_date": "2026-11-27", "categories": ["외식·술자리"], "direction": "OUT"}
+== gemini-3.6-flash minimal
+ 1.9s 이번 달 식비 얼마 썼어? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-27", "categories": ["식사", "외식·술자리"], "direction": "OUT"}
+ 1.6s 지난달 편의점에서 얼마 썼어? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-10-01", "to_date": "2026-10-31", "keyword": "편의점", "direction": "OUT"}
+ 1.8s 어제 카페에서 쓴 돈 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-26", "to_date": "2026-11-26", "categories": ["카페·간식"], "direction": "OUT"}
+ 1.7s 이번 달 교통비 합계 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-27", "categories": ["교통"], "direction": "OUT"}
+ 1.6s 생활비 통장 잔액만 알려줘 -> {"agents": ["account"]}
+ 1.8s 30만 원 써도 돼? -> {"agents": ["budget"]}
+ 1.8s 카드 대금 못 내면 어떻게 돼? -> {"agents": ["product"], "quick": ["docs"], "question": "카드 대금을 못 내면 어떻게 되나요?"}
+ 1.9s 11월 1일부터 10일까지 들어온 돈 -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-01", "to_date": "2026-11-10", "direction": "IN"}
+ 1.8s 이번 주 술값 얼마야? -> {"agents": ["account"], "quick": ["search"], "from_date": "2026-11-23", "to_date": "2026-11-27", "categories": ["외식·술자리"], "direction": "OUT"}

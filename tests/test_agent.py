@@ -570,3 +570,15 @@ async def test_quick_search_without_valid_period_goes_to_agent(bank):
     assert (await chat(client, tony, "편의점에서 얼마 썼어?")).json()["data"]["reply"] == "언제 쓴 돈을 볼까요?"
     assert (await chat(client, tony, "내일 쓴 돈")).json()["data"]["reply"] == "내일 거래는 아직 없어요."
     assert len(fake.agent_inputs) == 2
+
+
+async def test_router_model_only_with_real_gemini(monkeypatch):
+    """라우터 전용 모델(ADR 0036)은 실제 Gemini로 돌 때만. 테스트의 가짜 모델이나 설정이 없으면 담당과 같은 모델"""
+    from avengers_bank.domains.agent import llm as llm_mod
+
+    real, lite, fake = object(), object(), FakeChat()
+    monkeypatch.setattr(llm_mod, "gemini_chat", lambda: real)
+    monkeypatch.setattr(llm_mod, "router_chat", lambda: lite)
+    assert llm_mod.router_for(real) is lite and llm_mod.router_for(fake) is fake
+    monkeypatch.setattr(llm_mod, "router_chat", lambda: None)
+    assert llm_mod.router_for(real) is real
