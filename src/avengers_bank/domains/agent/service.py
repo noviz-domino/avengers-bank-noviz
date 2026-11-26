@@ -67,7 +67,7 @@ def prepare(token: str, thread: str, callbacks: list, metadata: dict) -> dict:
 
 
 def first_turn(message: str) -> dict:
-    return {"messages": [HumanMessage(message)], "plan": [], "routed": [], "quick": [], "question": None, "search": None}
+    return {"messages": [HumanMessage(message)], "plan": [], "routed": [], "quick": [], "question": None, "search": None, "target": None}
 
 
 async def read(queue: asyncio.Queue) -> AsyncIterator[str]:

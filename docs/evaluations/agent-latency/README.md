@@ -17,8 +17,12 @@ AI 상담을 고칠 때마다 같은 질문 세트를 실제 Gemini로 다시 �
 | 2026-11-27 | 검색형 빠른 길 넣기 전 기준선 (빠른 길 머지 뒤 다시 잼) | 21/21 | 2.3 | 8.3초 | 16.7초 | [03-before-search](2026-11-27_03-before-search.txt) | [ADR 0035](../../decisions/0035-agent-search-quick-lane.md) |
 | 2026-11-27 | 검색형 빠른 길 (기간·업종 지출·수입 질문도 LLM 한 번) | 21/21 | 2.0 | 7.3초 | 13.4초 | [04-search-lane](2026-11-27_04-search-lane.json) | [ADR 0035](../../decisions/0035-agent-search-quick-lane.md) |
 | 2026-11-27 | 라우터 모델 바꾸기 전 기준선 (검색형 머지 뒤 다시 잼) | 21/21 | 2.2 | 8.0초 | 13.7초 | [05-before-router](2026-11-27_05-before-router.json) | [ADR 0036](../../decisions/0036-router-light-model.md) |
-| 2026-11-27 | **라우터만 gemini-3.5-flash-lite, 생각 minimal** | **21/21** | **2.2** | **4.2초** | **11.5초** | [06-router-flash-lite](2026-11-27_06-router-flash-lite.json) | [ADR 0036](../../decisions/0036-router-light-model.md) |
+| 2026-11-27 | 라우터만 gemini-3.5-flash-lite, 생각 minimal | 21/21 | 2.2 | 4.2초 | 11.5초 | [06-router-flash-lite](2026-11-27_06-router-flash-lite.json) | [ADR 0036](../../decisions/0036-router-light-model.md) |
 | 2026-11-27 | (비교 후보) 라우터만 gemini-3.6-flash, 생각 minimal | 21/21 | 2.0 | 4.5초 | 11.4초 | [07-router-3.6-flash](2026-11-27_07-router-3.6-flash.json) | [ADR 0036](../../decisions/0036-router-light-model.md) |
+| 2026-11-27 | 이름 선택지 넣기 전 기준선 (라우터 모델 머지 뒤 다시 잼) | 21/21 | 2.2 | 2.9초 | 12.4초 | [09-before-named](2026-11-27_09-before-named.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
+| 2026-11-27 | (중간) 이름 선택지 첫판 | 21/21 | 1.4 | 1.2초 | 8.7초 | [10](2026-11-27_10-named-targets.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
+| 2026-11-27 | (중간) 카드 사용내역 규칙 고침 | 21/21 | 1.3 | 1.1초 | 6.5초 | [11](2026-11-27_11-named-targets-final.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
+| 2026-11-27 | **이름 선택지 + 금액 장치 (최종)** | **21/21** | **1.4** | **1.1초** | **6.7초** | [14-named-targets-guard](2026-11-27_14-named-targets-guard.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
 
 - 11월 6일 행과 11월 27일 행은 질문 수(14개와 21개)와 Gemini 응답 속도가 달라서 숫자를 바로 비교하지 않는다. 같은 날 같은 세트로 잰 전후만 비교한다.
 - 질문마다 한 번씩 재서 p95는 사실상 가장 느린 질문 1~2개의 값이다. 경향으로 본다.
@@ -82,6 +86,23 @@ AI 상담을 고칠 때마다 같은 질문 세트를 실제 Gemini로 다시 �
 | 생활비 통장 잔액만 알려줘 | 계좌 담당, 빠른 길 표시 없음(특정 계좌만) |
 | 30만 원 써도 돼? | 예산 담당, 빠른 길 표시 없음(금액 조건) |
 | 카드 대금 못 내면 어떻게 돼? | 상품 담당, 약관 빠른 길 |
+
+## 2026-11-27 이름 선택지: 바뀐 질문과 확인
+
+| 질문 | 전 (09) | 후 (14) |
+|---|---|---|
+| 생활비 통장 상세 보여줘 | 9.0초 (4번) | 1.1초 (1번) |
+| 체크카드 한도 얼마 남았어? | 8.6초 (4번) | 1.1초 (1번) |
+| 카드 사용내역 보여줘 | 11.8초 (5번) | 1.1초 (1번) |
+| 카드 한도랑 내 잔액 알려줘 | 19.6초 (6번) | 1.0초 (1번) |
+
+- 답 대조: [12-named-targets-answer-check](2026-11-27_12-named-targets-answer-check.md). 다섯 답 모두 같은 시각 REST 값과 같았다.
+- **흔들림 발견**: 11번 측정에서 "30만 원짜리 사도 돼?"가 1번 호출로 끝난 것을 보고 반복해 물었더니 가벼운 라우터가 8번 중 4번 남은 예산 빠른 길로 표시했다(이 모델은 temperature를 무시한다). 담당은 맞아서 21/21에는 안 보였다. 금액이 있으면 그 빠른 길을 막는 코드 장치를 넣고 다시 쟀다(14).
+- 반복 시험: [13-router-repeat-probe](2026-11-27_13-router-repeat-probe.txt) (질문 24개 × 3번, 3개가 흔들림), 스크립트 [`router_repeat_probe.py`](router_repeat_probe.py)
+
+## 지금까지 한 줄로
+
+같은 질문 21개에서 p50 **11.3초 → 1.1초**, p95 **17.1초 → 6.7초**, 질문당 LLM 호출 **3.4번 → 1.4번**, 담당 맞힘 21/21 유지 (빠른 길 → 검색형 빠른 길 → 가벼운 라우터 → 이름 선택지, 단계마다 같은 날 기준선과 비교).
 
 ## 새로 잴 때
 

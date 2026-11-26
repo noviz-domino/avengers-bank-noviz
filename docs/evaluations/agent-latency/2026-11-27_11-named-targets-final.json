@@ -1,0 +1,320 @@
+{
+ "date": "2026-11-27",
+ "model": "gemini-3.8-flash",
+ "thinking": "low",
+ "summary": {
+  "label": "11-named-targets-final",
+  "questions": 21,
+  "errors": 0,
+  "routing_accuracy": 1.0,
+  "llm_calls_avg": 1.3333333333333333,
+  "p50": 1.1,
+  "p95": 6.5
+ },
+ "rows": [
+  {
+   "q": "내 계좌 잔액 알려줘",
+   "expected": [
+    [
+     "account"
+    ]
+   ],
+   "routed": [
+    "account"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.3
+  },
+  {
+   "q": "이번 달에 편의점에서 얼마 썼어?",
+   "expected": [
+    [
+     "account"
+    ]
+   ],
+   "routed": [
+    "account"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.1
+  },
+  {
+   "q": "이번 달 들어온 돈이 얼마야?",
+   "expected": [
+    [
+     "account"
+    ]
+   ],
+   "routed": [
+    "account"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.1
+  },
+  {
+   "q": "생활비 통장 상세 보여줘",
+   "expected": [
+    [
+     "account"
+    ]
+   ],
+   "routed": [
+    "account"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.1
+  },
+  {
+   "q": "내 카드 목록 보여줘",
+   "expected": [
+    [
+     "card"
+    ]
+   ],
+   "routed": [
+    "card"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.0
+  },
+  {
+   "q": "체크카드 한도 얼마 남았어?",
+   "expected": [
+    [
+     "card"
+    ]
+   ],
+   "routed": [
+    "card"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.0
+  },
+  {
+   "q": "카드 사용내역 보여줘",
+   "expected": [
+    [
+     "card"
+    ]
+   ],
+   "routed": [
+    "card"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.1
+  },
+  {
+   "q": "적금 상품 뭐 있어?",
+   "expected": [
+    [
+     "product"
+    ]
+   ],
+   "routed": [
+    "product"
+   ],
+   "error": null,
+   "calls": 3,
+   "seconds": 6.5
+  },
+  {
+   "q": "카드 대금 못 내면 어떻게 돼?",
+   "expected": [
+    [
+     "product"
+    ]
+   ],
+   "routed": [
+    "product"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 6.0
+  },
+  {
+   "q": "이체 한도가 얼마야?",
+   "expected": [
+    [
+     "product"
+    ],
+    [
+     "account"
+    ]
+   ],
+   "routed": [
+    "account"
+   ],
+   "error": null,
+   "calls": 4,
+   "seconds": 9.7
+  },
+  {
+   "q": "스타크 신용카드 혜택이 뭐야?",
+   "expected": [
+    [
+     "product"
+    ]
+   ],
+   "routed": [
+    "product"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 4.4
+  },
+  {
+   "q": "카드 한도랑 내 잔액 알려줘",
+   "expected": [
+    [
+     "card",
+     "account"
+    ],
+    [
+     "account",
+     "card"
+    ]
+   ],
+   "routed": [
+    "card",
+    "account"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.0
+  },
+  {
+   "q": "안녕",
+   "expected": [
+    []
+   ],
+   "routed": [],
+   "error": null,
+   "calls": 1,
+   "seconds": 0.9
+  },
+  {
+   "q": "고마워!",
+   "expected": [
+    []
+   ],
+   "routed": [],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.1
+  },
+  {
+   "q": "이번 달 얼마 더 쓸 수 있어?",
+   "expected": [
+    [
+     "budget"
+    ]
+   ],
+   "routed": [
+    "budget"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.0
+  },
+  {
+   "q": "30만 원짜리 사도 돼?",
+   "expected": [
+    [
+     "budget"
+    ]
+   ],
+   "routed": [
+    "budget"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.0
+  },
+  {
+   "q": "오늘 하루에 얼마까지 써도 돼?",
+   "expected": [
+    [
+     "budget"
+    ]
+   ],
+   "routed": [
+    "budget"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.0
+  },
+  {
+   "q": "목표 저축 잘 지키고 있어?",
+   "expected": [
+    [
+     "budget"
+    ]
+   ],
+   "routed": [
+    "budget"
+   ],
+   "error": null,
+   "calls": 3,
+   "seconds": 5.6
+  },
+  {
+   "q": "잔액이랑 이번 달 예산 알려줘",
+   "expected": [
+    [
+     "account",
+     "budget"
+    ],
+    [
+     "budget",
+     "account"
+    ]
+   ],
+   "routed": [
+    "account",
+    "budget"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.0
+  },
+  {
+   "q": "이번 달 식비 얼마 썼어?",
+   "expected": [
+    [
+     "account"
+    ]
+   ],
+   "routed": [
+    "account"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 1.2
+  },
+  {
+   "q": "예산 관리는 어떻게 신청해?",
+   "expected": [
+    [
+     "budget"
+    ],
+    [
+     "product"
+    ]
+   ],
+   "routed": [
+    "product"
+   ],
+   "error": null,
+   "calls": 1,
+   "seconds": 5.0
+  }
+ ]
+}

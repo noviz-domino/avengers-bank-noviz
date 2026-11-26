@@ -14,11 +14,13 @@ from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.types import Command
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 from avengers_bank.core.clock import today_kst
 from avengers_bank.domains.accounts.schemas import Category
-from avengers_bank.domains.agent.quick import LANES, QuickKind, run_lane
+from avengers_bank.domains.agent.quick import (
+    LANES, QuickKind, account_label, card_label, lane_allowed, load_targets, resolve, run_lane,
+)
 
 MAX_HOPS = 3  # 한 턴에 도메인 Agent를 부르는 최대 횟수 (복합 요청 "정지하고 잔액 알려줘"는 2번)
 LABELS = {"account": "계좌", "card": "카드", "product": "상품·약관", "budget": "예산"}
@@ -83,7 +85,11 @@ quick: 담당의 일이 아래처럼 단순하면 표시한다. 조건·기간·
 - search(account): 기간 안에 쓴 돈·들어온 돈의 합계나 내역("이번 달 편의점에서 얼마 썼어", "지난주 들어온 돈"). from_date·to_date(YYYY-MM-DD, 오늘 날짜로 계산, 오늘을 넘지 않게)를 반드시 채운다. 업종이 목록에 있으면 categories("식비"는 식사와 외식·술자리), 목록에 없는 가게·낱말이면 keyword("편의점"), 쓴 돈이면 direction=OUT·들어온 돈이면 IN. 기간을 알 수 없거나 특정 계좌만·금액 조건이 붙으면 표시하지 않는다
 - cards(card): 내 카드 목록·상태를 묻는 것만. 한도·사용내역·정지는 아님
 - budget(budget): 이번 주기에 얼마 더 쓸 수 있는지, 하루에 얼마 써도 되는지만. "X원 써도 돼?"처럼 금액이 있으면 아님
-- docs(product): 약관·규칙·상품 조건을 묻는 질문. question에 앞 대화 없이도 알 수 있는 질문 한 문장을 쓴다. 상품 목록을 보여 달라는 것은 아님"""
+- docs(product): 약관·규칙·상품 조건을 묻는 질문. question에 앞 대화 없이도 알 수 있는 질문 한 문장을 쓴다. 상품 목록을 보여 달라는 것은 아님
+- account_detail(account): 특정 계좌 하나의 상세(잔액·계좌번호·이체 한도·금리·만기). account에 그 계좌를 반드시 고른다
+- card_limit(card): 카드 한도·남은 한도. 카드를 말했으면 card에 고르고 말하지 않았으면 비운다(사용 중인 카드 전부를 보여 준다)
+- card_txs(card): 카드 사용내역·최근 결제. 기간·가맹점·금액 조건이 붙으면 표시하지 않는다. 카드 이름·종류·끝자리를 콕 집어 말했을 때만 card에 고르고 그냥 "카드"면 비운다(모든 카드의 내역을 보여 준다)
+account·card: 사용자가 말한 내 계좌·카드가 선택지 중 하나로 분명할 때만 고른다. 여러 개가 맞으면 사용 중인 것이 하나뿐일 때 그것을 고르고 아니면 비운다"""
 
 class Plan(BaseModel):
     """라우터의 출력: 이번 턴에 일할 담당과 순서. 정해진 이름만 고를 수 있다 (ADR 0006: 엉뚱한 Agent로 보내지 않게).
@@ -101,12 +107,25 @@ class Plan(BaseModel):
     direction: Literal["IN", "OUT"] | None = Field(default=None, description="search: 쓴 돈 OUT, 들어온 돈 IN")
 
 
+def plan_schema(targets: dict) -> type[Plan]:
+    """내 계좌·카드 이름표를 라우터의 선택지로 (ADR 0037). 없는 계좌·카드는 고를 수 없다. 목록이 비면 그 칸 없이"""
+    fields = {}
+    if targets["accounts"]:
+        labels = tuple(dict.fromkeys(account_label(a) for a in targets["accounts"]))
+        fields["account"] = (Literal[labels] | None, Field(default=None, description="사용자가 말한 내 계좌. 분명하지 않으면 비운다"))
+    if targets["cards"]:
+        labels = tuple(dict.fromkeys(card_label(c) for c in targets["cards"]))
+        fields["card"] = (Literal[labels] | None, Field(default=None, description="사용자가 말한 내 카드. 분명하지 않으면 비운다"))
+    return create_model("Plan", __base__=Plan, **fields) if fields else Plan
+
+
 class ChatState(MessagesState):
     plan: list[str]  # 이번 턴에 아직 일하지 않은 담당
     routed: list[str]  # 이번 턴에 일한 담당 (응답·평가용)
     quick: list[str]  # 이번 턴에 빠른 길로 처리할 조회 (ADR 0034)
     question: str | None  # docs 빠른 길의 질문
     search: dict | None  # search 빠른 길의 조건 (ADR 0035)
+    target: dict | None  # 라우터가 이름표로 고른 계좌·카드와 내 카드 목록 (ADR 0037)
 
 
 def common_prompt() -> str:
@@ -136,13 +155,15 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
         # 턴 처음에 한 번만: 대화는 사람 말로 끝난다 (Gemini는 AI 메시지로 끝나는 요청을 거절한다)
         # 오늘 날짜는 끝에 붙인다: 날마다 바뀌는 부분을 뒤에 두어 앞부분은 늘 같게 (검색 기간 계산용, ADR 0035)
         system = SystemMessage(f"{ROUTER}\n오늘은 {today_kst().isoformat()}(한국)이다.")
-        plan = await (router_llm or llm).with_structured_output(Plan).ainvoke([system, *recent(state["messages"])])
+        targets = await load_targets(by_name)  # 이름표 선택지용 내 계좌·카드 (LLM 없음, ADR 0037)
+        plan = await (router_llm or llm).with_structured_output(plan_schema(targets)).ainvoke([system, *recent(state["messages"])])
         agents_in_order = list(dict.fromkeys(plan.agents))[:MAX_HOPS]  # 같은 담당 두 번, 핑퐁 없이
         if not agents_in_order:
             return Command(goto=END, update={"messages": [AIMessage(plan.reply or "무엇을 도와드릴까요?")]})
         return Command(goto=agents_in_order[0], update={"plan": agents_in_order[1:], "routed": agents_in_order[:1],
                                                          "quick": plan.quick, "question": plan.question,
-                                                         "search": plan.model_dump(include={"from_date", "to_date", "categories", "keyword", "direction"})})
+                                                         "search": plan.model_dump(include={"from_date", "to_date", "categories", "keyword", "direction"}),
+                                                         "target": resolve(targets, getattr(plan, "account", None), getattr(plan, "card", None))})
 
     def domain(name: str):
         async def run(state: ChatState) -> Command:
@@ -151,8 +172,11 @@ def build(llm: BaseChatModel, tools: list[BaseTool], checkpointer: BaseCheckpoin
             answer = None
             # 라우터가 단순 조회라고 표시: 도구만 부르고 코드가 답한다 (ADR 0034·0035). 한 담당에 표시된 길이 여럿이면 처음 것
             kind = next((k for k in LANES[name] if k in (state.get("quick") or [])), None)
+            said = next((m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), "")
+            if kind is not None and not lane_allowed(kind, said if isinstance(said, str) else str(said)):
+                kind = None  # 라우터 표시가 틀린 답이 될 수 있는 경우: 담당 Agent가 처리
             if kind is not None:
-                answer = await run_lane(kind, by_name[LANES[name][kind]], state.get("question"), state.get("search"))
+                answer = await run_lane(kind, by_name[LANES[name][kind]], state.get("question"), state.get("search"), state.get("target"))
             if answer is not None:
                 new = [AIMessage(answer)]
             else:
