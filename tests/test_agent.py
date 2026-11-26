@@ -483,3 +483,53 @@ async def test_chat_rate_limit_counts_conversations_not_ai_calls(bank):
     assert blocked.json()["error"]["code"] == "AI_RATE_LIMITED" and "1분에 6번" in blocked.json()["error"]["message"]
     assert sum(rag_router.daily_calls.values()) == 6 * 3  # 비용 상한은 그대로 호출 수 기준
 
+
+
+async def test_quick_lane_answers_without_agent_llm(bank):
+    """빠른 길 (ADR 0034): 라우터가 단순 조회라고 표시하면 담당 LLM 없이 도구 결과로 코드가 답한다. 복합 요청도 각각"""
+    from avengers_bank.core.database import SessionLocal
+
+    client, tony, peter, src, dst, fake = bank
+    async with SessionLocal() as db:
+        await seed_card_products(db)
+    assert (await issue(client, tony, src)).status_code == 201
+    fake.routes = [Plan(agents=["account", "card"], quick=["balance", "cards"])]
+    data = (await chat(client, tony, "잔액이랑 카드 목록 알려줘")).json()["data"]
+    assert fake.agent_inputs == []  # 라우터 한 번으로 끝
+    assert data["routed"] == ["account", "card"]
+    assert data["reply"].startswith("총자산은 1,000,000원이에요.") and "1,000,000원" in data["reply"].split("\n")[1]
+    assert "카드는 1장이에요." in data["reply"] and "사용 중" in data["reply"]
+    history = (await client.get(f"/chat/{data['session_id']}", headers=tony)).json()["data"]
+    assert [t["role"] for t in history] == ["user", "assistant", "assistant"]  # 다음 턴 담당이 볼 수 있게 저장
+
+
+async def test_quick_lane_stream_shows_steps(bank):
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(agents=["account"], quick=["balance"])]
+    evs = events_of(await stream(client, tony, "내 잔액"))
+    assert [d.get("stage") for e, d in evs if e == "status"] == ["routing", "routed", "agent", "tool"]  # 진행 표시는 그대로
+    assert evs[-1][0] == "done" and evs[-1][1]["reply"].startswith("총자산은 1,000,000원이에요.")
+
+
+async def test_quick_budget_uses_server_numbers(bank, monkeypatch):
+    from avengers_bank.domains.mcp_server import api
+    from tests.test_mcp import FakeBudget
+
+    client, tony, peter, src, dst, fake = bank
+    budget = FakeBudget({"enrolled": True, "free_before_saving": 450_000, "free_to_spend": -20_000,
+                         "daily_allowance": 0, "cycle": {"days_left": 15}})
+    monkeypatch.setattr(api, "client", budget.client)
+    fake.routes = [Plan(agents=["budget"], quick=["budget"])]
+    reply = (await chat(client, tony, "이번 달 얼마 더 쓸 수 있어?")).json()["data"]["reply"]
+    assert fake.agent_inputs == []
+    assert reply == ("이번 주기에 더 쓸 수 있는 돈이에요.\n- 생활비만 보면 450,000원\n- 목표 저축까지 지키면 20,000원 모자라요\n"
+                     "- 목표 저축을 지키려면 남은 15일 동안 더 쓸 수 있는 돈이 없어요.")
+
+
+async def test_quick_lane_falls_back_to_agent_when_tool_fails(bank):
+    """약관 질문의 RAG가 꺼져 있으면(도구 오류) 원래대로 상품 담당 Agent가 처리한다"""
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(agents=["product"], quick=["docs"], question="카드 대금을 못 내면 어떻게 되나요?")]
+    fake.replies = [AIMessage("약관 문서를 지금 찾을 수 없어요.")]
+    data = (await chat(client, tony, "카드 대금 못 내면 어떻게 돼?")).json()["data"]
+    assert len(fake.agent_inputs) == 1 and data["reply"] == "약관 문서를 지금 찾을 수 없어요."

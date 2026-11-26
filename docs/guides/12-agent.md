@@ -11,6 +11,7 @@
 | 채팅 API | `agent/router.py` (`POST /chat`, `GET /chat/{session_id}`) |
 | 한 턴 실행: 토큰 넣기, MCP 연결, 그래프 실행 | `agent/service.py` `chat` |
 | 라우터·담당 그래프, 프롬프트, 담당별 도구 | `agent/graph.py` |
+| 빠른 길: 단순 조회는 담당 LLM 없이 도구 + 템플릿 답 | `agent/quick.py` `run_lane` ([ADR 0034](../decisions/0034-agent-quick-lanes.md)) |
 | Gemini 채팅 모델 | `agent/llm.py` (테스트는 가짜로 바꿔 끼움) |
 | 대화 저장 | `agent/checkpoint.py` (PostgreSQL, 테스트는 메모리) |
 | 토큰을 MCP로 넘기는 곳 | `mcp_server/api.py` `agent_token`, `requester` |
@@ -61,6 +62,15 @@ class Plan(BaseModel):
     agents: list[Literal["account", "card", "product", "budget"]] = []   # 처리 순서대로
     reply: str | None = None   # 인사처럼 담당이 필요 없을 때의 답
 ```
+
+## 빠른 길 (ADR 0034)
+
+> **라우터가 담당을 고르면서 "잔액·카드 목록·남은 예산·약관 질문"처럼 단순한 일인지도 표시한다(`Plan.quick`). 표시된 담당은 LLM을 부르지 않고 도구를 바로 부른 뒤 코드 템플릿으로 답한다. 도구가 실패하면 평소처럼 담당 Agent가 처리한다.**
+
+- 담당 Agent는 "도구 고르기"와 "답 쓰기"로 LLM을 최소 두 번 부른다. 단순 조회는 이 두 번을 건너뛰어 한 턴이 LLM 한 번이 된다(잔액 12.6초 → 3.1초).
+- 약관 질문은 RAG가 근거와 함께 쓴 답을 그대로 내고 끝에 근거 문서 제목을 붙인다.
+- 빠른 길은 담당 노드 안에서 돌아서 `routed`와 진행 표시(담당 → 도구)가 그대로다.
+- 개선 전후 측정 원본과 질문별 비교는 [평가 기록](../evaluations/agent-latency/README.md)에 남긴다. 고칠 때마다 같은 질문 세트로 다시 잰다(`evaluate.py --out`).
 
 ## 왜 이렇게 했나
 
