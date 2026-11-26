@@ -1,6 +1,6 @@
 # 0036. 라우터만 가벼운 모델로: gemini-3.5-flash-lite, 생각 수준 minimal
 
-- 상태: 채택
+- 상태: 채택 (→ [0037](0037-router-named-targets.md): 이 모델은 temperature를 무시해서 같은 질문도 가끔 다르게 표시한다. 틀린 답이 되는 길은 코드 장치로 막음)
 - 날짜: 2026-11-27
 - 관련 PR: (이 문서를 추가하는 PR)
 - 관련: [ADR 0016](0016-agent-latency-tracing.md) 생각 수준, [ADR 0034](0034-agent-quick-lanes.md)·[ADR 0035](0035-agent-search-quick-lane.md) 빠른 길, [조사 보고서](../research/agent-latency-and-rag.md) 2순위 제안, [평가 기록](../evaluations/agent-latency/README.md)

@@ -65,7 +65,7 @@ class EventTranslator:
         if kind == "on_chain_start" and name in TOOLS and node == name and self.agent != name:
             self.agent = name  # 바깥 노드와 안쪽 Agent 그래프가 같은 이름이라 한 번만
             return [sse("status", {"stage": "agent", "agent": name, "label": AGENT_LABELS[name]})]
-        if kind == "on_tool_start":
+        if kind == "on_tool_start" and node != "router":  # 라우터 앞의 이름표 목록 조회는 진행 표시에 넣지 않는다 (ADR 0037)
             return [sse("status", {"stage": "tool", "agent": self.agent, "tool": name,
                                    "label": TOOL_LABELS.get(name, "처리하고 있어요")})]
         if self.agent is None or node == "router":

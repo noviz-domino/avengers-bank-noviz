@@ -582,3 +582,80 @@ async def test_router_model_only_with_real_gemini(monkeypatch):
     assert llm_mod.router_for(real) is lite and llm_mod.router_for(fake) is fake
     monkeypatch.setattr(llm_mod, "router_chat", lambda: None)
     assert llm_mod.router_for(real) is real
+
+
+async def two_cards(client, tony, src):
+    from avengers_bank.core.database import SessionLocal
+    from tests.test_card_payments import pay
+
+    async with SessionLocal() as db:
+        await seed_card_products(db)
+    debit = (await issue(client, tony, src)).json()["data"]
+    credit = (await issue(client, tony, src, type_="CREDIT")).json()["data"]
+    await pay(client, tony, debit, amount=4_500, key="pay-named-01", merchant="편의점 GS25")
+    await pay(client, tony, credit, amount=30_000, key="pay-named-02", merchant="주유소")
+    return debit, credit
+
+
+async def test_named_target_choices_are_only_mine(bank):
+    """이름 선택지 (ADR 0037): 라우터는 내 계좌·카드 이름표 중에서만 고른다. 없는 이름표는 양식이 거절한다"""
+    from pydantic import ValidationError
+
+    from avengers_bank.domains.agent.graph import plan_schema
+    from avengers_bank.domains.agent.quick import account_label, card_label, resolve
+
+    targets = {"accounts": [{"nickname": "생활비", "product_name": "입출금", "account_num": "110-101-000001", "account_id": 7}],
+               "cards": [{"nickname": None, "product_name": "체크", "masked_card_num": "9410-20**-****-0033", "status": "ACTIVE", "card_id": 3}]}
+    schema = plan_schema(targets)
+    plan = schema(agents=["card"], card=card_label(targets["cards"][0]), account=account_label(targets["accounts"][0]))
+    assert resolve(targets, plan.account, plan.card)["card"]["card_id"] == 3
+    with pytest.raises(ValidationError):
+        schema(agents=["card"], card="남의 카드 •••• 9999 (사용 중)")
+    assert resolve(targets, None, "없는 이름표")["card"] is None
+    assert plan_schema({"accounts": [], "cards": []}) is Plan  # 목록이 비면 선택지 칸 없이
+
+
+async def test_quick_card_limit_and_txs(bank):
+    """카드 한도·사용내역 빠른 길: 담당 LLM 없이 번호를 아는 상태로 바로 조회한다 (목록 조회 단계가 사라짐)"""
+    from avengers_bank.domains.agent.quick import card_label
+
+    client, tony, peter, src, dst, fake = bank
+    debit, credit = await two_cards(client, tony, src)
+    cards = (await client.get("/cards", headers=tony)).json()["data"]
+    debit_label = card_label(next(c for c in cards if c["card_id"] == debit["card_id"]))
+    PlanLike = type("PlanLike", (Plan,), {"__annotations__": {"card": str | None}, "card": None})
+    fake.routes = [PlanLike(agents=["card"], quick=["card_limit"], card=debit_label),
+                   Plan(agents=["card"], quick=["card_limit"]), Plan(agents=["card"], quick=["card_txs"])]
+    one = (await chat(client, tony, "체크카드 한도 얼마 남았어?")).json()["data"]["reply"]
+    assert "오늘 4,500원을 써서" in one and one.count("\n") == 0  # 고른 카드 하나만
+    every = (await chat(client, tony, "카드 한도 알려줘")).json()["data"]["reply"]
+    assert every.count("- ") == 2 and "신용 한도는" in every  # 안 고르면 사용 중인 카드 전부
+    txs = (await chat(client, tony, "카드 사용내역 보여줘")).json()["data"]["reply"]
+    assert txs.splitlines()[0] == "카드 최근 사용내역이에요." and txs.index("주유소") < txs.index("편의점 GS25")  # 최근 순
+    assert fake.agent_inputs == []
+
+
+async def test_quick_account_detail_needs_named_account(bank):
+    """계좌 상세는 계좌를 분명히 골랐을 때만. 안 골랐으면 담당 Agent가 되묻는다"""
+    from avengers_bank.domains.agent.quick import account_label
+
+    client, tony, peter, src, dst, fake = bank
+    accounts = (await client.get("/accounts", headers=tony)).json()["data"]["accounts"]
+    PlanLike = type("PlanLike", (Plan,), {"__annotations__": {"account": str | None}, "account": None})
+    fake.routes = [PlanLike(agents=["account"], quick=["account_detail"], account=account_label(accounts[0])),
+                   Plan(agents=["account"], quick=["account_detail"])]
+    fake.replies = [AIMessage("어느 계좌를 볼까요?")]
+    detail = (await chat(client, tony, "생활비 통장 상세 보여줘")).json()["data"]["reply"]
+    assert "- 잔액 1,000,000원" in detail and "이체 한도: 1회" in detail
+    assert (await chat(client, tony, "통장 상세 보여줘")).json()["data"]["reply"] == "어느 계좌를 볼까요?"
+    assert len(fake.agent_inputs) == 1
+
+
+async def test_budget_lane_ignored_when_question_has_amount(bank):
+    """가벼운 라우터가 "30만 원짜리 사도 돼?"를 가끔 남은 예산 빠른 길로 표시해도(실측 8번 중 4번) 금액이 있으면
+    코드가 막고 예산 담당이 check_budget으로 답한다 (ADR 0037)"""
+    client, tony, peter, src, dst, fake = bank
+    fake.routes = [Plan(agents=["budget"], quick=["budget"])]
+    fake.replies = [AIMessage("사면 200,000원이 모자라요.")]
+    reply = (await chat(client, tony, "30만 원짜리 사도 돼?")).json()["data"]["reply"]
+    assert reply == "사면 200,000원이 모자라요." and len(fake.agent_inputs) == 1

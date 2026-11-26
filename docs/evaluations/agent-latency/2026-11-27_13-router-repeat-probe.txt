@@ -1,0 +1,25 @@
+같음   내 계좌 잔액 알려줘  {"account / quick=balance": 3}
+같음   이번 달에 편의점에서 얼마 썼어?  {"account / quick=search": 3}
+같음   이번 달 들어온 돈이 얼마야?  {"account / quick=search": 3}
+같음   생활비 통장 상세 보여줘  {"account / quick=account_detail": 3}
+같음   내 카드 목록 보여줘  {"card / quick=cards": 3}
+같음   체크카드 한도 얼마 남았어?  {"card / quick=card_limit": 3}
+같음   카드 사용내역 보여줘  {"card / quick=card_txs": 3}
+같음   적금 상품 뭐 있어?  {"product / quick=-": 3}
+같음   카드 대금 못 내면 어떻게 돼?  {"product / quick=docs": 3}
+같음   이체 한도가 얼마야?  {"account / quick=account_detail": 3}
+같음   스타크 신용카드 혜택이 뭐야?  {"product / quick=docs": 3}
+같음   카드 한도랑 내 잔액 알려줘  {"card+account / quick=card_limit+balance": 3}
+같음   안녕  {"- / quick=-": 3}
+같음   고마워!  {"- / quick=-": 3}
+같음   이번 달 얼마 더 쓸 수 있어?  {"budget / quick=budget": 3}
+흔들림 30만 원짜리 사도 돼?  {"budget / quick=budget": 1, "budget / quick=-": 2}
+같음   오늘 하루에 얼마까지 써도 돼?  {"budget / quick=budget": 3}
+흔들림 목표 저축 잘 지키고 있어?  {"budget / quick=-": 2, "budget / quick=budget": 1}
+같음   잔액이랑 이번 달 예산 알려줘  {"account+budget / quick=balance+budget": 3}
+같음   이번 달 식비 얼마 썼어?  {"account / quick=search": 3}
+흔들림 예산 관리는 어떻게 신청해?  {"product / quick=docs": 2, "budget / quick=docs": 1}
+같음   30만 원짜리 사도 돼?  {"budget / quick=-": 3}
+같음   5만 원 써도 돼?  {"budget / quick=-": 3}
+같음   생활비 통장 잔액만 알려줘  {"account / quick=-": 3}
+질문 24개 중 3개가 3번 안에서 다르게 표시됨
