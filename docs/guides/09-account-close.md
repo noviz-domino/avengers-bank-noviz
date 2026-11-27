@@ -1,9 +1,9 @@
 # 9. 계좌 해지와 해지 뒤 환불
 
-> **잔액이 0이고, 쓸 수 있는 카드나 안 낸 카드 대금이 연결돼 있지 않은 입출금 계좌만 해지한다. 해지는 되돌릴 수 없어서 신청은 승인 대기만 만들고 PIN 승인 때 같은 검사를 한 번 더 한 뒤 해지한다([ADR 0033](../decisions/0033-irreversible-needs-pin.md)).**
+> **잔액이 0이고, 쓸 수 있는 카드나 안 낸 카드 대금이 연결돼 있지 않은 입출금 계좌만 해지한다. 해지는 되돌릴 수 없어서 신청은 승인 대기만 만들고 PIN 승인 때 같은 검사를 한 번 더 한 뒤 해지한다([ADR 0033(되돌릴 수 없는 작업 PIN 승인)](../decisions/0033-irreversible-needs-pin.md)).**
 > **해지 뒤 들어온 결제 취소는 "환불 대기"로 두고, 상담원이 고객을 확인한 뒤 다른 입출금 계좌로 보낸다.**
 
-결정 이유: [ADR 0012](../decisions/0012-account-close.md), [ADR 0033](../decisions/0033-irreversible-needs-pin.md)
+결정 이유: [ADR 0012(계좌 해지)](../decisions/0012-account-close.md), [ADR 0033(되돌릴 수 없는 작업 PIN 승인)](../decisions/0033-irreversible-needs-pin.md)
 
 ## 코드 위치
 

@@ -8,7 +8,7 @@
 
 이 폴더에는 선택하지 않은 안과 중간 수정본까지 생성 순서대로 **43개 PNG**를 보관했습니다. 파일 번호는 시안 선택 번호가 아닙니다. 원본 생성 ID와 SHA-256은 [manifest.json](manifest.json), 전체 과정은 [README.md](README.md)에 있습니다. `references/`는 공식 사이트에서 받은 참고 이미지로 생성 시안 43개와 별도입니다.
 
-> **2026-11-11 갱신:** 실제 구현 화면은 [implemented/](implemented/README.md)에 버전별로 캡처해 둡니다. 여백 줄이기·AI 상담 채팅형·로그인 다시 디자인(v2, [ADR 0027](../decisions/0027-compact-layout-chat-login.md))으로 아래 표의 AI 상담·전체 메뉴·카드 머리글은 시안과 달라졌습니다. 최신 기준은 v2 캡처입니다.
+> **2026-11-11 갱신:** 실제 구현 화면은 [implemented/](implemented/README.md)에 버전별로 캡처해 둡니다. 여백 줄이기·AI 상담 채팅형·로그인 다시 디자인(v2, [ADR 0027(채팅형 상담·로그인 화면)](../decisions/0027-compact-layout-chat-login.md))으로 아래 표의 AI 상담·전체 메뉴·카드 머리글은 시안과 달라졌습니다. 최신 기준은 v2 캡처입니다.
 
 ## 최신 선택과 기준 이미지
 

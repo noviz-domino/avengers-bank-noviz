@@ -16,14 +16,14 @@ avengers-bank/
 ├── CLAUDE.md               # Claude Code 작업 규칙 (변경 시 문서화)
 ├── Dockerfile, compose.yaml # Docker 실행 (app + PostgreSQL)
 ├── .github/workflows/ci.yml # CI: PR과 main push마다 pytest + PostgreSQL 마이그레이션 검사
-├── frontend/               # 모바일 웹 앱 (빌드 없는 HTML·CSS·ES 모듈). 서버가 /app으로 서빙 (ADR 0020)
+├── frontend/               # 모바일 웹 앱 (빌드 없는 HTML·CSS·ES 모듈). 서버가 /app으로 서빙 (ADR 0020 모바일 앱 API 연결)
 │   ├── app.mjs             # 화면 이동·로그인·홈·계좌·이체
 │   ├── api.mjs, approval.mjs # API 클라이언트(토큰 갱신·오류 코드), 공통 PIN 승인 창
 │   ├── ui.mjs, ui.css, ui.README.md # 디자인 값, 공통 UI 부품·사용법 (홈·하단 탭부터 이관)
 │   ├── assets/*.webp         # 홈 이벤트·추천 상품 배너 전체 이미지
 │   ├── cards.mjs, products.mjs, chat.mjs # 카드, 상품·가입, AI 상담(SSE)
 │   ├── signup.mjs, settings.mjs, search.mjs # 회원가입, 메뉴·PIN 변경, 거래 검색
-│   ├── protection.html·mjs, benefits.html·mjs # 카드 결제 보호·송금 요청 점검, 혜택 구성·주변 코스 (ADR 0023)
+│   ├── protection.html·mjs, benefits.html·mjs # 카드 결제 보호·송금 요청 점검, 혜택 구성·주변 코스 (ADR 0023 카드 결제 보호·혜택)
 │   └── *.test.mjs, integration.browser.mjs # 순수 함수 테스트(node --test), 실제 브라우저 통합 점검
 ├── docs/                   # 문서 목차: docs/README.md
 │   └── decisions/          # 설계 결정 기록(ADR): 왜 바꿨는지
@@ -68,7 +68,7 @@ avengers-bank/
         ├── cards/          # 카드 상품·카드·사용내역, 번호 규칙(card_number.py) ✅ 발급·정지·해제·결제·취소·대금 출금(/system), 결제 보호(protection.py, 가맹점 결제 /system/card-payments)
         ├── agent/          # AI 상담: 라우터 + 계좌·카드·상품·예산 Agent(graph.py), 채팅 API, 체크포인터, Langfuse(tracing.py), 측정(evaluate.py, routing.jsonl), 송금 전 요청 점검(transfer_check.py), 혜택 상담(benefits.py) ✅
         ├── mcp_server/     # MCP 도구 19개(REST를 사용자 토큰으로, 예산은 읽기만), HTTP /mcp + 로컬 stdio(login, 토큰 파일) ✅
-        ├── budget/         # 월급 주기 계산(calc.py), 신청·조회·검사·변경·해지 API, 결제 잠금·재검사 (ADR 0024) ✅
+        ├── budget/         # 월급 주기 계산(calc.py), 신청·조회·검사·변경·해지 API, 결제 잠금·재검사 (ADR 0024 예산 계산·결제 확인) ✅
         └── rag/            # 상품·약관 RAG: 데모 약관(docs/*.md), 청킹, Gemini 연결(ai.py), 하이브리드 검색, 평가(golden.jsonl) ✅
 ```
 
@@ -100,7 +100,7 @@ users ◀── approvals ◀── transfers   (이체는 승인 대기를 만�
 ```
 
 - 다른 도메인의 데이터가 필요하면 **service에서 상대 도메인의 repository**를 호출합니다. 다른 도메인의 router는 호출하지 않습니다.
-- 돈이 움직이는 처리(이체, 납입, 카드 결제)는 **실행 함수 하나**를 지나고, `async with db.begin():` 블록 하나 안에서 잔액 변경과 장부 기록을 모두 끝냅니다([ADR 0007](decisions/0007-money-execution-and-budget-guard.md)).
+- 돈이 움직이는 처리(이체, 납입, 카드 결제)는 **실행 함수 하나**를 지나고, `async with db.begin():` 블록 하나 안에서 잔액 변경과 장부 기록을 모두 끝냅니다([ADR 0007(돈 실행 지점·예산 가드)](decisions/0007-money-execution-and-budget-guard.md)).
 
 ## ERD 테이블 → 코드 위치
 
@@ -114,7 +114,7 @@ users ◀── approvals ◀── transfers   (이체는 승인 대기를 만�
 | `audit_logs` | `AuditLog` | `domains/audit/models.py` |
 | `card_products`, `cards`, `card_transactions` | `CardProduct`, `Card`, `CardTransaction` | `domains/cards/models.py` |
 
-> 팀 뼈대의 계좌 3종·거래내역 3종·카드 5개 모델은 [ADR 0003](decisions/0003-db-redesign.md)에 따라 지웠습니다. CHECK 제약용 `in_sql()`은 `core/database.py`에 있고, 마이그레이션에는 결과 문자열을 그대로 적습니다.
+> 팀 뼈대의 계좌 3종·거래내역 3종·카드 5개 모델은 [ADR 0003(DB 재설계)](decisions/0003-db-redesign.md)에 따라 지웠습니다. CHECK 제약용 `in_sql()`은 `core/database.py`에 있고, 마이그레이션에는 결과 문자열을 그대로 적습니다.
 
 ## 역할 분담 예시
 

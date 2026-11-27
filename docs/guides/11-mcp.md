@@ -2,7 +2,7 @@
 
 > **MCP 서버는 은행 기능을 AI가 쓸 수 있는 도구 19개로 묶은 얇은 층이다. 도구는 DB를 보지 않고 사용자 토큰으로 REST API만 부른다. 그래서 AI는 사용자보다 큰 권한을 가질 수 없고, 돈은 여전히 PIN 없이 움직이지 않는다.**
 
-결정 이유: [ADR 0014](../decisions/0014-mcp-server.md), [ADR 0004](../decisions/0004-agent-integration.md)
+결정 이유: [ADR 0014(MCP 서버)](../decisions/0014-mcp-server.md), [ADR 0004(AI 연결 구조)](../decisions/0004-agent-integration.md)
 
 ## MCP가 뭔가
 

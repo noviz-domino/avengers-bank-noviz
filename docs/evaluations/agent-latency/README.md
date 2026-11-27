@@ -10,19 +10,19 @@ AI 상담을 고칠 때마다 같은 질문 세트를 실제 Gemini로 다시 �
 
 | 날짜 | 변경 | 담당 맞힘 | 질문당 LLM 호출 | p50 | p95 | 원본 | 결정 기록 |
 |---|---|---|---|---|---|---|---|
-| 2026-11-06 | 개선 전 (담당이 끝날 때마다 라우터 다시 호출, 질문 14개) | 14/14 | 4.1 | 15.0초 | 28.5초 | 결정 기록 안 표 | [ADR 0016](../../decisions/0016-agent-latency-tracing.md) |
-| 2026-11-06 | 라우터가 턴 처음에 한 번만 계획 + 생각 수준 low (질문 14개) | 13/14 | 3.1 | 8.2초 | 16.8초 | 결정 기록 안 표 | [ADR 0016](../../decisions/0016-agent-latency-tracing.md) |
-| 2026-11-27 | 빠른 길 넣기 전 기준선 (질문 21개) | 21/21 | 3.4 | 11.3초 | 17.1초 | [01-before](2026-11-27_01-before.txt) | [ADR 0034](../../decisions/0034-agent-quick-lanes.md) |
-| 2026-11-27 | 빠른 길 (잔액·카드 목록·남은 예산·약관 질문은 LLM 한 번) | 21/21 | 2.4 | 8.7초 | 15.9초 | [02-quick-lanes](2026-11-27_02-quick-lanes.txt) | [ADR 0034](../../decisions/0034-agent-quick-lanes.md) |
-| 2026-11-27 | 검색형 빠른 길 넣기 전 기준선 (빠른 길 머지 뒤 다시 잼) | 21/21 | 2.3 | 8.3초 | 16.7초 | [03-before-search](2026-11-27_03-before-search.txt) | [ADR 0035](../../decisions/0035-agent-search-quick-lane.md) |
-| 2026-11-27 | 검색형 빠른 길 (기간·업종 지출·수입 질문도 LLM 한 번) | 21/21 | 2.0 | 7.3초 | 13.4초 | [04-search-lane](2026-11-27_04-search-lane.json) | [ADR 0035](../../decisions/0035-agent-search-quick-lane.md) |
-| 2026-11-27 | 라우터 모델 바꾸기 전 기준선 (검색형 머지 뒤 다시 잼) | 21/21 | 2.2 | 8.0초 | 13.7초 | [05-before-router](2026-11-27_05-before-router.json) | [ADR 0036](../../decisions/0036-router-light-model.md) |
-| 2026-11-27 | 라우터만 gemini-3.5-flash-lite, 생각 minimal | 21/21 | 2.2 | 4.2초 | 11.5초 | [06-router-flash-lite](2026-11-27_06-router-flash-lite.json) | [ADR 0036](../../decisions/0036-router-light-model.md) |
-| 2026-11-27 | (비교 후보) 라우터만 gemini-3.6-flash, 생각 minimal | 21/21 | 2.0 | 4.5초 | 11.4초 | [07-router-3.6-flash](2026-11-27_07-router-3.6-flash.json) | [ADR 0036](../../decisions/0036-router-light-model.md) |
-| 2026-11-27 | 이름 선택지 넣기 전 기준선 (라우터 모델 머지 뒤 다시 잼) | 21/21 | 2.2 | 2.9초 | 12.4초 | [09-before-named](2026-11-27_09-before-named.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
-| 2026-11-27 | (중간) 이름 선택지 첫판 | 21/21 | 1.4 | 1.2초 | 8.7초 | [10](2026-11-27_10-named-targets.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
-| 2026-11-27 | (중간) 카드 사용내역 규칙 고침 | 21/21 | 1.3 | 1.1초 | 6.5초 | [11](2026-11-27_11-named-targets-final.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
-| 2026-11-27 | **이름 선택지 + 금액 장치 (최종)** | **21/21** | **1.4** | **1.1초** | **6.7초** | [14-named-targets-guard](2026-11-27_14-named-targets-guard.json) | [ADR 0037](../../decisions/0037-router-named-targets.md) |
+| 2026-11-06 | 개선 전 (담당이 끝날 때마다 라우터 다시 호출, 질문 14개) | 14/14 | 4.1 | 15.0초 | 28.5초 | 결정 기록 안 표 | [ADR 0016(응답 시간 측정)](../../decisions/0016-agent-latency-tracing.md) |
+| 2026-11-06 | 라우터가 턴 처음에 한 번만 계획 + 생각 수준 low (질문 14개) | 13/14 | 3.1 | 8.2초 | 16.8초 | 결정 기록 안 표 | [ADR 0016(응답 시간 측정)](../../decisions/0016-agent-latency-tracing.md) |
+| 2026-11-27 | 빠른 길 넣기 전 기준선 (질문 21개) | 21/21 | 3.4 | 11.3초 | 17.1초 | [01-before](2026-11-27_01-before.txt) | [ADR 0034(빠른 길)](../../decisions/0034-agent-quick-lanes.md) |
+| 2026-11-27 | 빠른 길 (잔액·카드 목록·남은 예산·약관 질문은 LLM 한 번) | 21/21 | 2.4 | 8.7초 | 15.9초 | [02-quick-lanes](2026-11-27_02-quick-lanes.txt) | [ADR 0034(빠른 길)](../../decisions/0034-agent-quick-lanes.md) |
+| 2026-11-27 | 검색형 빠른 길 넣기 전 기준선 (빠른 길 머지 뒤 다시 잼) | 21/21 | 2.3 | 8.3초 | 16.7초 | [03-before-search](2026-11-27_03-before-search.txt) | [ADR 0035(검색형 빠른 길)](../../decisions/0035-agent-search-quick-lane.md) |
+| 2026-11-27 | 검색형 빠른 길 (기간·업종 지출·수입 질문도 LLM 한 번) | 21/21 | 2.0 | 7.3초 | 13.4초 | [04-search-lane](2026-11-27_04-search-lane.json) | [ADR 0035(검색형 빠른 길)](../../decisions/0035-agent-search-quick-lane.md) |
+| 2026-11-27 | 라우터 모델 바꾸기 전 기준선 (검색형 머지 뒤 다시 잼) | 21/21 | 2.2 | 8.0초 | 13.7초 | [05-before-router](2026-11-27_05-before-router.json) | [ADR 0036(가벼운 라우터)](../../decisions/0036-router-light-model.md) |
+| 2026-11-27 | 라우터만 gemini-3.5-flash-lite, 생각 minimal | 21/21 | 2.2 | 4.2초 | 11.5초 | [06-router-flash-lite](2026-11-27_06-router-flash-lite.json) | [ADR 0036(가벼운 라우터)](../../decisions/0036-router-light-model.md) |
+| 2026-11-27 | (비교 후보) 라우터만 gemini-3.6-flash, 생각 minimal | 21/21 | 2.0 | 4.5초 | 11.4초 | [07-router-3.6-flash](2026-11-27_07-router-3.6-flash.json) | [ADR 0036(가벼운 라우터)](../../decisions/0036-router-light-model.md) |
+| 2026-11-27 | 이름 선택지 넣기 전 기준선 (라우터 모델 머지 뒤 다시 잼) | 21/21 | 2.2 | 2.9초 | 12.4초 | [09-before-named](2026-11-27_09-before-named.json) | [ADR 0037(이름 선택지)](../../decisions/0037-router-named-targets.md) |
+| 2026-11-27 | (중간) 이름 선택지 첫판 | 21/21 | 1.4 | 1.2초 | 8.7초 | [10](2026-11-27_10-named-targets.json) | [ADR 0037(이름 선택지)](../../decisions/0037-router-named-targets.md) |
+| 2026-11-27 | (중간) 카드 사용내역 규칙 고침 | 21/21 | 1.3 | 1.1초 | 6.5초 | [11](2026-11-27_11-named-targets-final.json) | [ADR 0037(이름 선택지)](../../decisions/0037-router-named-targets.md) |
+| 2026-11-27 | **이름 선택지 + 금액 장치 (최종)** | **21/21** | **1.4** | **1.1초** | **6.7초** | [14-named-targets-guard](2026-11-27_14-named-targets-guard.json) | [ADR 0037(이름 선택지)](../../decisions/0037-router-named-targets.md) |
 
 - 11월 6일 행과 11월 27일 행은 질문 수(14개와 21개)와 Gemini 응답 속도가 달라서 숫자를 바로 비교하지 않는다. 같은 날 같은 세트로 잰 전후만 비교한다.
 - 질문마다 한 번씩 재서 p95는 사실상 가장 느린 질문 1~2개의 값이다. 경향으로 본다.

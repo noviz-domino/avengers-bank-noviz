@@ -2,7 +2,7 @@
 
 > **할인율·크레딧은 은행 카탈로그(코드)에만 있고, 추천 조합과 코스 금액도 코드가 계산한다. AI는 도구를 불러 그 결과를 설명만 하고, 응답에는 계산 원본이 같이 붙는다. 저장한 구성은 미리보기라 실제 결제 금액은 바뀌지 않는다.**
 
-결정 이유: [ADR 0023](../decisions/0023-card-protection-and-benefits.md)
+결정 이유: [ADR 0023(카드 결제 보호·혜택)](../decisions/0023-card-protection-and-benefits.md)
 
 ## 코드 위치
 
