@@ -36,7 +36,7 @@
   docker compose -p avengers-bank -f compose.yaml -f compose.prod.yaml up -d --build
   ```
 - 마이그레이션이 있는 커밋을 되돌릴 때는 코드보다 먼저 `alembic downgrade`로 DB를 내림 (서버 DB가 코드보다 새 버전이면 앱이 뜨지 않음)
-- 평일 11:25~18:00에만 켜짐 (EventBridge Scheduler). 그 밖의 시간에는 주소가 열리지 않음
+- 2026-11-27부터 상시 가동. 정지 스케줄(`avengers-bank-stop`)은 비활성화했고 평일 09:00 시작 스케줄(`avengers-bank-start`)은 수동으로 꺼도 다시 켜지도록 남겼다. 비용은 평일 낮 운영의 약 3.7배(t3.small 24시간). 예전처럼 돌리려면 정지 스케줄을 ENABLED로
 
 ## 배포 뒤 점검
 
