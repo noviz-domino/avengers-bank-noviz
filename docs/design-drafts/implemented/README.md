@@ -13,11 +13,11 @@
 
 | 버전 | 날짜 | 무엇을 | 결정 기록 |
 |---|---|---|---|
-| [v1](v1-2026-11-11-before/) | 2026-11-11 | 개편 직전 상태 (main `7b36f5c`). 시안 14·15·20·21·23·25번을 따라 구현한 화면 | [ADR 0021](../../decisions/0021-ui-components.md) |
-| [v2](v2-2026-11-11-compact/) | 2026-11-11 | 여백 줄이기, AI 상담 채팅형 개편, 로그인 화면 다시 디자인 | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
-| [v3](v3-2026-11-11-login-review/) | 2026-11-11 | 로그인 화면 리뷰 반영. 02~08은 v4 직전 상태(main `0bd196a`)를 375×812로 찍음 | [ADR 0027](../../decisions/0027-compact-layout-chat-login.md) |
-| [v4](v4-2026-11-11-layout-tabs/) | 2026-11-11 | 좌우 여백 1.5배·위 여백, 하단 탭 시트(홈·계좌·카드·상품·AI 상담), 전체 메뉴는 머리글 오른쪽 위, 계좌 탭 새 화면(09). 384×760(갤럭시 S23+ 기준)으로 찍음 | [ADR 0029](../../decisions/0029-layout-gutter-tabs-menu.md) |
-| [v5](v5-2026-11-26-noviz-layout/) | 2026-11-26 | 노비즈 뱅크 색 체계(회청색 바탕·흰 상자·파랑 하나)와 Pretendard 웹폰트, 파란 총자산 카드, 상담 칩·승인 카드·에이전트 진행 표시. 01(처음 홈의 "새 기능" 코치마크, ADR 0032)·02·03·05·09만 384×760으로 찍고 넓은 화면 두 칸 배치는 `d1`(진행 중)·`d2`(답변 끝) 1440×900 | [ADR 0031](../../decisions/0031-noviz-layout-agent-steps.md), [0032](../../decisions/0032-ai-chat-discovery.md) |
+| [v1](v1-2026-11-11-before/) | 2026-11-11 | 개편 직전 상태 (그때의 main 커밋 `7b36f5c`). 시안 14·15·20·21·23·25번을 따라 구현한 화면 | [ADR 0021(공통 UI 부품)](../../decisions/0021-ui-components.md) |
+| [v2](v2-2026-11-11-compact/) | 2026-11-11 | 여백 줄이기, AI 상담 채팅형 개편, 로그인 화면 다시 디자인 | [ADR 0027(채팅형 상담·로그인 화면)](../../decisions/0027-compact-layout-chat-login.md) |
+| [v3](v3-2026-11-11-login-review/) | 2026-11-11 | 로그인 화면 리뷰 반영. 02~08은 v4 직전 상태(그때의 main 커밋 `0bd196a`)를 375×812로 찍음 | [ADR 0027(채팅형 상담·로그인 화면)](../../decisions/0027-compact-layout-chat-login.md) |
+| [v4](v4-2026-11-11-layout-tabs/) | 2026-11-11 | 좌우 여백 1.5배·위 여백, 하단 탭 시트(홈·계좌·카드·상품·AI 상담), 전체 메뉴는 머리글 오른쪽 위, 계좌 탭 새 화면(09). 384×760(갤럭시 S23+ 기준)으로 찍음 | [ADR 0029(여백·하단 탭)](../../decisions/0029-layout-gutter-tabs-menu.md) |
+| [v5](v5-2026-11-26-noviz-layout/) | 2026-11-26 | 노비즈 뱅크 색 체계(회청색 바탕·흰 상자·파랑 하나)와 Pretendard 웹폰트, 파란 총자산 카드, 상담 칩·승인 카드·에이전트 진행 표시. 01(처음 홈의 "새 기능" 코치마크, ADR 0032(AI 상담 알리기))·02·03·05·09만 384×760으로 찍고 넓은 화면 두 칸 배치는 `d1`(진행 중)·`d2`(답변 끝) 1440×900 | [ADR 0031(노비즈 뱅크 디자인)](../../decisions/0031-noviz-layout-agent-steps.md), [0032](../../decisions/0032-ai-chat-discovery.md) |
 
 ## v1 → v2 화면별 비교
 
@@ -51,12 +51,12 @@ v3는 375×812, v4는 384×760이라 폭이 9px 다릅니다. 여백 비교는 �
 | 홈 (아래) | ![v3](v3-2026-11-11-login-review/03-home-bottom.png) | ![v4](v4-2026-11-11-layout-tabs/03-home-bottom.png) | 하단 탭이 위 모서리 둥근 시트로. 순서 홈·계좌·카드·상품·AI 상담 |
 | 상품 | ![v3](v3-2026-11-11-login-review/04-products.png) | ![v4](v4-2026-11-11-layout-tabs/04-products.png) | 여백·전체 메뉴 버튼. 목록은 상품명 17px·금리 25px로 키우고 설명·"연(세전)"·"기본 연"은 12·11px로 줄임 ([목록 부분](v4-2026-11-11-layout-tabs/10-products-list.png)) |
 | AI 상담 | ![v3](v3-2026-11-11-login-review/05-ai-chat.png) | ![v4](v4-2026-11-11-layout-tabs/05-ai-chat.png) | 여백·전체 메뉴 버튼 |
-| 카드 (크게) | ![v3](v3-2026-11-11-login-review/06-cards-large.png) | ![v4](v4-2026-11-11-layout-tabs/06-cards-large.png) | 여백·전체 메뉴 버튼. 처음엔 쓸 수 있는 카드부터 보여 줌(분실 0017은 왼쪽 칸에 기록으로 남음, seed가 0033 발급, ADR 0030) |
+| 카드 (크게) | ![v3](v3-2026-11-11-login-review/06-cards-large.png) | ![v4](v4-2026-11-11-layout-tabs/06-cards-large.png) | 여백·전체 메뉴 버튼. 처음엔 쓸 수 있는 카드부터 보여 줌(분실 0017은 왼쪽 칸에 기록으로 남음, seed가 0033 발급, ADR 0030(카드 상태 감사 기록)) |
 | 카드 (목록) | ![v3](v3-2026-11-11-login-review/07-cards-list.png) | ![v4](v4-2026-11-11-layout-tabs/07-cards-list.png) | 여백·전체 메뉴 버튼 |
 | 전체 메뉴 | ![v3](v3-2026-11-11-login-review/08-menu.png) | ![v4](v4-2026-11-11-layout-tabs/08-menu.png) | 하단 탭 대신 뒤로 버튼(열기 전 화면으로). 맨 위에 메뉴 검색, 바로가기 8칸(계좌 검색·카드 검색 추가) |
 | 계좌 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/09-accounts.png) | 계좌 합계, 입출금·예금적금 묶음, 새 계좌 만들기 |
 | 알림 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/14-notifications.png) ![v4](v4-2026-11-11-layout-tabs/15-notifications-notice.png) | 홈 머리글 종 버튼. 하위 메뉴 입출금내역·카드내역·혜택(광고)·공지사항 |
-| 예산 생활비 | 하루 금액만 | ![v4](v4-2026-11-11-layout-tabs/16-budget-essentials.png) | 업종마다 금액 + 주기(매일·주 N회·월 N회), ADR 0024 |
+| 예산 생활비 | 하루 금액만 | ![v4](v4-2026-11-11-layout-tabs/16-budget-essentials.png) | 업종마다 금액 + 주기(매일·주 N회·월 N회), ADR 0024(예산 계산·결제 확인) |
 | 계좌 상세 검색 (새로) | 별도 계좌 검색 화면 | ![v4](v4-2026-11-11-layout-tabs/17-account-search.png) ![v4](v4-2026-11-11-layout-tabs/18-account-filter.png) | 거래내역 위 키워드 칸(바로 입력) + 필터 작은 창(기간·카테고리·금액) |
 | 전체 거래내역 | 검색 폼 | ![v4](v4-2026-11-11-layout-tabs/19-all-transactions.png) | 홈 "최근 거래 전체보기"는 목록만 |
 | 카드 검색 (새 화면) | 없음 | ![v4](v4-2026-11-11-layout-tabs/13-card-search.png) | 카드 탭 머리글 돋보기. 가맹점·카드·카테고리·기간, 합계는 취소 제외 |
@@ -72,7 +72,7 @@ v3는 375×812, v4는 384×760이라 폭이 9px 다릅니다. 여백 비교는 �
 | **B. 네이비 배경 + 흰 시트** | **선택 (앱에서 사용)** | `frontend/login.mjs`의 `loginView`, `frontend/login.css` |
 | C. 글자 + 사선 띠 | 보관 | [archived-code/login-c.mjs](login-options-2026-11-11/archived-code/login-c.mjs), [login-c.css](login-options-2026-11-11/archived-code/login-c.css) |
 
-> 2026-11-11 수정: 처음에는 A·C를 앱에 남겨 `?login=a`·`?login=c`로 열리게 했지만, 그 주소를 없애고 이 보관 폴더로 옮겼습니다 ([ADR 0027](../../decisions/0027-compact-layout-chat-login.md)).
+> 2026-11-11 수정: 처음에는 A·C를 앱에 남겨 `?login=a`·`?login=c`로 열리게 했지만, 그 주소를 없애고 이 보관 폴더로 옮겼습니다 ([ADR 0027(채팅형 상담·로그인 화면)](../../decisions/0027-compact-layout-chat-login.md)).
 
 | A. 캐릭터 + 알약 (보관) | B. 네이비 배경 + 흰 시트 (선택) | C. 글자 + 사선 띠 (보관) |
 |---|---|---|

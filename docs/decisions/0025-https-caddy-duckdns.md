@@ -3,7 +3,7 @@
 - 상태: 채택
 - 날짜: 2026-11-11
 - 관련 PR: (이 문서를 추가하는 PR)
-- 관련: [배포 체크리스트](../deploy-checklist.md), [ADR 0020](0020-mobile-app-real-api.md) 모바일 웹 서빙
+- 관련: [배포 체크리스트](../deploy-checklist.md), [ADR 0020(모바일 앱 API 연결)](0020-mobile-app-real-api.md) 모바일 웹 서빙
 
 ## 배경
 

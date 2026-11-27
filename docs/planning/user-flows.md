@@ -219,7 +219,7 @@ README의 "실패 상황 동작 확인"에 쓸 후보입니다. 구현하면서 
 
 ## 테이블 이름 대응
 
-| 흐름에 적힌 이름 (FigJam 초안) | 현재 ERD (`docs/ERD.md`, ADR 0003) |
+| 흐름에 적힌 이름 (FigJam 초안) | 현재 ERD (`docs/ERD.md`, ADR 0003(DB 재설계)) |
 |---|---|
 | `users` | `users` |
 | `accounts` | `accounts` (+ 예·적금은 `account_terms`) |

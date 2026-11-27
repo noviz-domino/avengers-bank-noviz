@@ -1,14 +1,14 @@
 # 0036. 라우터만 가벼운 모델로: gemini-3.5-flash-lite, 생각 수준 minimal
 
-- 상태: 채택 (→ [0037](0037-router-named-targets.md): 이 모델은 temperature를 무시해서 같은 질문도 가끔 다르게 표시한다. 틀린 답이 되는 길은 코드 장치로 막음)
+- 상태: 채택 (→ [0037(이름 선택지)](0037-router-named-targets.md): 이 모델은 temperature를 무시해서 같은 질문도 가끔 다르게 표시한다. 틀린 답이 되는 길은 코드 장치로 막음)
 - 날짜: 2026-11-27
 - 관련 PR: (이 문서를 추가하는 PR)
-- 관련: [ADR 0016](0016-agent-latency-tracing.md) 생각 수준, [ADR 0034](0034-agent-quick-lanes.md)·[ADR 0035](0035-agent-search-quick-lane.md) 빠른 길, [조사 보고서](../research/agent-latency-and-rag.md) 2순위 제안, [평가 기록](../evaluations/agent-latency/README.md)
+- 관련: [ADR 0016(응답 시간 측정)](0016-agent-latency-tracing.md) 생각 수준, [ADR 0034(빠른 길)](0034-agent-quick-lanes.md)·[ADR 0035(검색형 빠른 길)](0035-agent-search-quick-lane.md) 빠른 길, [조사 보고서](../research/agent-latency-and-rag.md) 2순위 제안, [평가 기록](../evaluations/agent-latency/README.md)
 
 ## 배경
 
-- 라우터는 모든 턴에 한 번씩 돈다. 빠른 길(ADR 0034·0035)로 흔한 질문이 LLM 한 번이 되자 그 한 번이 곧 라우터라서 라우터 속도가 답 시간 대부분이 됐다.
-- 담당과 라우터가 같은 `gemini-3.8-flash`(생각 `low`)를 썼다. 이 모델은 생각 수준 `minimal`을 지원하지 않는다(ADR 0016).
+- 라우터는 모든 턴에 한 번씩 돈다. 빠른 길(ADR 0034(빠른 길)·0035(검색형 빠른 길))로 흔한 질문이 LLM 한 번이 되자 그 한 번이 곧 라우터라서 라우터 속도가 답 시간 대부분이 됐다.
+- 담당과 라우터가 같은 `gemini-3.8-flash`(생각 `low`)를 썼다. 이 모델은 생각 수준 `minimal`을 지원하지 않는다(ADR 0016(응답 시간 측정)).
 - 라우터가 하는 일은 담당 고르기와 빠른 길 표시, 검색 기간·업종 채우기다. 긴 글을 쓰거나 도구 결과를 해석하지 않는다.
 
 ## 결정

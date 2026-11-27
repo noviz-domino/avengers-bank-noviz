@@ -31,7 +31,7 @@
 
 ## 타행 이체·결제 보호와 합친 뒤 (2026-11-11)
 
-예산은 [0022](0022-clearinghub.md) 타행 이체와 [0023](0023-card-protection-and-benefits.md) 결제 보호보다 늦게 main에 들어왔다. 세 기능이 같은 승인 실행(`approvals/service.py`)과 카드 결제(`cards/service.py`)를 지나서 다음처럼 맞췄다.
+예산은 [0022(타행 이체)](0022-clearinghub.md) 타행 이체와 [0023(카드 결제 보호·혜택)](0023-card-protection-and-benefits.md) 결제 보호보다 늦게 main에 들어왔다. 세 기능이 같은 승인 실행(`approvals/service.py`)과 카드 결제(`cards/service.py`)를 지나서 다음처럼 맞췄다.
 
 - 카드 결제는 실행 함수 하나(`_execute_payment`)가 한도·신용·예산을 검사한다. 바로 결제, 보호 승인 뒤 결제, 예산 확인 뒤 결제가 모두 이 함수를 지난다.
 - 결제 보호가 결제를 보류할 때 예산도 미리 계산해 같은 승인 화면에 영향 문장을 붙인다. 넘으면 그 승인에서 사유를 받는다. 이체와 같이 PIN 한 번으로 두 확인을 받는다.

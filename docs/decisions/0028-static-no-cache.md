@@ -3,7 +3,7 @@
 - 상태: 채택
 - 날짜: 2026-11-11
 - 관련 PR: (이 문서를 추가하는 PR)
-- 관련: [ADR 0020](0020-mobile-app-real-api.md) `/app` 서빙, [ADR 0027](0027-compact-layout-chat-login.md) 로그인 화면
+- 관련: [ADR 0020(모바일 앱 API 연결)](0020-mobile-app-real-api.md) `/app` 서빙, [ADR 0027(채팅형 상담·로그인 화면)](0027-compact-layout-chat-login.md) 로그인 화면
 
 ## 배경
 

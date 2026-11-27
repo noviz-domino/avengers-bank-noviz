@@ -14,13 +14,13 @@
 | 최근 거래·승인 대기 / 옅은 배경 | `--ui-amber`, `--ui-amber-soft` | `#a86500` / `#fff3db` |
 | 오류 / 보조 글자 / 구분선 | `--ui-error`, `--ui-muted`, `--ui-line` | `#d63a40` / `#5d6b82` / `#e3e9f2` |
 | 페이지 / 섹션 / 본문 / 보조 | `--ui-title-size`, `--ui-section-size`, `--ui-body-size`, `--ui-small-size` | 26 / 18 / 15 / 13px |
-| 좌우 여백 | `--ui-page-gutter` | 20px, 340px 이하 16px ([ADR 0031](../docs/decisions/0031-noviz-layout-agent-steps.md), 처음 값은 [ADR 0029](../docs/decisions/0029-layout-gutter-tabs-menu.md)의 36px). 공통 `main`·홈·카드·상품·상담이 모두 이 값을 써요 |
+| 좌우 여백 | `--ui-page-gutter` | 20px, 340px 이하 16px ([ADR 0031(노비즈 뱅크 디자인)](../docs/decisions/0031-noviz-layout-agent-steps.md), 처음 값은 [ADR 0029(여백·하단 탭)](../docs/decisions/0029-layout-gutter-tabs-menu.md)의 36px). 공통 `main`·홈·카드·상품·상담이 모두 이 값을 써요 |
 | 여백 단위 | `--ui-space-xs`, `--ui-space-sm`, `--ui-space-md`, `--ui-space-lg` | 4 / 8 / 16 / 24px |
 | 작은 / 큰 모서리 | `--ui-radius-sm`, `--ui-radius` | 12 / 18px |
 | 그림자 | `--ui-shadow` | `0 1px 2px #17203308` (거의 없음) |
 | 최소 터치 | `--ui-touch` | 44px |
 
-색 체계는 노비즈 뱅크에서 가져왔어요([ADR 0031](../docs/decisions/0031-noviz-layout-agent-steps.md)). 홈·계좌 탭은 회청색 바탕 위에 흰 상자를 쌓고 섹션 머리에는 색 띠를 두지 않아요. 색은 계좌 아이콘 타일에만 써요. 총자산은 파란 카드에 흰 글자 32px(340px 이하도 32px)로 강조해요. 페이지 제목은 `pageTitle`을 써요. 시안의 작은 배너 컨트롤도 터치 영역은 44px이에요. 폰트는 Pretendard 웹폰트(jsDelivr)를 불러오고 못 받으면 맑은 고딕 → 시스템 글꼴 순서예요. 넓은 화면(1024px 이상)에서는 왼쪽 화면 + 오른쪽 AI 상담 두 칸이에요(`app.mjs`의 `desktop`).
+색 체계는 노비즈 뱅크에서 가져왔어요([ADR 0031(노비즈 뱅크 디자인)](../docs/decisions/0031-noviz-layout-agent-steps.md)). 홈·계좌 탭은 회청색 바탕 위에 흰 상자를 쌓고 섹션 머리에는 색 띠를 두지 않아요. 색은 계좌 아이콘 타일에만 써요. 총자산은 파란 카드에 흰 글자 32px(340px 이하도 32px)로 강조해요. 페이지 제목은 `pageTitle`을 써요. 시안의 작은 배너 컨트롤도 터치 영역은 44px이에요. 폰트는 Pretendard 웹폰트(jsDelivr)를 불러오고 못 받으면 맑은 고딕 → 시스템 글꼴 순서예요. 넓은 화면(1024px 이상)에서는 왼쪽 화면 + 오른쪽 AI 상담 두 칸이에요(`app.mjs`의 `desktop`).
 
 ## 사용 규칙
 

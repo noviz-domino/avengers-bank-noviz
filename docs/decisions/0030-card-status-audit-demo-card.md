@@ -3,7 +3,7 @@
 - 상태: 채택
 - 날짜: 2026-11-11
 - 관련 PR: (이 문서를 추가하는 PR)
-- 관련: [ADR 0004](0004-approval-flow.md) 안전해지는 쪽은 바로, [ADR 0025](0025-https-caddy-duckdns.md) 서버 공개
+- 관련: [ADR 0004(AI 연결 구조)](0004-approval-flow.md) 안전해지는 쪽은 바로, [ADR 0025(HTTPS 주소)](0025-https-caddy-duckdns.md) 서버 공개
 
 ## 배경
 

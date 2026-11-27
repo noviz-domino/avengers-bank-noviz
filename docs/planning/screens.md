@@ -52,4 +52,4 @@ flowchart LR
 | 상품 | 상품 목록·상세·가입 조건 | 상품 |
 | 채팅 | 자연어 요청, 승인 화면으로 가는 링크 | Agent |
 
-승인 화면(PIN 입력)은 어느 메뉴에서든 돈이 움직이면 나오는 **공통 화면**입니다([ADR 0004](../decisions/0004-agent-integration.md)). Agent는 이 화면으로 가는 링크만 줄 수 있습니다.
+승인 화면(PIN 입력)은 어느 메뉴에서든 돈이 움직이면 나오는 **공통 화면**입니다([ADR 0004(AI 연결 구조)](../decisions/0004-agent-integration.md)). Agent는 이 화면으로 가는 링크만 줄 수 있습니다.

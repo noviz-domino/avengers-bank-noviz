@@ -3,7 +3,7 @@
 - 상태: 채택
 - 날짜: 2026-11-27
 - 관련 PR: (이 문서를 추가하는 PR)
-- 관련: [ADR 0034](0034-agent-quick-lanes.md)·[0035](0035-agent-search-quick-lane.md) 빠른 길, [ADR 0036](0036-router-light-model.md) 가벼운 라우터, [평가 기록](../evaluations/agent-latency/README.md)
+- 관련: [ADR 0034(빠른 길)](0034-agent-quick-lanes.md)·[0035(검색형 빠른 길)](0035-agent-search-quick-lane.md) 빠른 길, [ADR 0036(가벼운 라우터)](0036-router-light-model.md) 가벼운 라우터, [평가 기록](../evaluations/agent-latency/README.md)
 
 ## 배경
 
@@ -22,10 +22,10 @@
 4. **라우터 표시를 코드가 한 번 더 거른다** (`lane_allowed`). 금액이 있는 예산 질문("30만 원짜리 사도 돼?")은 남은 예산 요약 빠른 길을 쓰지 않고 예산 담당이 `check_budget`으로 답한다. 이 장치를 넣은 이유는 아래 "가벼운 라우터의 흔들림"이다.
 5. **진행 표시에 목록 조회를 넣지 않는다**: 라우터 앞의 목록 조회는 사용자에게 보여 줄 단계가 아니다(`stream.py`).
 
-## 가벼운 라우터의 흔들림 (ADR 0036의 후속)
+## 가벼운 라우터의 흔들림 (ADR 0036(가벼운 라우터)의 후속)
 
 - 최종 측정 중 "30만 원짜리 사도 돼?"가 LLM 1번으로 끝난 것을 보고 같은 질문을 반복해 물었다. 가벼운 라우터(`gemini-3.5-flash-lite`)는 **8번 중 4번** 남은 예산 빠른 길로 표시했다. 그러면 "사도 되는지" 대신 일반 예산 요약이 나간다. 담당은 맞아서 라우팅 점수(21/21)로는 보이지 않았다.
-- 이 모델은 temperature 설정을 무시한다(실행 경고: "uses fixed sampling defaults"). ADR 0036의 칸 채우기 시험은 질문당 한 번이라 이런 흔들림을 잡지 못했다.
+- 이 모델은 temperature 설정을 무시한다(실행 경고: "uses fixed sampling defaults"). ADR 0036(가벼운 라우터)의 칸 채우기 시험은 질문당 한 번이라 이런 흔들림을 잡지 못했다.
 - 평가 질문 21개와 추가 3개를 3번씩 물으니 24개 중 3개가 흔들렸다: "30만 원짜리 사도 돼?"(금액 장치로 막음), "목표 저축 잘 지키고 있어?"(요약이 나가도 목표 저축 줄이 들어 있어 주제는 맞음), "예산 관리는 어떻게 신청해?"(맞는 담당 둘 사이). 원본: [13](../evaluations/agent-latency/2026-11-27_13-router-repeat-probe.txt), 스크립트: [`router_repeat_probe.py`](../evaluations/agent-latency/router_repeat_probe.py)
 - 그래서 **틀린 표시가 틀린 답이 되는 길은 코드로 막는다**는 원칙을 더했다. 표시가 넘쳐도 결과가 넓어지기만 하는 길(잔액 전체, 사용 중인 카드 전부)은 그대로 둔다.
 
